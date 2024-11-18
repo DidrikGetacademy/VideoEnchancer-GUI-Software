@@ -1,0 +1,15 @@
+# Ignore virtual environment
+/venv/
+
+# Ignore assets folder
+/Assets/
+
+# Ignore AI-ONNX folder
+/AI-onnx/
+
+# Ignore specific Python file
+/LearnReflectAI.py
+
+# Ignore compiled Python files
+*.pyc
+__pycache__/
