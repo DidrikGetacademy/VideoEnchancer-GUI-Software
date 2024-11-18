@@ -10,6 +10,8 @@
 # Ignore specific Python file
 /LearnReflectAI.py
 
+/.vscode/
+
 # Ignore compiled Python files
 *.pyc
 __pycache__/
