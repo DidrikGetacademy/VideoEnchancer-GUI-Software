@@ -4,9 +4,11 @@ from customtkinter import (
     CTkEntry,
     CTkLabel,
 )
-
 from tkinter import StringVar, messagebox
 from Logger import logging
+from Decryption import load_key
+
+
 
 class ActivationWindow(CTkToplevel):
     def __init__(self, parent, run_main_program_callback=None):
@@ -18,7 +20,7 @@ class ActivationWindow(CTkToplevel):
         self.activation_key_var = StringVar()
 
     
-        from Validate_key import validate_key, load_key
+        from Validate_key import validate_key
         stored_key = load_key()
         if stored_key:
             if validate_key(stored_key):  
@@ -29,7 +31,7 @@ class ActivationWindow(CTkToplevel):
                     return
                 else:
                     messagebox.showerror("Error", "Invalid or expired activation key.")
-                    logging.warning("Error", "Invalid or expired activation key.")
+                    logging.warning("Invalid or expired activation key.")
                     self.destroy()
             
 
