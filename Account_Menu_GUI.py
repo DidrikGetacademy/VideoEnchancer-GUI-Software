@@ -45,9 +45,18 @@ class MainApp(ctk.CTk):
         self.login_frame.pack(fill="both",expand=True)
         
     def hide_frames(self):
+        self.title_label.pack_forget()
+        self.Register_button.pack_forget()
+        self.login_button.pack_forget()
         self.register_frame.pack_forget()
         self.login_frame.pack_forget()
         
+    def show_mainwindow(self):
+        self.title_label.pack(pady=20)
+        self.Register_button.pack(pady=20)
+        self.login_button.pack(pady=20)       
+        
+         
 if __name__ == "__main__":
     app = MainApp()
     app.mainloop()

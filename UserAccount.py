@@ -35,7 +35,7 @@ class UserAccountFrame(ctk.CTkFrame):
             self.enchancer_button.pack(pady=10)
         else: 
             self.enchancer_button = ctk.CTkButton(self,text="LearnReflect Video Enchancer", state="disabled")
-            self.enchancer_button.pack(10)
+            self.enchancer_button.pack(pady=10)
             
             self.activation_button = ctk.CTkButton(self,text="Activate subscription",command=self.open_activation_window)
             self.activation_button.pack(pady=10)

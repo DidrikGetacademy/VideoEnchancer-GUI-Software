@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from Login import User_login
-
+from Logger import logging
 
 
 
@@ -30,6 +30,9 @@ class LoginFrame(ctk.CTkFrame):
         self.login_button = ctk.CTkButton(self,text="Login",command=self.Login_user)
         self.login_button.pack(pady=10)
         
+        self.goback_button = ctk.CTkButton(self,text="Go back",command=self.go_back)
+        self.goback_button.pack(pady=10)
+        
         self.status_label = ctk.CTkLabel(self,text="")
         self.status_label.pack(pady=10)
 
@@ -46,4 +49,10 @@ class LoginFrame(ctk.CTkFrame):
            if user_data: # checks if user_data is not none
              self.status_label.configure(text="Redirecting to your account...")
              self.switch_to_Accountsystem(user_data)
+      
+      
+    def go_back(self):
+      logging.info("Going back to main window")
+      self.pack_forget()
+      self.master.show_mainwindow()
 
