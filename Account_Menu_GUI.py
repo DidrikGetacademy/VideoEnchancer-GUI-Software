@@ -1,8 +1,7 @@
 import customtkinter as ctk 
-import subprocess
 from RegisterAccount_GUI import RegistrationFrame
 from LoginAccount_GUI import LoginFrame
-
+from UserAccount import UserAccountFrame
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -11,21 +10,30 @@ ctk.set_default_color_theme("blue")
 class MainApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.geometry("600x400")
+        self.geometry("800x800")
         self.title("Account Management")
         self.title_label =ctk.CTkLabel(self,text="Account Management",font=("Arial",24))
         self.title_label.pack(pady=20)
 
 
-        self.Register_button = ctk.CTkButton(self,text="Regiter Account",command=self.open_register_account)
+        self.Register_button = ctk.CTkButton(self,text="Register Account",command=self.open_Register_Account)
         self.Register_button.pack(pady=20)
 
-        self.login_button = ctk.CTkButton(self,text="Login",command=self.open_login_account)
+        self.login_button = ctk.CTkButton(self,text="Login",command=self.open_login_Account)
         self.login_button.pack(pady=20)
         
         
-        self.register_frame = RegistrationFrame(self)
-        self.login_frame = LoginFrame(self)
+        self.register_frame = RegistrationFrame(self, self.open_login_Account)
+        self.login_frame = LoginFrame(self, self.Connect_UserAccount)
+        self.UserAccount_Frame = None
+    
+    
+    def Connect_UserAccount(self,user_data):
+        if self.UserAccount_Frame is None:
+            self.UserAccount_Frame = UserAccountFrame(self,user_data)
+        self.hide_frames()
+        self.UserAccount_Frame.pack(fill="both",expand=True)
+        
     
     def open_Register_Account(self): 
         self.hide_frames()

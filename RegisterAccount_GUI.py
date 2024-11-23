@@ -3,8 +3,9 @@ from Registration import register_user
 
 
 class RegistrationFrame(ctk.CTkFrame):
-    def __init__(self,master):
+    def __init__(self,master,open_login_account):
         super().__init__(master)
+        self.switch_to_login = open_login_account
         
 
 
@@ -43,11 +44,13 @@ class RegistrationFrame(ctk.CTkFrame):
         self.status_label.pack(pady=10)
 
 
-
-
-def Register_new_user(self):
-    Email = self.email_entry.get()
-    Password = self.password_entry.get()
-    Name = self.name_entry.get()
-    register_user(Email,Password,Name)
+    def Register_new_user(self):
+        Email = self.email_entry.get()
+        Password = self.password_entry.get()
+        Name = self.name_entry.get()
+        status_message = register_user(Email,Password,Name)
+        self.status_label.configure(text=status_message)
+        
+        if "success" in status_message.lower():
+                self.switch_to_login()
     

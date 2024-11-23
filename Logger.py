@@ -1,7 +1,6 @@
 import os
 import sys
 import logging
-import inspect
 from pathlib import Path
 log_dir = Path(os.getenv("APPDATA",".")) / "LearnReflect"
 log_dir.mkdir(parents=True,exist_ok=True)
