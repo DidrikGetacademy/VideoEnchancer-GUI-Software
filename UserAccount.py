@@ -1,11 +1,14 @@
 import customtkinter as ctk
-
+from Logger import logging
+from activation_window import ActivationWindow
+import subprocess
+import sys
+import os 
 class UserAccountFrame(ctk.CTkFrame):
     def __init__(self,master,user_data):
         super().__init__(master)
         
         self.user_data = user_data
-        
         self.create_widgets()
         
     
@@ -23,4 +26,49 @@ class UserAccountFrame(ctk.CTkFrame):
         self.subscription_label = ctk.CTkLabel(self,text=f"Subscription: {self.user_data.get('subscription_type','N/A')}")
         self.subscription_label.pack(pady=5)
         
+        self.update_buttons()
         
+        
+    def update_buttons(self):
+        if self.is_subscription_active():
+            self.enchancer_button = ctk.CTkButton(self,text="LearnReflect Video Enchancer", command=self.run_enchancer,state="normal")
+            self.enchancer_button.pack(pady=10)
+        else: 
+            self.enchancer_button = ctk.CTkButton(self,text="LearnReflect Video Enchancer", state="disabled")
+            self.enchancer_button.pack(10)
+            
+            self.activation_button = ctk.CTkButton(self,text="Activate subscription",command=self.open_activation_window)
+            self.activation_button.pack(pady=10)
+            
+    
+    def is_subscription_active(self):
+        subscription_type = self.user_data.get('subscription_type','')
+        if subscription_type.lower() in ['monthly','permanent']:
+            return True #Returnerer TRUE dersom det finnes et aktiv subscription abonoment hos bruker.
+        return False
+    
+    
+    
+    
+    
+    
+    #How to run the learnreflect video enchancer
+    def run_enchancer(self):
+        try:
+            script_path = os.path.join(os.path.dirname(__file__),'LearnReflectAI.py')
+            subprocess.run([sys.executable,script_path])
+            
+        except Exception as e:
+            logging.error(f"Error while running LearnReflect Video Enchancer: {e}")
+            
+            
+        
+        
+    #open the window to activate the program, NB: how will the status for subscription get updated? verify with server??
+    def open_activation_window(self):
+        ActivationWindow(self,run_main_program_callback=self.update_buttons)
+        
+        
+        
+        
+    
