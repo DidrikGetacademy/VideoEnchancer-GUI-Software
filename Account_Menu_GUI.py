@@ -28,9 +28,9 @@ class MainApp(ctk.CTk):
         self.UserAccount_Frame = None
     
     
-    def Connect_UserAccount(self,user_data):
+    def Connect_UserAccount(self):
         if self.UserAccount_Frame is None:
-            self.UserAccount_Frame = UserAccountFrame(self,user_data)
+            self.UserAccount_Frame = UserAccountFrame(self)
         self.hide_frames()
         self.UserAccount_Frame.pack(fill="both",expand=True)
         

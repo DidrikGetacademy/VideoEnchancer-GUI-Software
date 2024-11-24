@@ -1,14 +1,16 @@
 import customtkinter as ctk
 from Logger import logging
 from activation_window import ActivationWindow
+from User_data_storage import get_user_data
 import subprocess
 import sys
 import os 
+
 class UserAccountFrame(ctk.CTkFrame):
-    def __init__(self,master,user_data):
+    def __init__(self,master):
         super().__init__(master)
         
-        self.user_data = user_data
+        self.user_data = get_user_data()
         self.create_widgets()
         
     
@@ -64,9 +66,14 @@ class UserAccountFrame(ctk.CTkFrame):
             
         
         
-    #open the window to activate the program, NB: how will the status for subscription get updated? verify with server??
+    #open the window to activate the program,
     def open_activation_window(self):
-        ActivationWindow(self,run_main_program_callback=self.update_buttons)
+        ActivationWindow(self,run_main_program_callback=self.refresh_user_data)
+        
+    
+    def refresh_user_data(self):
+        self.user_data = get_user_data() #henter ut oppdatert brukerdata
+        self.update_buttons() #Oppdaterer GUI
         
         
         

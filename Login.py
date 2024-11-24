@@ -25,6 +25,7 @@ def User_login(P_email, P_password):
                     'name': data.get('name', 'N/A'),
                     'email': data.get('email', 'N/A'),
                     'subscription_type': data.get('subscription_type', 'N/A'),
+                    'id': data.get('id', 'N/A')
                 }
                 return "Success", user_data
             
@@ -44,3 +45,8 @@ def User_login(P_email, P_password):
     except requests.exceptions.RequestException as e:
         logging.error(f"Request error: {str(e)}")
         return f"Request error {str(e)}", None
+
+
+
+def Forget_password(Email):
+ 

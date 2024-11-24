@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from Login import User_login
 from Logger import logging
-
+from User_data_storage import  set_user_data
 
 
 
@@ -47,6 +47,7 @@ class LoginFrame(ctk.CTkFrame):
            self.status_label.configure(text=status_message)
            
            if user_data: # checks if user_data is not none
+             set_user_data(user_data) #store the Userdata
              self.status_label.configure(text="Redirecting to your account...")
              self.switch_to_Accountsystem(user_data)
       
