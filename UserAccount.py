@@ -68,11 +68,12 @@ class UserAccountFrame(ctk.CTkFrame):
         
     #open the window to activate the program,
     def open_activation_window(self):
-        ActivationWindow(self,run_main_program_callback=self.refresh_user_data)
+        ActivationWindow(self,self.refresh_user_data) #pass callback to update user data
         
     
     def refresh_user_data(self):
         self.user_data = get_user_data() #henter ut oppdatert brukerdata
+        self.subscription_label.configure(text=f"Subscription: {self.user_data.get('subscription_type','N/A')}")
         self.update_buttons() #Oppdaterer GUI
         
         

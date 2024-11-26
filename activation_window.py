@@ -11,11 +11,11 @@ from Decryption import load_key
 
 
 class ActivationWindow(CTkToplevel):
-    def __init__(self, parent, run_main_program_callback=None):
+    def __init__(self, parent, on_activation_success):
         super().__init__(parent)
         self.title("Activation Key")
         self.geometry("600x600")
-        self.run_main_program_callback = run_main_program_callback
+        self.on_activation_success = on_activation_success
         logging.info("Activation window opened.")
         self.activation_key_var = StringVar()
 
@@ -26,8 +26,8 @@ class ActivationWindow(CTkToplevel):
             if validate_key(stored_key):  
                 messagebox.showinfo("Success","Activation successful!")
                 self.destroy() 
-                if self.run_main_program_callback:
-                    self.run_main_program_callback() 
+                if self.on_activation_success:
+                    self.on_activation_success() 
                     return
                 else:
                     messagebox.showerror("Error", "Invalid or expired activation key.")
@@ -74,8 +74,8 @@ class ActivationWindow(CTkToplevel):
             if validate_key(key):  
                 messagebox.showinfo("Success", "Activation Key is valid!")
                 self.destroy()
-                if self.run_main_program_callback:
-                    self.run_main_program_callback()  
+                if self.on_activation_success:
+                    self.on_activation_success()  
             else:
                 messagebox.showerror("Error", "Invalid or used activation key.")
                 logging.warning("Error", "Invalid or used activation key.")

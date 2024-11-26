@@ -1,0 +1,4 @@
+fikse error: invalid activation key.
+
+-lagre innloggingsdetaljer i appdata sånn at man ikke alltid må logge inn på nytt, sette opp automatisk innlogging for eksempel en knapp (husk meg)
+
