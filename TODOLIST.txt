@@ -1,3 +1,1 @@
 Sette opp glemt-passord
-
-sette opp aktiveringsnøkkel for subscription og koble til bruker

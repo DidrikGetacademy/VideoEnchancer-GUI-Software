@@ -49,7 +49,7 @@ class LoginFrame(ctk.CTkFrame):
            if user_data: # checks if user_data is not none
              set_user_data(user_data) #store the Userdata
              self.status_label.configure(text="Redirecting to your account...")
-             self.switch_to_Accountsystem(user_data)
+             self.switch_to_Accountsystem()
       
       
     def go_back(self):
