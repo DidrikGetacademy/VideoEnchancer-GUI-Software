@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from Logger import logging
 from activation_window import ActivationWindow
-from User_data_storage import get_user_data
+from User_data_storage import get_user_data, Update_user_data
 import subprocess
 import sys
 import os 
@@ -72,7 +72,7 @@ class UserAccountFrame(ctk.CTkFrame):
         
     
     def refresh_user_data(self):
-        self.user_data = get_user_data() #henter ut oppdatert brukerdata
+        self.user_data = Update_user_data() #henter ut oppdatert brukerdata
         self.subscription_label.configure(text=f"Subscription: {self.user_data.get('subscription_type','N/A')}")
         self.update_buttons() #Oppdaterer GUI
         

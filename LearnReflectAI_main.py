@@ -16,13 +16,13 @@ def start_program():
     try:
        if not is_program_activated():
           logging.info("Program not activated. opening activation window")
-          activation_window = ActivationWindow(root,run_main_program_callback=run_LearnReflectAI) 
+          activation_window = ActivationWindow(root) 
           activation_window.wait_window()  
         
         
        if is_program_activated():
            logging.info("Program is activated. running LearnReflectAI.")
-           run_LearnReflectAI()
+           
     
     except Exception as e:
         logging.error(f"Error in start_program: {e}",exc_info=True)
@@ -45,27 +45,3 @@ def is_program_activated():
     return True
 
 
-
-
-
-def run_LearnReflectAI():
-    try:
-        script_path = resource_path('LearnReflectAI.py')
-        logging.info(f"Script path resolved to: {script_path}")
-        
-        if not os.path.exists(script_path):
-          logging.error(f"LearnReflectAI.py not found at: {script_path}")
-          raise FileNotFoundError("LearnReflectAI.py is missing!    ")
-
-
-      
-        subprocess.run([sys.executable, script_path])
-
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Subprocess for LearnReflectAI exited with an error: {e}", exc_info=True)
-    except Exception as e:
-        logging.error(f"Error in run_LearnReflectAI: {e}", exc_info=True)
-
-        
-    
-start_program()  
