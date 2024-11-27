@@ -1,7 +1,7 @@
 import customtkinter as ctk 
 from RegisterAccount_GUI import RegistrationFrame
 from LoginAccount_GUI import LoginFrame
-from UserAccount import UserAccountFrame
+
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -29,6 +29,7 @@ class MainApp(ctk.CTk):
     
     
     def Connect_UserAccount(self):
+        from UserAccount import UserAccountFrame
         if self.UserAccount_Frame is None:
             self.UserAccount_Frame = UserAccountFrame(self)
         self.hide_frames()

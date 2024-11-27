@@ -45,11 +45,11 @@ def Update_user_data():
             
             if response.status_code == 200:
                 _user_data['id'] = data.get('id',_user_data.get('id'))
-                _user_data['name'] = data.get('name',_user_data.get('id',"N/A"))
+                _user_data['name'] = data.get('name',_user_data.get('name',"N/A"))
                 _user_data['email'] = data.get('email',_user_data.get("email","N/A"))
                 _user_data['subscription_type'] = data.get('subscription_type',_user_data.get('subscription_type',"N/A"))
                 logging.info("User data successfully updated")
-                return "Success",_user_data
+                return _user_data
             else:
                 return data.get("message", "Update failed"),None
         except ValueError:
