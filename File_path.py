@@ -36,6 +36,7 @@ def get_app_data_path():
 app_data_path = get_app_data_path()
 secret_key_path = app_data_path / 'secret.key'
 activation_key_path = app_data_path / 'activation_key.json'
+User_data_Path = app_data_path / 'Userdata.txt'
 
 
 
@@ -54,6 +55,10 @@ def ensure_directories():
     if not secret_key_path.exists() or secret_key_path.stat().st_size == 0:
         logging.error("Failed to generate or save the encryption key.")
         raise ValueError("Encryption key could not be s aved or laded correctly")
+    
+   
+        
+
         
     
     
@@ -70,4 +75,27 @@ def ensure_directories():
     except ImportError as e:
         logging.error(f"Error importing load_key: {e}")
         raise
-        
+
+
+
+def ensure_userdata():
+     if not User_data_Path.exists():
+        from User_data_storage import get_user_data
+        UserData = get_user_data()
+        with open(User_data_Path,"w") as user: 
+            json.dump(UserData,user)
+     else: 
+         logging.info("no user data too write")
+
+
+def load_userdata():
+     if User_data_Path.exists():
+         try: 
+             with open(User_data_Path,'r') as file:
+                 return json.load(file) #returns the loaded data
+         except (json.JSONDecodeError, IOError) as e:
+             logging.error(f"Error loading user data: {e}")
+             return {}
+         else:
+             logging.warning("Userdata file does not exsist.")
+             return {}

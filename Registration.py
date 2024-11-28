@@ -26,6 +26,8 @@ def register_user(Email,Pasword,Name):
         
         try: 
            data = response.json()
+           if response.status_code == 201:
+               return "success"
            if response.status_code == 400:
                return "Bad request."
            elif response.status_code == 500:
@@ -37,4 +39,4 @@ def register_user(Email,Pasword,Name):
             return
         
     except requests.exceptions.RequestException as e:
-            return f"an error occured: {str(e)}"
+            return f"Invalid Details: {str(e)}"

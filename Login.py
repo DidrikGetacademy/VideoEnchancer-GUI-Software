@@ -44,7 +44,7 @@ def User_login(P_email, P_password):
 
     except requests.exceptions.RequestException as e:
         logging.error(f"Request error: {str(e)}")
-        return f"Request error {str(e)}", None
+        return f"Invalid Credentials {str(e)}", None
 
 
 

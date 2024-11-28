@@ -17,6 +17,8 @@ class UserAccountFrame(ctk.CTkFrame):
     
     def create_widgets(self):
         
+        for widget in self.winfo_children():
+            widget.destroy()
 
         self.title_label = ctk.CTkLabel(self,text="User Account", font=("Arial",20))
         self.title_label.pack(pady=20)
@@ -31,7 +33,7 @@ class UserAccountFrame(ctk.CTkFrame):
         self.subscription_label.pack(pady=5)
         
         self.logout_button = ctk.CTkButton(self,text="Logout", command=self.Logout)
-
+        self.logout_button.pack(pady=5)
         
         self.update_buttons()
         
@@ -67,7 +69,8 @@ class UserAccountFrame(ctk.CTkFrame):
         self.master.show_mainwindow()
     
     
-    #How to run the learnreflect video enchancer
+
+#function too start video enchancer
     def run_enchancer(self):
         try:
             script_path = os.path.join(os.path.dirname(__file__),'LearnReflectAI.py')

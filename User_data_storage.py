@@ -1,21 +1,25 @@
 import requests
 from Logger import logging
+
+#Global userdata
 _user_data = {}
 
 
 
 def set_user_data(data):
     global _user_data
+    if not isinstance(data,dict):
+        logging.error("Invalid data type. Expected a dictionary.")
+        return
     _user_data = data
+    from File_path import ensure_userdata
+    ensure_userdata()
+    logging.info("User data has been set, and dumped in file.")
 
 
 
 def get_user_data():
     return _user_data
-
-
-
-
 
 
 
@@ -42,19 +46,37 @@ def Update_user_data():
         
         try:
             data = response.json()
-            
-            if response.status_code == 200:
-                _user_data['id'] = data.get('id',_user_data.get('id'))
-                _user_data['name'] = data.get('name',_user_data.get('name',"N/A"))
-                _user_data['email'] = data.get('email',_user_data.get("email","N/A"))
-                _user_data['subscription_type'] = data.get('subscription_type',_user_data.get('subscription_type',"N/A"))
-                logging.info("User data successfully updated")
-                return _user_data
-            else:
-                return data.get("message", "Update failed"),None
         except ValueError:
-            logging.error(f"Unexpected response format: {response.text}")
-            return "Invalid response from server",None
+            logging.error(f"unexpected response format: {response.text}")
+            return "invalid respone from sever",None
+        
+        if data.get("success",False):
+            user = data.get("user",{})
+            logging.info(user)
+            _user_data['id'] = user.get('id',_user_data.get('id',"Unknown"))
+            _user_data['name'] = user.get('name', _user_data.get('name',"Unkown"))
+            _user_data['email'] = user.get('email', _user_data.get('email',"Unkown"))
+            _user_data['subscription_type'] = user.get('subscription_type', _user_data.get('subscription_type',"Unkown"))
+            
+            logging.info("User data successfully updated")
+            return _user_data
+        else:
+            error_message = data.get("message","Failed to update user data.")
+            logging.error(f"Server error:  {error_message}")
+            return error_message,None
     except requests.exceptions.RequestException as e:
-        logging.error(f"Request Error: {str(e)}")
-        return f"Request error {str(e)}",None
+        logging.error(f"Request error: {str(e)}")
+        return f"Request error: {str(e)}",None       
+     
+     
+     
+     
+     
+def Change_password():
+    #change password function
+    return
+
+
+def Remember_me():
+    #way too be remember so you dont have to login all the time.
+    return
