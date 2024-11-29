@@ -5,7 +5,7 @@ from User_data_storage import _user_data, get_user_data, set_user_data, Update_u
 import subprocess
 import sys
 import os 
-from Account_Menu_GUI import MainApp
+
 
 class UserAccountFrame(ctk.CTkFrame):
     def __init__(self,master):

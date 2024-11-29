@@ -69,14 +69,39 @@ def Update_user_data():
         return f"Request error: {str(e)}",None       
      
      
-     
-     
-     
-def Change_password():
-    #change password function
-    return
 
 
-def Remember_me():
-    #way too be remember so you dont have to login all the time.
-    return
+def request_password_reset(email):
+    url = "https://leanreflects.com/Server/ResetPassword.php"
+    payload = {"email": email}
+    headers= {"Content-Type": "application/json"}
+    try: 
+        response = requests.post(url,json=payload,headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        return {"error": str(e)}
+    
+    
+         
+     
+def Reset_password(Token,New_Password):
+    url = "https://learnreflects.com/Server/ResetPasswordToken.php"
+    payload = {"token": Token, "password": New_Password}
+    headers = {"Content-Type": "application/json"}
+    try:
+        response = requests.post(
+            url,
+            json=payload,
+            headers=headers
+        )
+        response.raise_for_status()
+        logging.info(f"Response: {response.text}")
+        return response.json()
+    
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request error: {str(e)}")
+        return f"Request error: {str(e)}"
+            
+
+
