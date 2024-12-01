@@ -67,8 +67,26 @@ class UserAccountFrame(ctk.CTkFrame):
 #function too start video enchancer
     def run_enchancer(self):
         from LearnReflectAI import App
-        app = App(self)
-        app.mainloop()
+       # self.hide_widgets()
+       # new_window = self.master
+       # app = App(new_window)
+       # app.window.mainloop()
+       
+        #self.master.destroy()
+        #new_window = ctk.CTk()
+        #app = App(new_window)
+        #app.window.mainloop()
+        
+        self.pack_forget()
+        new_window = ctk.CTk()
+        app = App(new_window)
+        self.master.destroy()
+        new_window.mainloop()
+      
+    def hide_widgets(self):
+        for widget in self.winfo_children():
+            widget.pack_forget()   
+       
 
             
         
