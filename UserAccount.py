@@ -1,12 +1,7 @@
 import customtkinter as ctk
 from Logger import logging
 from activation_window import ActivationWindow
-from User_data_storage import _user_data, get_user_data, set_user_data, Update_user_data
-import subprocess
-import sys
-import os 
-
-
+from User_data_storage import  get_user_data, set_user_data, Update_user_data
 class UserAccountFrame(ctk.CTkFrame):
     def __init__(self,master):
         super().__init__(master)
@@ -63,7 +58,6 @@ class UserAccountFrame(ctk.CTkFrame):
     
     
     def Logout(self):
-        
         set_user_data({})
         self.pack_forget()
         self.master.show_mainwindow()
@@ -72,13 +66,10 @@ class UserAccountFrame(ctk.CTkFrame):
 
 #function too start video enchancer
     def run_enchancer(self):
-        try:
-            script_path = os.path.join(os.path.dirname(__file__),'LearnReflectAI.py')
-            subprocess.run([sys.executable,script_path])
-            
-        except Exception as e:
-            logging.error(f"Error while running LearnReflect Video Enchancer: {e}")
-            
+        from LearnReflectAI import App
+        app = App(self)
+        app.mainloop()
+
             
         
     

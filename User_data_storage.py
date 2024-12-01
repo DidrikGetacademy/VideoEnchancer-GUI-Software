@@ -72,7 +72,7 @@ def Update_user_data():
 
 
 def request_password_reset(email):
-    url = "https://leanreflects.com/Server/ResetPassword.php"
+    url = "https://learnreflects.com/Server/ResetPassword.php"
     payload = {"email": email}
     headers= {"Content-Type": "application/json"}
     try: 

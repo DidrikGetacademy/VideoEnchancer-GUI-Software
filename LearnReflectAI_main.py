@@ -1,10 +1,7 @@
-import subprocess
-from Validate_key import validate_key
-import os
-import sys
+
 from Logger import logging
 from tkinter import Tk
-from File_path import activation_key_path, resource_path
+from File_path import activation_key_path
 from Decryption import load_key
 
 
