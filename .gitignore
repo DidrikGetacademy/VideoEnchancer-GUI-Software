@@ -15,8 +15,3 @@
 # Ignore compiled Python files
 *.pyc
 __pycache__/
-
-/dist
-
-/build
-.venv/
