@@ -1,0 +1,23 @@
+
+How is made. 🛠
+LearnReflectAI is completely written in Python, from backend to frontend.
+ pytorch (https://github.com/pytorch/pytorch)
+ onnx (https://github.com/onnx/onnx)
+ onnxconverter-common (https://github.com/microsoft/onnxconverter-common)
+ onnxruntime-directml (https://github.com/microsoft/onnxruntime)
+ customtkinter (https://github.com/TomSchimansky/CustomTkinter)
+ openCV (https://github.com/opencv/opencv)
+ moviepy (https://github.com/Zulko/moviepy)
+ pyInstaller (https://github.com/pyinstaller/pyinstaller)
+
+
+Requirements. 🤓
+Windows 11 / Windows 10
+RAM >= 8Gb
+Any Directx12 compatible GPU with >= 4GB VRAM
+
+
+Credits.
+BSRGAN - https://github.com/cszn/BSRGAN
+Real-ESRGAN - https://github.com/xinntao/Real-ESRGAN
+IRCNN - https://github.com/lipengFu/IRCNN

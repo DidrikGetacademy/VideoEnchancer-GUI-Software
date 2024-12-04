@@ -33,7 +33,7 @@ class MainApp(ctk.CTk):
 
     def Connect_User_Account(self):
         from UserAccount import UserAccountFrame
-
+        
         if self.UserAccount_Frame is None:
             self.UserAccount_Frame = UserAccountFrame(self)
         self.hide_frames()
@@ -43,7 +43,7 @@ class MainApp(ctk.CTk):
         self.hide_frames()
         self.register_frame.pack(fill="both", expand=True)
 
-    def open_login_Account(self):
+    def open_login_Account(self):     
         self.hide_frames()
         self.login_frame.pack(fill="both", expand=True)
 
@@ -58,7 +58,9 @@ class MainApp(ctk.CTk):
         self.title_label.pack(pady=20)
         self.Register_button.pack(pady=20)
         self.login_button.pack(pady=20)
-
+    
+   
+        
 
 if __name__ == "__main__":
     app = MainApp()

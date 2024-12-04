@@ -1,6 +1,6 @@
 # Ignore virtual environment
 /venv/
-
+/.venv
 # Ignore assets folder
 /Assets/
 
@@ -8,10 +8,15 @@
 /AI-onnx/
 
 # Ignore specific Python file
-/LearnReflectAI.py
+/VideoEnchancer.py
 
 /.vscode/
 
 # Ignore compiled Python files
 *.pyc
 __pycache__/
+
+/dist
+
+/build
+.venv/

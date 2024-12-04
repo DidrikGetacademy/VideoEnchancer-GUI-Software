@@ -1,17 +1,21 @@
 import requests
 from Logger import logging
-
+import time
 #Global userdata
 _user_data = {}
 
 
+    
 
-def set_user_data(data):
+def set_user_data(data,password = None,RememberMe = False):
     global _user_data
     if not isinstance(data,dict):
         logging.error("Invalid data type. Expected a dictionary.")
         return
     _user_data = data
+    if password and RememberMe == True:
+        _user_data["password"] = password
+        _user_data["last_login"] = time.time() #saves the current time.
     from File_path import ensure_userdata
     ensure_userdata()
     logging.info("User data has been set, and dumped in file.")
@@ -20,6 +24,7 @@ def set_user_data(data):
 
 def get_user_data():
     return _user_data
+
 
 
 
