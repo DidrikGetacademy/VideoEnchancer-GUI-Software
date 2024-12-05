@@ -38,6 +38,8 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
+    uac_admin=False,  # Ensure this is False
     codesign_identity=None,
     entitlements_file=None,
+    manifest=r"C:\Users\didri\Desktop\LearnReflect VideoEnchancer\Program.manifest",
 )

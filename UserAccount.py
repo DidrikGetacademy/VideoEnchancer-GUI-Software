@@ -3,7 +3,9 @@ from Logger import logging
 from activation_window import ActivationWindow
 from User_data_storage import  get_user_data, set_user_data, Update_user_data
 import logging
-    import subprocess
+
+
+
 
 
 
@@ -59,27 +61,44 @@ class UserAccountFrame(ctk.CTkFrame):
         self.master.login_frame.reset_fields()
         self.master.show_mainwindow()
     
+    
     def run_enchancer(self):
         from File_path import resource_path
         import os
-        video_enchancer_exe = os.path.join(os.path.dirname(__file__), "VideoEnchancer.exe")
-        if not os.path.exists(video_enchancer_exe):
-           logging.info(f"Error: The executable {video_enchancer_exe} does not exist.")
+        import subprocess
+        VideoEnchancer_Folder = resource_path('VideoEnchancer.exe')
+        video_enhancer_exe = os.path.join(VideoEnchancer_Folder,'VideoEnchancer.exe')  
+        logging.info(f"Resolved path to VideoEnhancer.exe: {video_enhancer_exe}")
+  
+        if not os.path.exists(video_enhancer_exe):
+           logging.info(f"Error: The executable {video_enhancer_exe} does not exist.")
+           return
+       
+        if not os.access(video_enhancer_exe, os.X_OK):
+           logging.error(f"No execute permission for {video_enhancer_exe}. Check file permissions.")
+           return
        
         try: 
-            result = subprocess.run(
-                [video_enchancer_exe],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            logging.info(f"Video enchancer output: {result.stdout}")
-        except subprocess.CalledProcessError as e:
-            logging.info(f"Videoenchancer failed with error: {e}")
-        except FileNotFoundError:
-            logging.info(f"Videoenchancer exe  not found at: {video_enchancer_exe}")
-    
+            self.master.destroy()
+            
+     
+            result = subprocess.run([video_enhancer_exe],stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+             
+            stdout = result.stdout.decode().strip()
+            stderr = result.stderr.decode().strip()
+            logging.info(f"VideoEnhancer stdout: {stdout}")
+            logging.error(f"VideoEnhancer stderr: {stderr}")
+            
+            logging.info(f"Successfully launched {video_enhancer_exe}")
+        except subprocess.CalledProcessError as e: 
+             logging.error(f"VideoEnhancer.exe returned a non-zero exit status: {e.returncode}")
+             logging.error(f"Error message: {e.stderr.decode().strip() if e.stderr else 'No error message'}")
+        except Exception as e:
+            logging.error(f"Failed to launch VideoEnchancer.exe: {str(e)}")
+ 
+            
+
         
         
     def hide_widgets(self):

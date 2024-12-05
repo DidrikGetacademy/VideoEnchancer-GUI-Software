@@ -24,3 +24,5 @@ __pycache__/
 *.tmp
 *.DS_Store
 Thumbs.db
+build/VideoEnchancer/VideoEnchancer.pkg
+dist/VideoEnchancer.exe
