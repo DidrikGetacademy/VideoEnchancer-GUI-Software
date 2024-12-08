@@ -18,6 +18,8 @@ a = Analysis(
         (r'C:\Users\didri\Desktop\LearnReflect VideoEnchancer\UserAccount.py', 'UserAccount.py'),
         (r'C:\Users\didri\Desktop\LearnReflect VideoEnchancer\Validate_key.py', 'Validate_key.py'),
         (r'C:\Users\didri\Desktop\LearnReflect VideoEnchancer\dist\VideoEnchancer.exe', 'VideoEnchancer.exe'),
+        (r"C:\Users\didri\Desktop\LearnReflect VideoEnchancer\Assets", "Assets"),
+
     ],
     hiddenimports=[
         'numpy.core',

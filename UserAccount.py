@@ -12,6 +12,7 @@ import logging
 class UserAccountFrame(ctk.CTkFrame):
     def __init__(self,master):
         super().__init__(master)
+        self.configure(fg_color="transparent")
         self.user_data = get_user_data()
         self.create_widgets()
         

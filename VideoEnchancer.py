@@ -6,10 +6,8 @@ from subprocess import run  as subprocess_run
 from shutil     import rmtree as remove_directory
 from timeit     import default_timer as timer
 
-import customtkinter as ctk
+
 from Logger import logging
-from activation_window import ActivationWindow
-from User_data_storage import  get_user_data, set_user_data, Update_user_data
 from typing    import Callable
 from threading import Thread
 from itertools import repeat
@@ -2567,6 +2565,8 @@ def place_AI_interpolation_menu():
     interpolation_button.place(relx = column0_x, rely = row3_y - 0.05, anchor = "center")
     interpolation_menu.place(relx = column0_x, rely  = row3_y, anchor = "center")
 
+
+
 def place_AI_multithreading_menu():
     AI_multithreading_button = create_info_button(open_info_AI_multithreading, "AI multithreading")
     AI_multithreading_menu   = create_option_menu(select_AI_multithreading_from_menu, AI_multithreading_list, default_AI_multithreading)
@@ -2615,6 +2615,7 @@ def place_video_extension_menu():
     
     video_extension_button.place(relx = column2_x, rely = row2_y - 0.05, anchor = "center")
     video_extension_menu.place(relx = column2_x, rely = row2_y, anchor = "center")
+
 
 def place_message_label():
     message_label = CTkLabel(
@@ -2731,8 +2732,27 @@ class App():
         place_video_extension_menu()
         place_message_label()
         place_upscale_button()
-
+        
+        
+        
+#def is_launched_by(expected_parent_name):
+       # try:
+       #    import psutil
+        #    import sys
+        #    import os
+        #    parent_process = psutil.Process(os.getppid())
+         #   return parent_process.name() == expected_parent_name
+    #    except Exception as e:
+          #  logging.info(f"Error checking parent process: {e}")
+         #   return False
+        
+        
+        
 if __name__ == "__main__":
+    
+    #if not is_launched_by("Account_Menu_GUI.exe"):
+       # logging.info("Access denied: This program must be launched by Account_Menu_gui.exe")
+       # sys.exit(1)
     multiprocessing_freeze_support()
     set_appearance_mode("Dark")
     set_default_color_theme("dark-blue")

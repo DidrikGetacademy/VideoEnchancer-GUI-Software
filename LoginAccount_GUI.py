@@ -9,7 +9,12 @@ from Logger import logging
 class LoginFrame(ctk.CTkFrame):
     def __init__(self, master, Connect_UserAccount):
         super().__init__(master)
+  
+        
         self.switch_to_Accountsystem = Connect_UserAccount
+        
+        
+        
         self.title_label = ctk.CTkLabel(self, text="Login Account", font=("Arial", 20))
         self.title_label.pack(pady=10)
         

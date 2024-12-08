@@ -11,13 +11,32 @@ LearnReflectAI is completely written in Python, from backend to frontend.
  pyInstaller (https://github.com/pyinstaller/pyinstaller)
 
 
+
+Credits.
+BSRGAN - https://github.com/cszn/BSRGAN
+Real-ESRGAN - https://github.com/xinntao/Real-ESRGAN
+IRCNN - https://github.com/lipengFu/IRCNN
+
+
+
 Requirements. 🤓
 Windows 11 / Windows 10
 RAM >= 8Gb
 Any Directx12 compatible GPU with >= 4GB VRAM
 
 
-Credits.
-BSRGAN - https://github.com/cszn/BSRGAN
-Real-ESRGAN - https://github.com/xinntao/Real-ESRGAN
-IRCNN - https://github.com/lipengFu/IRCNN
+#Features
+ Elegant and easy to use GUI
+ Image and Video upscale
+ Multiple GPUs support
+ Compatible images - jpg, png, tif, bmp, webp, heic
+ Compatible video - mp4, wemb, mkv, flv, gif, avi, mov, mpg, qt, 3gp
+ Automatic image tilling to avoid gpu VRAM limitation
+ Resize image/video before upscaling
+ Interpolation beetween original file and upscaled file
+ Video upscaling STOP&RESUME
+ PRIVACY FOCUSED - no internet connection required / everything is on your PC
+
+
+
+ Implement AUDIO demucus Audio enchancement in VideoEnchancer
