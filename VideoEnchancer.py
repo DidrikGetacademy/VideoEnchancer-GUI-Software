@@ -78,7 +78,7 @@ from cv2 import (
     cvtColor     as opencv_cvtColor,
     resize       as opencv_resize,
 )
-
+import numpy as np
 from numpy import (
     ndarray     as numpy_ndarray,
     frombuffer  as numpy_frombuffer,
@@ -115,6 +115,7 @@ from customtkinter import (
 )
 
 
+
 if sys.stdout is None: sys.stdout = open(os_devnull, "w")
 if sys.stderr is None: sys.stderr = open(os_devnull, "w")
 
@@ -145,6 +146,7 @@ gpus_list              = [ "GPU 1", "GPU 2", "GPU 3", "GPU 4" ]
 image_extension_list   = [ ".png", ".jpg", ".bmp", ".tiff" ]
 video_extension_list   = [ ".mp4 (x264)", ".mp4 (x265)", ".avi" ]
 interpolation_list     = [ "Low", "Medium", "High", "Disabled" ]
+audio_mode_list        = ["Disabled", "Audio Enchancement", "Vocal Remover"] 
 AI_multithreading_list = [ "1 threads", "2 threads", "3 threads", "4 threads", "5 threads", "6 threads"]
 
 OUTPUT_PATH_CODED    = "Same path as input files"
@@ -169,6 +171,7 @@ if os_path_exists(USER_PREFERENCE_PATH):
         default_image_extension   = json_data["default_image_extension"]
         default_video_extension   = json_data["default_video_extension"]
         default_interpolation     = json_data["default_interpolation"]
+        default_audio_mode        = json_data.get("default_audio_mode",audio_mode_list[0]) 
         default_output_path       = json_data["default_output_path"]
         default_resize_factor     = json_data["default_resize_factor"]
         default_VRAM_limiter      = json_data["default_VRAM_limiter"]
@@ -181,6 +184,7 @@ else:
     default_image_extension   = image_extension_list[0]
     default_video_extension   = video_extension_list[0]
     default_interpolation     = interpolation_list[0]
+    default_audio_mode        = audio_mode_list[0] 
     default_output_path       = OUTPUT_PATH_CODED
     default_resize_factor     = str(50)
     default_VRAM_limiter      = str(4)
@@ -196,6 +200,7 @@ row1_y = row0_y + offset_y_options
 row2_y = row1_y + offset_y_options
 row3_y = row2_y + offset_y_options
 row4_y = row3_y + offset_y_options
+row5_y = row4_y + offset_y_options
 
 offset_x_options = 0.28
 column1_x = 0.5
@@ -219,9 +224,8 @@ supported_video_extensions = [
     '.mpg', '.mpeg', ".vob"
 ]
 
+
 # AI -------------------
-
-
 class AI:
 
     # CLASS INIT FUNCTIONS
@@ -242,13 +246,17 @@ class AI:
 
         # Calculated variables
         self.AI_model_path    = find_by_relative_path(f"AI-onnx{os_separator}{self.AI_model_name}_fp16.onnx")
+        self.Audio_model_path = find_by_relative_path(f"AI-onnx{os_separator}Vocal_Isolation_UNet.onnx")
         self.inferenceSession = self._load_inferenceSession()
         self.upscale_factor   = self._get_upscale_factor()
-
+        self.vocal_inferenceSession = self._load_vocal_inferencesession() 
+        
+        
     def _get_upscale_factor(self) -> int:
         if   "x1" in self.AI_model_name: return 1
         elif "x2" in self.AI_model_name: return 2
         elif "x4" in self.AI_model_name: return 4
+
 
     def _load_inferenceSession(self) -> onnxruntime_inferenceSession:        
         match self.directml_gpu:
@@ -257,15 +265,78 @@ class AI:
             case 'GPU 3': directml_backend = [('DmlExecutionProvider', {"device_id": "2"})]
             case 'GPU 4': directml_backend = [('DmlExecutionProvider', {"device_id": "3"})]
             case 'CPU':   directml_backend = ['CPUExecutionProvider']
-
         inference_session = onnxruntime_inferenceSession(path_or_bytes = self.AI_model_path, providers = directml_backend)
 
         return inference_session
 
-
-
-    # INTERNAL CLASS FUNCTIONS
-
+    #didrik
+    def _load_vocal_inferencesession(self) -> onnxruntime_inferenceSession:  
+        match self.directml_gpu:
+           case 'GPU 1': directml_backend = [('DmlExecutionProvider', {"device_id": "0"})]
+           case 'GPU 2': directml_backend = [('DmlExecutionProvider', {"device_id": "1"})]
+           case 'GPU 3': directml_backend = [('DmlExecutionProvider', {"device_id": "2"})]
+           case 'GPU 4': directml_backend = [('DmlExecutionProvider', {"device_id": "3"})]
+           case 'CPU': directml_backend = [('DmlExecutionProvider')]
+        inference_Session_Audio = onnxruntime_inferenceSession(path_or_bytes=self.Audio_model_path,providers=directml_backend)
+        return inference_Session_Audio
+    
+    
+    
+    #didrik
+    def extract_audio_from_video(self,video_path: str) -> str:
+        import os
+        video_dir = os.path.dirname(video_path)
+        audio_output_path = os.path.join(video_dir, "extracted_audio.wav")
+        command = ["ffmpeg",  "-y", "-i", video_path, "-q:a", "0", "-map", "0:a", audio_output_path]
+        subprocess_run(command, check=True)
+        logging.info(f"Extracted audio at {audio_output_path}")
+        return audio_output_path #Returns the extracted audio from video_path in wav format 
+    
+    
+    #didrik
+    def run_vocal_isolation(self, input_audio_path: str) -> str:
+        from scipy.io.wavfile import write, read
+        sample_rate, audio_data = read(input_audio_path)
+        if len(audio_data.shape) > 1:
+            audio_data = np.mean(audio_data, axis=1)
+        audio_data = (audio_data.astype(np.float32) / 32767.0) 
+        target_height = 513
+        target_width = 10000
+        audio_flattened = audio_data.flatten()
+        audio_padded = np.zeros((target_height, target_width), dtype=np.float32)
+        num_samples = min(audio_flattened.size, target_height * target_width)
+        audio_padded.flat[:num_samples] = audio_flattened[:num_samples]
+        audio_input = np.expand_dims(audio_padded, axis=0)
+        audio_input = np.expand_dims(audio_input,axis=1)
+        input_name = self.vocal_inferenceSession.get_inputs()[0].name
+        output_name = self.vocal_inferenceSession.get_outputs()[0].name
+        isolated_audio = self.vocal_inferenceSession.run([output_name], {input_name: audio_input})[0]
+        isolated_audio = np.squeeze(isolated_audio) 
+        isolated_audio = (isolated_audio * 32767).astype(np.int32) 
+        isolated_output_path = input_audio_path.replace("extracted_audio", "isolated_audio")
+        write(isolated_output_path,sample_rate,isolated_audio)
+        logging.info(f"isolated audio saved at {isolated_output_path}")
+        return isolated_output_path
+        
+        
+        
+        
+    #didrik
+    def process_vocal_isolation(self,video_path: str) -> str:
+        extracted_audio_path = self.extract_audio_from_video(video_path)
+        isolated_audio_path = self.run_vocal_isolation(extracted_audio_path) 
+        
+        logging.info(f"Process completed: isolated audio path -> {isolated_audio_path}")
+        return isolated_audio_path
+        
+    
+    
+    
+    
+    
+    
+    
+    #INTERNAL CLASS FUNCTIONS
     def get_image_mode(self, image: numpy_ndarray) -> str:
         match image.shape:
             case (rows, cols):
@@ -605,7 +676,7 @@ class AI:
 
 
 
-
+ 
 
 
 
@@ -1153,7 +1224,7 @@ def create_active_button(
 
 
 
-
+#HER
 
 
 
@@ -1339,13 +1410,6 @@ def prepare_output_video_directory_name(
 
 
 
-
-
-
-
-
-
-
 # Image/video Utils functions ------------------------
 def get_video_fps(video_path: str) -> float:
     video_capture = opencv_VideoCapture(video_path)
@@ -1421,6 +1485,7 @@ def video_encoding(
         upscaled_frame_paths: list[str], 
         cpu_number: int,
         selected_video_extension: str, 
+        isolated_audio_path: str = None
         ) -> None:
         
     match selected_video_extension:
@@ -1442,23 +1507,31 @@ def video_encoding(
         bitrate  = "12M",
         preset   = "ultrafast"
     )
-
+    if isolated_audio_path:
+        audio_source = isolated_audio_path 
+    else:
+        audio_source = video_path
+        
+    audio_source = isolated_audio_path if isolated_audio_path else video_path
     # Copy the audio from original video
     audio_passthrough_command = [
         FFMPEG_EXE_PATH,
         "-y",
-        "-i", video_path,
+        "-i", audio_source,
         "-i", no_audio_path,
         "-c:v", "copy",
-        "-map", "1:v:0",
-        "-map", "0:a?",
-        "-c:a", "copy",
+        "-c:a", "acc", #RE-encode audio to ACC for compability
+        "-b:a", "192k", #Audio bitrate
+        "-map", "1:v:0", #Map video from no_audio_path
+        "-map", "0:a:0", #map audio from isolated audio
         video_output_path
     ]
     try: 
         subprocess_run(audio_passthrough_command, check = True, shell = "False")
-        if os_path_exists(no_audio_path): os_remove(no_audio_path)
-    except:
+        if os_path_exists(no_audio_path):
+            os_remove(no_audio_path)
+    except Exception as e:
+        print(f"Error during video encoding: {e}")
         pass
     
 def check_video_upscaling_resume(
@@ -1878,6 +1951,8 @@ def upscale_video(
     target_directory  = prepare_output_video_directory_name(video_path, selected_output_path, selected_AI_model, resize_factor, selected_interpolation_factor)
     video_output_path = prepare_output_video_filename(video_path, selected_output_path, selected_AI_model, resize_factor, selected_video_extension, selected_interpolation_factor)
     
+    isolated_audio_path = AI_instance.process_vocal_isolation(video_path)
+    
     # 2. Resume upscaling OR Extract video frames
     video_upscale_continue = check_video_upscaling_resume(target_directory, selected_AI_model)
     if video_upscale_continue:
@@ -1921,7 +1996,7 @@ def upscale_video(
 
     # 5. Video encoding
     write_process_status(processing_queue, f"{file_number}. Processing upscaled video")
-    video_encoding(video_path, video_output_path, upscaled_frame_paths, cpu_number, selected_video_extension)
+    video_encoding(video_path, video_output_path, upscaled_frame_paths, cpu_number, selected_video_extension,isolated_audio_path)
     copy_file_metadata(video_path, video_output_path)
 
 def upscale_video_frames(
@@ -2225,6 +2300,14 @@ def open_output_path_action():
 
 # GUI select from menus functions ---------------------------
 
+def select_audio_mode_from_menu(selected_mode):
+    global selected_audio_mode
+    selected_audio_mode = selected_mode
+    logging.info(f"Selected audio mode: {selected_mode}")
+    
+    if selected_audio_mode == "Vocal Remover":
+        logging.info("Vocal remover enabled. audio will be isolation during video")
+    
 def select_AI_from_menu(selected_option: str) -> None:
     global selected_AI_model    
     selected_AI_model = selected_option
@@ -2335,6 +2418,22 @@ def open_info_gpu():
         subtitle    = "This widget allows to select the GPU for AI upscale",
         default_value = default_gpu,
         option_list   = option_list
+    )
+
+#didrik
+def open_info_audio_mode(): 
+    option_list = [
+        "Audio Mode Options:"
+        "\n • Audio Enhancement: Improve overall sound quality, reducing background noise and clarifying audio details.\n" +
+        "   • Vocal Isolation: Separate and isolate vocals from the background music or environment, allowing you to emphasize or remove singing or speech.\n"
+    ]
+    
+    MessageBox(
+        messageType= "info",
+        title = "Audio Enchancement",
+        subtitle = "This Widget allows to choose Vocal isolation or Audio Enchancement",
+        default_value = default_audio_mode,
+        option_list = option_list
     )
 
 def open_info_AI_interpolation():
@@ -2564,8 +2663,7 @@ def place_AI_interpolation_menu():
     
     interpolation_button.place(relx = column0_x, rely = row3_y - 0.05, anchor = "center")
     interpolation_menu.place(relx = column0_x, rely  = row3_y, anchor = "center")
-
-
+ 
 
 def place_AI_multithreading_menu():
     AI_multithreading_button = create_info_button(open_info_AI_multithreading, "AI multithreading")
@@ -2601,6 +2699,17 @@ def place_cpu_textbox():
 
     cpu_button.place(relx = column1_x, rely = row3_y - 0.05, anchor = "center")
     cpu_textbox.place(relx = column1_x, rely  = row3_y, anchor = "center")
+    
+def place_Audio_Selection_menu():
+    audio_mode_button = create_info_button(open_info_audio_mode,"Audio Mode",width=150)
+    Audio_mode_menu = create_option_menu(
+        select_audio_mode_from_menu,
+        audio_mode_list,
+        default_audio_mode
+        )
+    
+    audio_mode_button.place(relx=column1_x,rely=row4_y - 0.05,anchor="center")
+    Audio_mode_menu.place(relx=column1_x,rely=row4_y,anchor="center")
 
 def place_image_output_menu():
     file_extension_button = create_info_button(open_info_image_output, "Image output")
@@ -2670,18 +2779,26 @@ def on_app_close() -> None:
     global tiles_resolution
     global resize_factor
     global cpu_number
+    global selected_audio_mode 
 
     AI_model_to_save          = f"{selected_AI_model}"
     AI_multithreading_to_save = f"{selected_AI_multithreading} threads"
     gpu_to_save               = selected_gpu
     image_extension_to_save   = selected_image_extension
     video_extension_to_save   = selected_video_extension
+    
     interpolation_to_save= {
         0: "Disabled",
         0.3: "Low",
         0.5: "Medium",
         0.7: "High",
     }.get(selected_interpolation_factor)
+    
+    Audio_option_to_save = {
+        0: "Disabled",
+        1: "Vocal Isolation",
+        2: "Audio Enchancement",
+    }.get(selected_audio_mode)
 
     user_preference = {
         "default_AI_model":          AI_model_to_save,
@@ -2690,6 +2807,7 @@ def on_app_close() -> None:
         "default_image_extension":   image_extension_to_save,
         "default_video_extension":   video_extension_to_save,
         "default_interpolation":     interpolation_to_save,
+        "default_audio_mode":         Audio_option_to_save,
         "default_output_path":       selected_output_path.get(),
         "default_resize_factor":     str(selected_resize_factor.get()),
         "default_VRAM_limiter":      str(selected_VRAM_limiter.get()),
@@ -2705,12 +2823,10 @@ def on_app_close() -> None:
 
     
     
-#Calling other functions: The rest of the __init__ method places various UI elements like textboxes, buttons, and menus on the window using functions like place_loadFile_section(window), place_app_name(), etc. These functions are likely defined elsewhere in your code to organize different parts of the interface.
-#master = master parameter represents the main window (likely a CTk window from customtkinter).
 class App():
-    def __init__(self, Master):#Master is the main application window (a graphical container).
+    def __init__(self, Master):
         self.toplevel_window = None
-        Master.protocol("WM_DELETE_WINDOW", on_app_close)#This line redefines what happens when you click the "X" button to close the window. By default, clicking the "X" closes the program. Here, it runs a custom function called on_app_close. (This function needs to be defined elsewhere in the program.)
+        Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
         Master.geometry("675x675")
         Master.resizable(False, False)
@@ -2724,6 +2840,7 @@ class App():
         place_AI_menu()
         place_AI_multithreading_menu()
         place_AI_interpolation_menu()
+        place_Audio_Selection_menu()
         place_gpu_menu()
         place_vram_textbox()
         place_cpu_textbox()
@@ -2825,8 +2942,6 @@ if __name__ == "__main__":
     
     
     
-#The Run function creates an instance of the App class, passing the window (which is the ParentFrame window) as an argument.
-
     app = App(window)#Creates an instance of the App class. Passes the window object (the main GUI window) to the App class so it can set it up.
     window.update()#Refreshes the window to ensure that all updates (like layouts and text) are visible.
     window.mainloop()#Starts the GUI's event loop, which keeps the window open and responsive. This is where the program "waits" for the user to interact with the window (like clicking a button).
