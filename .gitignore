@@ -11,7 +11,8 @@
 
 # Ignore AI-ONNX folder
 /AI-onnx/
-
+/AI AudioEnchancer/
+/AI UNet-Architecture/
 # Ignore VSCode settings
 /.vscode/
 
