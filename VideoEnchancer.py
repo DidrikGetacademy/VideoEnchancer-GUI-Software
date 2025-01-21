@@ -465,7 +465,11 @@ class AI:
             os.remove(extracted_audio_path)
             
         print(f"Returning Enchanced audio at: {Audio_Inference_output}")
-        return Audio_Inference_output 
+        if Audio_Inference_output != None:
+            return Audio_Inference_output
+        else:
+            return None
+
     
           
  
@@ -2088,7 +2092,7 @@ def video_encoding(
         "-i", audio_source,
         "-i", no_audio_path,
         "-c:v", "copy",
-        "-c:a", "acc", #RE-encode audio to ACC for compability
+        "-c:a", "copy",
         "-b:a", "192k", #Audio bitrate
         "-map", "1:v:0", #Map video from no_audio_path
         "-map", "0:a:0", #map audio from isolated audio
