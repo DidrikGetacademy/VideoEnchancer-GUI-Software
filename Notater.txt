@@ -1,3 +1,6 @@
 Select forsvinner vis man fjerner videoene som er i vinduet
 
 gjøre ferdig bruk av audio
+
+
+implementere Før/Etter bilder av Oppskalering ved bruk av den modellen som er valgt. 

@@ -575,26 +575,6 @@ class AI:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
  # VIDEO CLASS FUNCTIONS
     def calculate_multiframes_supported_by_gpu(self, video_frame_path: str) -> int:
         resized_video_frame  = self.resize_image_with_resize_factor(image_read(video_frame_path))
@@ -607,33 +587,6 @@ class AI:
         print(f" Frames supported simultaneously by GPU: {frames_simultaneously}")
 
         return frames_simultaneously
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -741,40 +694,6 @@ class AI:
         return tiled_image
 
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -940,58 +859,6 @@ class AI:
 
 
  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -3201,7 +3068,7 @@ def open_files_action():
         file_widget.place(
             relx = 0.0, 
             rely = 0.0, 
-            relwidth  = 1.0, 
+            relwidth  = 0.25, 
             relheight = 0.42
         )
         
@@ -3809,94 +3676,94 @@ def place_output_path_textbox():
         height  = 25
     )
   
-    output_path_button.place(relx = column1_5_x, rely = row0_y - 0.05, anchor = "center")
-    output_path_textbox.place(relx = column1_5_x, rely  = row0_y, anchor = "center")
-    select_output_path_button.place(relx = column2_x, rely  = row0_y - 0.05, anchor = "center")
+    output_path_button.place(relx = column1_5_x + 0.31, rely = row0_y + 0.39, anchor = "center")
+    output_path_textbox.place(relx = column1_5_x + 0.27, rely  = row0_y + 0.42, anchor = "center")
+    select_output_path_button.place(relx = column2_x + 0.18, rely  = row0_y + 0.38, anchor = "center")
 
 def place_AI_menu():
     AI_menu_button = create_info_button(open_info_AI_model, "AI model")
     AI_menu        = create_option_menu(select_AI_from_menu, AI_models_list, default_AI_model)
 
-    AI_menu_button.place(relx = column0_x, rely = row1_y - 0.05, anchor = "center")
-    AI_menu.place(relx = column0_x, rely = row1_y, anchor = "center")
+    AI_menu_button.place(relx = column0_x - 0.15, rely = row1_y - 0.05, anchor = "center")
+    AI_menu.place(relx = column0_x- 0.15, rely = row1_y, anchor = "center")
 
 def place_AI_interpolation_menu():
     interpolation_button = create_info_button(open_info_AI_interpolation, "AI Interpolation")
     interpolation_menu   = create_option_menu(select_interpolation_from_menu, interpolation_list, default_interpolation)
     
-    interpolation_button.place(relx = column0_x, rely = row3_y - 0.05, anchor = "center")
-    interpolation_menu.place(relx = column0_x, rely  = row3_y, anchor = "center")
+    interpolation_button.place(relx = column0_x- 0.15, rely = row3_y - 0.05, anchor = "center")
+    interpolation_menu.place(relx = column0_x- 0.15, rely  = row3_y, anchor = "center")
  
 
 def place_AI_multithreading_menu():
     AI_multithreading_button = create_info_button(open_info_AI_multithreading, "AI multithreading")
     AI_multithreading_menu   = create_option_menu(select_AI_multithreading_from_menu, AI_multithreading_list, default_AI_multithreading)
     
-    AI_multithreading_button.place(relx = column0_x, rely = row2_y - 0.05, anchor = "center")
-    AI_multithreading_menu.place(relx = column0_x, rely  = row2_y, anchor = "center")
+    AI_multithreading_button.place(relx = column0_x- 0.15, rely = row2_y - 0.05, anchor = "center")
+    AI_multithreading_menu.place(relx = column0_x- 0.15, rely  = row2_y, anchor = "center")
 
 
 def place_input_resolution_textbox():
     resize_factor_button  = create_info_button(open_info_input_resolution, "Input resolution %")
     resize_factor_textbox = create_text_box(selected_resize_factor) 
 
-    resize_factor_button.place(relx = column0_x, rely = row4_y - 0.05, anchor = "center")
-    resize_factor_textbox.place(relx = column0_x, rely = row4_y, anchor = "center")
+    resize_factor_button.place(relx = column0_x- 0.15, rely = row4_y - 0.05, anchor = "center")
+    resize_factor_textbox.place(relx = column0_x- 0.15, rely = row4_y, anchor = "center")
 
 
 def place_gpu_menu():
     gpu_button = create_info_button(open_info_gpu, "GPU")
     gpu_menu   = create_option_menu(select_gpu_from_menu, gpus_list, default_gpu)
     
-    gpu_button.place(relx = column1_x, rely = row1_y - 0.053, anchor = "center")
-    gpu_menu.place(relx = column1_x, rely  = row1_y, anchor = "center")
+    gpu_button.place(relx = column1_x- 0.35, rely = row1_y - 0.053, anchor = "center")
+    gpu_menu.place(relx = column1_x- 0.35, rely  = row1_y, anchor = "center")
 
 
 def place_vram_textbox():
     vram_button  = create_info_button(open_info_vram_limiter, "GPU Vram (GB)")
     vram_textbox = create_text_box(selected_VRAM_limiter) 
   
-    vram_button.place(relx = column1_x, rely = row2_y - 0.05, anchor = "center")
-    vram_textbox.place(relx = column1_x, rely  = row2_y, anchor = "center")
+    vram_button.place(relx = column1_x- 0.35, rely = row2_y - 0.05, anchor = "center")
+    vram_textbox.place(relx = column1_x- 0.35, rely  = row2_y, anchor = "center")
 
 
 def place_cpu_textbox():
     cpu_button  = create_info_button(open_info_cpu, "CPU number")
     cpu_textbox = create_text_box(selected_cpu_number)
 
-    cpu_button.place(relx = column1_x, rely = row3_y - 0.05, anchor = "center")
-    cpu_textbox.place(relx = column1_x, rely  = row3_y, anchor = "center")
+    cpu_button.place(relx = column1_x- 0.35, rely = row3_y - 0.05, anchor = "center")
+    cpu_textbox.place(relx = column1_x- 0.35, rely  = row3_y, anchor = "center")
     
     
 def place_Audio_Selection_menu():
     audio_mode_button = create_info_button(open_info_audio_mode,"Audio Mode",width=150)
     Audio_mode_menu = create_option_menu(select_audio_mode_from_menu,audio_mode_list,default_audio_mode)
   
-    audio_mode_button.place(relx=column1_x,rely=row4_y - 0.05,anchor="center")
-    Audio_mode_menu.place(relx=column1_x,rely=row4_y,anchor="center")
+    audio_mode_button.place(relx=column1_x- 0.35,rely=row4_y - 0.05,anchor="center")
+    Audio_mode_menu.place(relx=column1_x- 0.35,rely=row4_y,anchor="center")
 
 
 def place_keep_frames_menu():
     keep_frames_button = create_info_button(open_info_keep_frames, "Keep frames")
     keep_frames_menu   = create_option_menu(select_save_frame_from_menu, keep_frames_list, default_keep_frames)
     
-    keep_frames_button.place(relx = column1_x, rely = row4_y - 0.053, anchor = "center")
-    keep_frames_menu.place(relx = column1_x, rely = row4_y, anchor = "center")
+    keep_frames_button.place(relx = column1_x- 0.4, rely = row4_y - 0.053, anchor = "center")
+    keep_frames_menu.place(relx = column1_x- 0.4, rely = row4_y, anchor = "center")
     
 
 def place_image_output_menu():
     file_extension_button = create_info_button(open_info_image_output, "Image output")
     file_extension_menu   = create_option_menu(select_image_extension_from_menu, image_extension_list, default_image_extension)
     
-    file_extension_button.place(relx = column2_x, rely = row1_y - 0.05, anchor = "center")
-    file_extension_menu.place(relx = column2_x, rely = row1_y, anchor = "center")
+    file_extension_button.place(relx = column2_x- 0.625, rely = row1_y - 0.15, anchor = "center")
+    file_extension_menu.place(relx = column2_x- 0.63, rely = row1_y -0.1, anchor = "center")
 
 def place_video_extension_menu():
     video_extension_button = create_info_button(open_info_video_extension, "Video output")
     video_extension_menu   = create_option_menu(select_video_extension_from_menu, video_extension_list, default_video_extension)
     
-    video_extension_button.place(relx = column2_x, rely = row2_y - 0.05, anchor = "center")
-    video_extension_menu.place(relx = column2_x, rely = row2_y, anchor = "center")
+    video_extension_button.place(relx = column2_x- 0.71, rely = row2_y - 0.25, anchor = "center")
+    video_extension_menu.place(relx = column2_x- 0.71, rely = row2_y - 0.205, anchor = "center")
 
 
 def place_message_label():
@@ -3910,7 +3777,7 @@ def place_message_label():
         anchor       = "center",
         corner_radius = 12
     )
-    message_label.place(relx = column2_x, rely = row4_y - 0.075, anchor = "center")
+    message_label.place(relx = column2_x - 0.55, rely = row4_y - 0.032, anchor = "center")
 
 def place_stop_button(): 
     stop_button = create_active_button(
@@ -3931,7 +3798,7 @@ def place_upscale_button():
         width   = 140,
         height  = 30
     )
-    upscale_button.place(relx = column2_x, rely = row4_y, anchor = "center")
+    upscale_button.place(relx = column2_x - 0.55, rely = row4_y, anchor = "center")
    
 
 
@@ -4098,7 +3965,7 @@ class App():
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
-        Master.geometry("1000x1000")
+        Master.geometry("1920x1080")
         Master.resizable(False, False)
         Master.iconbitmap(find_by_relative_path("Assets" + os_separator + "logo.ico"))
 
