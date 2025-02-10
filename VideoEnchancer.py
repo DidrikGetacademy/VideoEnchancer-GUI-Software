@@ -146,7 +146,7 @@ SRVGGNetCompact_models_list = [ "RealESR_Gx4", "RealSRx4_Anime" ]
 RRDB_models_list            = [ "BSRGANx4", "BSRGANx2", "RealESRGANx4" ]
 
 
-global loading_label
+
 global preview_shown
 global original_preview
 global upscaled_preview
@@ -250,35 +250,6 @@ supported_video_extensions = [
 
 
 
-def open_files_action():
-    global loading_label, preview_shown, original_preview, upscaled_preview
-    info_message.set("Selecting files")
-
-    uploaded_files_list = list(filedialog.askopenfilenames())
-    supported_files_list = check_supported_selected_files(uploaded_files_list)
-    if len(supported_files_list) > 0:
-        loading_icon = LoadingIcon(window)
-        loading_icon.label.place(relx=0.5, rely=0.5,anchor="center")
-
-        window.update()
-
-        video_path = next((f for f in supported_files_list if check_if_file_is_video(f)), None)
-
-        if video_path:
-            print(f"open_files_action: {video_path}")
-
-            preview_thread = threading.Thread(
-                target = process_and_show_preview,
-                args=(video_path,loading_icon)
-            )
-            preview_thread.start()
-            print("preview started")
-        else: 
-            loading_icon.stop()
-            info_message.set("No video found")
-    else: 
-        info_message.set("Not supported files :(")
-    
 
 
 
@@ -295,10 +266,19 @@ def open_files_action():
 
 
 
-
-
-
-
+#ERRROR
+#[LearnReflect AI] External ffmpeg.exe file found
+#[LearnReflect AI] Preference file exist
+#Started animate
+#open_files_action: C:/Users/didri/AppData/Local/CapCut/Videos/Facebook/Grace.mp4
+#preview started
+#Processing video: C:/Users/didri/AppData/Local/CapCut/Videos/Facebook/Grace.mp4
+#rezise factor: 20%
+#Selected vram: [2.2]
+#vram limiter: [8.0]
+#max resolution: [1760]
+#Running inference now... AI instance details --> [selected Model: RealSRx4_Anime, selected_gpu: Auto, resize_factor: 20, max_resolution: 1760]
+#Preview error:  Unable to allocate 552. MiB for an array with shape (6980, 6912, 3) and data type float32
 
 
 
@@ -329,7 +309,6 @@ class LoadingIcon:
         self.label.destroy()
     
     def animate(self):
-        print("Animate function")
         if self.animating:
             self.label.configure(image=self.frames[self.current_frame])
             self.current_frame = (self.current_frame + 1) % len(self.frames)
@@ -341,46 +320,48 @@ class LoadingIcon:
 def show_preview_frames(original, upscaled, loading_icon):
     global original_preview, upscaled_preview, preview_shown
     loading_icon.stop()
+    print("Loading stopped. showing images now...")
     
     # Convert to CTkImage
     original_image = CTkImage(Image.fromarray(original), size=(400,225))
     upscaled_image = CTkImage(Image.fromarray(upscaled), size=(800,450))
     
-    # Update background area
-    background = CTkLabel(window, text="", fg_color=dark_color)
-    background.place(relx=0.0, rely=0.0, relwidth=0.25, relheight=0.42)
+    for widget in window.winfo_children():
+        if isinstance(widget,CTkLabel) and widget.cget("text") == "":
+            widget.destroy()
+
     
     original_preview = CTkLabel(
         master=window,
         image=original_image,
         text="Original",
-        compound="Bottom",
+        compound="top",
         fg_color=dark_color,
     )
-    original_preview.place(relx=0.1, rely=0.2, anchor="w")
+    original_preview.place(relx=0.5, rely=0.5, anchor="e")
     
     upscaled_preview = CTkLabel(
         master=window,
         image=upscaled_image,
         text="Upscaled",
-        compound="Bottom",
+        compound="top",
         fg_color=dark_color
     )
-    upscaled_preview.place(relx=0.4, rely=0.2, anchor="w")
+    upscaled_preview.place(relx=0.5, rely=0.5, anchor="w")
     
-    preview_shown = True  # Set flag to indicate that the preview is now shown.
+    preview_shown = True  
     info_message.set("Preview Ready!")
+    print("preview ready!")
 
 
 
 
 def process_and_show_preview(video_path, loading_icon):
-    # Check if an AI model has been selected
     if not selected_AI_model or selected_AI_model == AI_LIST_SEPARATOR[0]:
         show_error_message("Select an AI model first!")
+        print("Select an AI model first!")
         return 
     
-    # Retrieve the first image (frame) from the video
     cap = cv2.VideoCapture(video_path)
     ret, frame = cap.read()
     cap.release()
@@ -390,42 +371,53 @@ def process_and_show_preview(video_path, loading_icon):
         print("Could not read video")
         return
     
-    # Convert the frame from BGR to RGB (make sure opencv_cvtColor is defined or use cv2.cvtColor)
     original_frame = opencv_cvtColor(frame, COLOR_BGR2RGB)
-    
 
-    # Initialize upscaled_frame in case the upscale process fails
     upscaled_frame = None  
     try:
      
         print(f"Processing video: {video_path}")
-        resize_factor = selected_resize_factor.get()
-        tiles_resolution = AI.return_max_resolution()
-        print(f"tiles resolution: {tiles_resolution}")
-        print(f"rezise factor: {resize_factor}")
-        # Create an AI instance using the selected model, GPU, the provided resize_factor, and tiles_resolution.
-        ai_instance = AI(selected_AI_model, selected_gpu, resize_factor, tiles_resolution)
-        
-        # Perform the upscaling
-        upscaled_frame = ai_instance.AI_orchestration(frame)
-        
-        # Convert the upscaled frame to RGB
-        upscaled_frame = cv2.cvtColor(upscaled_frame, COLOR_BGR2RGB)
-    except Exception as e:
-        print(f"Error during upscaling/inference: {str(e)}")
-        loading_icon.stop()
-        info_message.set("Upscaling failed")
-        return  # Exit early if processing fails
+        resize_factor = int(float(selected_resize_factor.get()))
+        print(f"rezise factor: {resize_factor}%")
 
-    # Schedule updating the UI with the original and upscaled frames
-    window.after(0, lambda: show_preview_frames(original_frame, upscaled_frame, loading_icon))
+
+        if selected_AI_model in RRDB_models_list:
+            vram_multiplier = very_high_VRAM
+            print(f"Selected vram: [{very_high_VRAM}]\n")
+        elif selected_AI_model in SRVGGNetCompact_models_list:
+            vram_multiplier = medium_VRAM
+            print(F"Selected vram: [{medium_VRAM}]\n")
+        elif selected_AI_model in IRCNN_models_list:
+            vram_multiplier = very_low_VRAM
+            print(f"Selected_ai_model in ircnn_models_list: [{selected_AI_model}]\n")
+        else:
+            vram_multiplier = very_high_VRAM 
+            print(f"elseblock: [{very_high_VRAM}]\n")
+
+        vram_limiter = float(selected_VRAM_limiter.get())
+        print(f"vram limiter: [{vram_limiter}]\n")
+        max_resolution = int(vram_multiplier * vram_limiter * 100)
+        print(f"max resolution: [{max_resolution}]\n")
+
+        print(f"Running inference now... AI instance details --> [selected Model: {selected_AI_model}, selected_gpu: {selected_gpu}, resize_factor: {resize_factor}, max_resolution: {max_resolution}]")
+        ai_instance = AI(selected_AI_model, selected_gpu, resize_factor, max_resolution)
+        upscaled_frame = ai_instance.AI_orchestration(frame)
+        upscaled_frame = cv2.cvtColor(upscaled_frame, COLOR_BGR2RGB) if upscaled_frame is not None else None
+        window.after(0, lambda: show_preview_frames(original_frame, upscaled_frame, loading_icon))
+
+        
+     
+    except Exception as e:
+        print(f"Preview error:  {str(e)}")
+        loading_icon.stop()
+        return
+
 
 
 
 
 
 ####YOUTUBE DOWNLOADING####
-
 def download_youtube_link(youtube_url,output_path):
     ydl_opts = {
         'outtmpl': f'{output_path}/%(title)s.%(ext)s',
@@ -481,13 +473,10 @@ class AI:
         elif "x4" in self.AI_model_name: return 4
         
         
-  
-
-    def return_max_resolution(self):
-        return self.max_resolution
     
 
-    def _load_inferenceSession(self) -> onnxruntime_inferenceSession:        
+    def _load_inferenceSession(self) -> onnxruntime_inferenceSession:     
+        directml_backend = [('DmlExecutionProvider', {"device_id": "0" or "1"})] or directml_backend == ['CPUExecutionProvider']
         match self.directml_gpu:
             case 'GPU 1': directml_backend = [('DmlExecutionProvider', {"device_id": "0"})]
             case 'GPU 2': directml_backend = [('DmlExecutionProvider', {"device_id": "1"})]
@@ -3204,7 +3193,7 @@ def get_upscale_factor() -> int:
     return upscale_factor
 
 def open_files_action():
-    global loading_label, preview_shown, original_preview,upscaled_preview
+    global  preview_shown, original_preview,upscaled_preview
     info_message.set("Selecting files")
 
     uploaded_files_list = list(filedialog.askopenfilenames())
@@ -3212,6 +3201,7 @@ def open_files_action():
     if len(supported_files_list) > 0:
         loading_icon = LoadingIcon(window)
         loading_icon.label.place(relx=0.5, rely=0.5,anchor="center")
+        loading_icon.start()
 
         window.update()
 
@@ -3229,8 +3219,10 @@ def open_files_action():
         else: 
             loading_icon.stop()
             info_message.set("No video found")
+            print("no video found...")
     else: 
         info_message.set("Not supported files :(")
+        print("No supported files. ")
     
 
 def open_output_path_action():
