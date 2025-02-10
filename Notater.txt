@@ -1,4 +1,3 @@
-Select forsvinner vis man fjerner videoene som er i vinduet
 
 gjøre ferdig bruk av audio
 

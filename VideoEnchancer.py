@@ -5,13 +5,18 @@ from webbrowser import open as open_browser
 from subprocess import run  as subprocess_run
 from shutil     import rmtree as remove_directory
 from timeit     import default_timer as timer
-
-
+from PIL import Image, ImageTk, ImageSequence
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import threading
+import cv2
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from Logger import logging
 from typing    import Callable
 from threading import Thread
 from itertools import repeat
 from multiprocessing.pool import ThreadPool
+import yt_dlp
 from multiprocessing import ( 
     Process, 
     Queue          as multiprocessing_Queue,
@@ -102,6 +107,7 @@ from tkinter import DISABLED
 from customtkinter import (
     CTk,
     CTkButton,
+    CTkFrame,
     CTkEntry,
     CTkFont,
     CTkImage,
@@ -140,6 +146,10 @@ SRVGGNetCompact_models_list = [ "RealESR_Gx4", "RealSRx4_Anime" ]
 RRDB_models_list            = [ "BSRGANx4", "BSRGANx2", "RealESRGANx4" ]
 
 
+global loading_label
+global preview_shown
+global original_preview
+global upscaled_preview
 AI_models_list         = ( SRVGGNetCompact_models_list + AI_LIST_SEPARATOR + RRDB_models_list + AI_LIST_SEPARATOR + IRCNN_models_list )
 gpus_list              = ["Auto", "GPU 1", "GPU 2", "GPU 3", "GPU 4" ]
 keep_frames_list       = [ "Disabled", "Enabled" ]
@@ -240,6 +250,35 @@ supported_video_extensions = [
 
 
 
+def open_files_action():
+    global loading_label, preview_shown, original_preview, upscaled_preview
+    info_message.set("Selecting files")
+
+    uploaded_files_list = list(filedialog.askopenfilenames())
+    supported_files_list = check_supported_selected_files(uploaded_files_list)
+    if len(supported_files_list) > 0:
+        loading_icon = LoadingIcon(window)
+        loading_icon.label.place(relx=0.5, rely=0.5,anchor="center")
+
+        window.update()
+
+        video_path = next((f for f in supported_files_list if check_if_file_is_video(f)), None)
+
+        if video_path:
+            print(f"open_files_action: {video_path}")
+
+            preview_thread = threading.Thread(
+                target = process_and_show_preview,
+                args=(video_path,loading_icon)
+            )
+            preview_thread.start()
+            print("preview started")
+        else: 
+            loading_icon.stop()
+            info_message.set("No video found")
+    else: 
+        info_message.set("Not supported files :(")
+    
 
 
 
@@ -267,11 +306,138 @@ supported_video_extensions = [
 
 
 
+#Loading icon ---> start ---> animating ---> animation...
+class LoadingIcon:
+    def __init__(self,master):
+        self.master = master
+        self.loading_gif = Image.open(find_by_relative_path("Assets" + os_separator + "Loading.gif"))
+        self.frames = [CTkImage(frame.convert('RGBA'), size=(100, 100)) 
+               for frame in ImageSequence.Iterator(self.loading_gif)]
+
+        self.label = CTkLabel(master,text="", image=self.frames[0])
+        self.label.place(relx=0.5, rely=0.5, anchor="center")
+        self.current_frame = 0
+        self.animating = False
+
+    def start(self):
+        self.animating = True
+        print("Started animate")
+        self.animate()
+
+    def stop(self):
+        self.animating = False 
+        self.label.destroy()
+    
+    def animate(self):
+        print("Animate function")
+        if self.animating:
+            self.label.configure(image=self.frames[self.current_frame])
+            self.current_frame = (self.current_frame + 1) % len(self.frames)
+            self.master.after(50,self.animate)
+
+
+
+
+def show_preview_frames(original, upscaled, loading_icon):
+    global original_preview, upscaled_preview, preview_shown
+    loading_icon.stop()
+    
+    # Convert to CTkImage
+    original_image = CTkImage(Image.fromarray(original), size=(400,225))
+    upscaled_image = CTkImage(Image.fromarray(upscaled), size=(800,450))
+    
+    # Update background area
+    background = CTkLabel(window, text="", fg_color=dark_color)
+    background.place(relx=0.0, rely=0.0, relwidth=0.25, relheight=0.42)
+    
+    original_preview = CTkLabel(
+        master=window,
+        image=original_image,
+        text="Original",
+        compound="Bottom",
+        fg_color=dark_color,
+    )
+    original_preview.place(relx=0.1, rely=0.2, anchor="w")
+    
+    upscaled_preview = CTkLabel(
+        master=window,
+        image=upscaled_image,
+        text="Upscaled",
+        compound="Bottom",
+        fg_color=dark_color
+    )
+    upscaled_preview.place(relx=0.4, rely=0.2, anchor="w")
+    
+    preview_shown = True  # Set flag to indicate that the preview is now shown.
+    info_message.set("Preview Ready!")
+
+
+
+
+def process_and_show_preview(video_path, loading_icon):
+    # Check if an AI model has been selected
+    if not selected_AI_model or selected_AI_model == AI_LIST_SEPARATOR[0]:
+        show_error_message("Select an AI model first!")
+        return 
+    
+    # Retrieve the first image (frame) from the video
+    cap = cv2.VideoCapture(video_path)
+    ret, frame = cap.read()
+    cap.release()
+
+    if not ret:
+        loading_icon.stop()
+        print("Could not read video")
+        return
+    
+    # Convert the frame from BGR to RGB (make sure opencv_cvtColor is defined or use cv2.cvtColor)
+    original_frame = opencv_cvtColor(frame, COLOR_BGR2RGB)
+    
+
+    # Initialize upscaled_frame in case the upscale process fails
+    upscaled_frame = None  
+    try:
+     
+        print(f"Processing video: {video_path}")
+        resize_factor = selected_resize_factor.get()
+        tiles_resolution = AI.return_max_resolution()
+        print(f"tiles resolution: {tiles_resolution}")
+        print(f"rezise factor: {resize_factor}")
+        # Create an AI instance using the selected model, GPU, the provided resize_factor, and tiles_resolution.
+        ai_instance = AI(selected_AI_model, selected_gpu, resize_factor, tiles_resolution)
+        
+        # Perform the upscaling
+        upscaled_frame = ai_instance.AI_orchestration(frame)
+        
+        # Convert the upscaled frame to RGB
+        upscaled_frame = cv2.cvtColor(upscaled_frame, COLOR_BGR2RGB)
+    except Exception as e:
+        print(f"Error during upscaling/inference: {str(e)}")
+        loading_icon.stop()
+        info_message.set("Upscaling failed")
+        return  # Exit early if processing fails
+
+    # Schedule updating the UI with the original and upscaled frames
+    window.after(0, lambda: show_preview_frames(original_frame, upscaled_frame, loading_icon))
 
 
 
 
 
+####YOUTUBE DOWNLOADING####
+
+def download_youtube_link(youtube_url,output_path):
+    ydl_opts = {
+        'outtmpl': f'{output_path}/%(title)s.%(ext)s',
+        'format': 'bestvideo+bestaudio/best',
+        'merge_output_format': 'mp4',
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:  
+            ydl.download([youtube_url])
+        return "Download Complete!"
+    except Exception as e:
+        return f"error during download {str(e)}"
 
 
 
@@ -317,7 +483,9 @@ class AI:
         
   
 
-
+    def return_max_resolution(self):
+        return self.max_resolution
+    
 
     def _load_inferenceSession(self) -> onnxruntime_inferenceSession:        
         match self.directml_gpu:
@@ -3036,46 +3204,34 @@ def get_upscale_factor() -> int:
     return upscale_factor
 
 def open_files_action():
+    global loading_label, preview_shown, original_preview,upscaled_preview
     info_message.set("Selecting files")
 
-    uploaded_files_list    = list(filedialog.askopenfilenames())
-    uploaded_files_counter = len(uploaded_files_list)
+    uploaded_files_list = list(filedialog.askopenfilenames())
+    supported_files_list = check_supported_selected_files(uploaded_files_list)
+    if len(supported_files_list) > 0:
+        loading_icon = LoadingIcon(window)
+        loading_icon.label.place(relx=0.5, rely=0.5,anchor="center")
 
-    supported_files_list    = check_supported_selected_files(uploaded_files_list)
-    supported_files_counter = len(supported_files_list)
-    
-    print("> Uploaded files: " + str(uploaded_files_counter) + " => Supported files: " + str(supported_files_counter))
+        window.update()
 
-    if supported_files_counter > 0:
-        global file_widget
+        video_path = next((f for f in supported_files_list if check_if_file_is_video(f)), None)
 
-        upscale_factor = get_upscale_factor()
+        if video_path:
+            print(f"open_files_action: {video_path}")
 
-        try:
-            resize_factor = int(float(str(selected_resize_factor.get())))
-        except:
-            resize_factor = 0
-
-        file_widget = FileWidget(
-            master = window, 
-            selected_file_list = supported_files_list,
-            resize_factor  = resize_factor,
-            upscale_factor = upscale_factor,
-            fg_color = dark_color, 
-            bg_color = dark_color
-        )
-        
-        file_widget.place(
-            relx = 0.0, 
-            rely = 0.0, 
-            relwidth  = 0.25, 
-            relheight = 0.42
-        )
-        
-        info_message.set("Ready")
-
+            preview_thread = threading.Thread(
+                target = process_and_show_preview,
+                args=(video_path,loading_icon)
+            )
+            preview_thread.start()
+            print("preview started")
+        else: 
+            loading_icon.stop()
+            info_message.set("No video found")
     else: 
         info_message.set("Not supported files :(")
+    
 
 def open_output_path_action():
     asked_selected_output_path = filedialog.askdirectory()
@@ -3612,6 +3768,19 @@ def open_info_cpu():
 
 # GUI place functions ---------------------------
 def place_loadFile_section(window):
+    global background, preview_container
+
+
+    preview_container = CTkFrame(
+        window,
+        fg_color=dark_color,
+        width=int(window.winfo_width() * 0.25),
+        height=int(window.winfo_height() * 0.42)
+    )
+    preview_container.place(relx=0.0, rely=0.0)
+
+
+
     logo_image = CTkImage(pillow_image_open(find_by_relative_path("Assets" + os_separator + "bedre.jpg")),
                           size=(window.winfo_width(), window.winfo_height()))
     
@@ -3622,12 +3791,15 @@ def place_loadFile_section(window):
         width    = window.winfo_width(),
         height   = window.winfo_height()
     )
+    background.pack(fill="both",expand=True)
+
+    
 
    
 
     input_file_text_image = CTkImage(pillow_image_open(find_by_relative_path("Assets" + os_separator + "ROBOT.PNG")),
                                      size=(300,150))
-    
+    global input_file_text, input_file_button
     input_file_text = CTkLabel(
         master = window, 
         image      = input_file_text_image, 
@@ -3788,7 +3960,7 @@ def place_stop_button():
         height  = 30,
         border_color = "#EC1D1D"
     )
-    stop_button.place(relx = column2_x, rely = row4_y, anchor = "center")
+    stop_button.place(relx = column2_x- 0.5 , rely = row4_y , anchor = "center")
 
 def place_upscale_button(): 
     upscale_button = create_active_button(
@@ -3984,10 +4156,8 @@ class App():
         place_video_extension_menu()
         place_message_label()
         place_upscale_button()
-        
-        
     
-        
+
         
         
 if __name__ == "__main__":
