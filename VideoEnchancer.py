@@ -77,6 +77,7 @@ from cv2 import (
     IMREAD_UNCHANGED,
     INTER_LINEAR,
     INTER_AREA,
+    INTER_CUBIC,
     VideoCapture as opencv_VideoCapture,
     cvtColor     as opencv_cvtColor,
     imdecode     as opencv_imdecode,
@@ -757,7 +758,7 @@ class AI:
 
         match self.input_resize_factor:
             case factor if factor > 1:
-                return opencv_resize(image, (new_width, new_height), interpolation = INTER_LINEAR)
+                return opencv_resize(image, (new_width, new_height), interpolation = INTER_CUBIC)
             case factor if factor < 1:
                 return opencv_resize(image, (new_width, new_height), interpolation = INTER_AREA)
             case _:
@@ -1483,16 +1484,22 @@ class FileWidget(CTkScrollableFrame):
             file_infos = (f"{video_name}\n"
                           f"Resolution {width}x{height} • {minutes}m:{round(seconds)}s • {num_frames}frames\n")
             
-            if self.input_resize_factor != 0 and self.upscale_factor != 0:
-                resized_height  = int(height * (self.input_resize_factor/100))
-                resized_width   = int(width * (self.input_resize_factor/100))
+            if self.input_resize_factor != 0 and self.output_resize_factor != 0 and self.upscale_factor != 0 :
 
-                upscaled_height = int(resized_height * self.upscale_factor)
-                upscaled_width  = int(resized_width * self.upscale_factor)
+                input_resized_height  = int(height * (self.input_resize_factor/100))
+                input_resized_width   = int(width * (self.input_resize_factor/100))
 
-                file_infos += (f"AI input {self.input_resize_factor}% ➜ {resized_width}x{resized_height} \n"
-                               f"AI output x{self.upscale_factor} ➜ {upscaled_width}x{upscaled_height}")
+                upscaled_height = int(input_resized_height * self.upscale_factor)
+                upscaled_width  = int(input_resized_width * self.upscale_factor)
 
+                output_resized_height = int(upscaled_height * (self.output_resize_factor/100))
+                output_resized_width  = int(upscaled_width * (self.output_resize_factor/100))
+
+                file_infos += (
+                    f"AI input ({self.input_resize_factor}%) ➜ {input_resized_width}x{input_resized_height} \n"
+                    f"AI output (x{self.upscale_factor}) ➜ {upscaled_width}x{upscaled_height} \n"
+                    f"Video output ({self.output_resize_factor}%) ➜ {output_resized_width}x{output_resized_height}"
+                )
         else:
             image_name    = str(file_path.split("/")[-1])
             height, width = get_image_resolution(image_read(file_path))
@@ -1501,15 +1508,21 @@ class FileWidget(CTkScrollableFrame):
             file_infos = (f"{image_name}\n"
                           f"Resolution {width}x{height}\n")
             
-            if self.input_resize_factor != 0 and self.upscale_factor != 0:
-                resized_height = int(height * (self.input_resize_factor/100))
-                resized_width  = int(width * (self.input_resize_factor/100))
+            if self.input_resize_factor != 0 and self.output_resize_factor != 0 and self.upscale_factor != 0 :
+                input_resized_height = int(height * (self.input_resize_factor/100))
+                input_resized_width  = int(width * (self.input_resize_factor/100))
 
-                upscaled_height = int(resized_height * self.upscale_factor)
-                upscaled_width  = int(resized_width * self.upscale_factor)
+                upscaled_height = int(input_resized_height * self.upscale_factor)
+                upscaled_width  = int(input_resized_width * self.upscale_factor)
 
-                file_infos += (f"AI input {self.input_resize_factor}% ➜ {resized_width}x{resized_height} \n"
-                               f"AI output x{self.upscale_factor} ➜ {upscaled_width}x{upscaled_height}")
+                
+                output_resized_height = int(upscaled_height * (self.output_resize_factor/100))
+                output_resized_width  = int(upscaled_width * (self.output_resize_factor/100))
+            file_infos += (
+                                f"AI input ({self.input_resize_factor}%) ➜ {input_resized_width}x{input_resized_height} \n"
+                                f"AI output (x{self.upscale_factor}) ➜ {upscaled_width}x{upscaled_height} \n"
+                                f"Video output ({self.output_resize_factor}%) ➜ {output_resized_width}x{output_resized_height}"
+                            )
 
         return file_infos, file_icon
 
@@ -1559,10 +1572,11 @@ class FileWidget(CTkScrollableFrame):
     def set_upscale_factor(self, upscale_factor) -> None:
         self.upscale_factor = upscale_factor
 
-    def set_resize_factor(self, resize_factor) -> None:
-        self.input_resize_factor = resize_factor
+    def set_resize_factor(self, input_resize_factor) -> None:
+        self.input_resize_factor = input_resize_factor
  
- 
+    def set_output_resize_factor(self, output_resize_factor) -> None:
+        self.output_resize_factor = output_resize_factor
  
  
  
@@ -1631,17 +1645,16 @@ def update_file_widget(a, b, c) -> None:
     except:
         return
     
-    upscale_factor = get_upscale_factor()
+    upscale_factor, input_resize_factor, output_resize_factor  = get_values_for_file_widget()
 
-    try:
-        resize_factor = int(float(str(selected_input_resize_factor.get())))
-    except:
-        resize_factor = 0
-    
+
     file_widget.clean_file_list()
-    file_widget.set_resize_factor(resize_factor)
     file_widget.set_upscale_factor(upscale_factor)
+    file_widget.set_input_resize_factor(input_resize_factor)
+    file_widget.set_output_resize_factor(output_resize_factor)
     file_widget._create_widgets()
+
+    
 
 def create_info_button(
         command: Callable, 
@@ -1907,7 +1920,8 @@ def prepare_output_video_filename(
         video_path: str, 
         selected_output_path: str,
         selected_AI_model: str, 
-        resize_factor: int, 
+        input_resize_factor: int, 
+        output_resize_factor: int,
         selected_video_extension: str,
         selected_interpolation_factor: float
         ) -> str:
@@ -1928,7 +1942,7 @@ def prepare_output_video_filename(
     to_append = f"_{selected_AI_model}"
 
     # Selected resize
-    to_append += f"_Resize-{str(int(resize_factor * 100))}"
+    to_append += f"_Resize-{str(int(input_resize_factor * 100))}"
 
     # Selected intepolation
     match selected_interpolation_factor:
@@ -1955,7 +1969,8 @@ def prepare_output_video_directory_name(
         video_path: str, 
         selected_output_path: str,
         selected_AI_model: str, 
-        resize_factor: int, 
+        input_resize_factor: int, 
+        output_resize_factor: int,
         selected_interpolation_factor: float
         ) -> str:
     
@@ -1970,7 +1985,7 @@ def prepare_output_video_directory_name(
     to_append = f"_{selected_AI_model}"
 
     # Selected resize
-    to_append += f"_Resize-{str(int(resize_factor * 100))}"
+    to_append += f"_Resize-{str(int(input_resize_factor * 100))}"
 
     # Selected intepolation
     match selected_interpolation_factor:
@@ -2580,6 +2595,7 @@ def upscale_button_command() -> None:
     global selected_video_extension
     global tiles_resolution
     global input_resize_factor
+    global output_resize_factor
     global cpu_number
     global selected_audio_mode
     global process_upscale_orchestrator
@@ -2618,6 +2634,7 @@ def upscale_button_command() -> None:
                 selected_image_extension,
                 tiles_resolution, 
                 input_resize_factor, 
+                output_resize_factor,
                 cpu_number, 
                 selected_video_extension,
                 selected_interpolation_factor,
@@ -2693,7 +2710,8 @@ def upscale_orchestrator(
         selected_gpu: str,
         selected_image_extension: str,
         tiles_resolution: int,
-        resize_factor: int,
+        input_resize_factor: int,
+        output_resize_factor: int,
         cpu_number: int,
         selected_video_extension: str,
         selected_interpolation_factor: float,
@@ -2703,13 +2721,13 @@ def upscale_orchestrator(
         ) -> None:
 
     write_process_status(processing_queue, f"Loading AI model")
-    AI_instance = AI(selected_AI_model, selected_gpu, resize_factor, tiles_resolution)
+    AI_instance = AI(selected_AI_model, selected_gpu, input_resize_factor,output_resize_factor, tiles_resolution)
     AI_instance_list = []
     AI_instance_list.append(AI_instance)
 
     if selected_AI_multithreading > 1:
         for _ in range(selected_AI_multithreading - 1):
-            AI_instance_list.append(AI(selected_AI_model, selected_gpu, resize_factor, tiles_resolution))
+            AI_instance_list.append(AI(selected_AI_model, selected_gpu, input_resize_factor, output_resize_factor,  tiles_resolution))
 
     try:
         how_many_files = len(selected_file_list)
@@ -2726,7 +2744,8 @@ def upscale_orchestrator(
                     AI_instance,
                     AI_instance_list,
                     selected_AI_model,
-                    resize_factor, 
+                    input_resize_factor,
+                    output_resize_factor,  
                     cpu_number, 
                     selected_video_extension, 
                     selected_interpolation_factor,
@@ -2743,7 +2762,8 @@ def upscale_orchestrator(
                     AI_instance,
                     selected_AI_model,
                     selected_image_extension, 
-                    resize_factor, 
+                    input_resize_factor, 
+                    output_resize_factor, 
                     selected_interpolation_factor
                 )
 
@@ -2797,12 +2817,13 @@ def upscale_image(
         AI_instance: AI,
         selected_AI_model: str,
         selected_image_extension: str,
-        resize_factor: int, 
+        input_resize_factor: int, 
+        output_resize_factor: int,
         selected_interpolation_factor: float
         ) -> None:
     
     starting_image = image_read(image_path)
-    upscaled_image_path = prepare_output_image_filename(image_path, selected_output_path, selected_AI_model, resize_factor, selected_image_extension, selected_interpolation_factor)
+    upscaled_image_path = prepare_output_image_filename(image_path, selected_output_path, selected_AI_model, input_resize_factor, output_resize_factor, selected_image_extension, selected_interpolation_factor)
 
     write_process_status(processing_queue, f"{file_number}. Upscaling image")
     upscaled_image = AI_instance.AI_orchestration(starting_image)
@@ -2890,10 +2911,11 @@ def upscale_video(
         AI_instance: AI,
         AI_instance_list: list[AI],
         selected_AI_model: str,
-        resize_factor: int, 
+        input_resize_factor: int, 
         cpu_number: int, 
         selected_video_extension: str,
         selected_interpolation_factor: float,
+        output_resize_factor: int,
         selected_AI_multithreading: int,
         selected_keep_frames: bool,
         selected_audio_mode: str
@@ -2905,8 +2927,8 @@ def upscale_video(
     processing_times_async = []
     
     # 1.Preparation
-    target_directory  = prepare_output_video_directory_name(video_path, selected_output_path, selected_AI_model, resize_factor, selected_interpolation_factor)
-    video_output_path = prepare_output_video_filename(video_path, selected_output_path, selected_AI_model, resize_factor, selected_video_extension, selected_interpolation_factor)
+    target_directory  = prepare_output_video_directory_name(video_path, selected_output_path, selected_AI_model, input_resize_factor,output_resize_factor, selected_interpolation_factor)
+    video_output_path = prepare_output_video_filename(video_path, selected_output_path, selected_AI_model, input_resize_factor,output_resize_factor, selected_video_extension, selected_interpolation_factor)
     
     Audio_Inference_output = AI_instance.process_Audio_Inference(video_path,selected_audio_mode,) 
     
@@ -2919,7 +2941,7 @@ def upscale_video(
         write_process_status(processing_queue, f"{file_number}. Extracting video frames")
         extracted_frames_paths = extract_video_frames(processing_queue, file_number, target_directory, video_path, cpu_number)
 
-    upscaled_frame_paths = [prepare_output_video_frame_filename(frame_path, selected_AI_model, resize_factor, selected_interpolation_factor) for frame_path in extracted_frames_paths]
+    upscaled_frame_paths = [prepare_output_video_frame_filename(frame_path, selected_AI_model, input_resize_factor, output_resize_factor,selected_interpolation_factor) for frame_path in extracted_frames_paths]
 
     # 3. Check if video need tiles OR video multithreading upscale
     first_frame_path             = extracted_frames_paths[0]
@@ -3195,6 +3217,7 @@ def user_input_checks() -> bool:
     global selected_image_extension
     global tiles_resolution
     global input_resize_factor
+    global output_resize_factor
     global cpu_number
 
     # Selected files 
@@ -3901,7 +3924,7 @@ def place_loadFile_section(window):
         )
     preview_frame_button = CTkButton(
         master = window,
-        command  = show_preview_frames(), 
+    #    command  = show_preview_frames(), 
         text     = "Preview Frames",
         width    = 140,
         height   = 30,
@@ -4501,6 +4524,8 @@ if __name__ == "__main__":
         "High": 0.7,
     }.get(default_interpolation)
 
+    
+
     selected_input_resize_factor.set(default_resize_factor)
     selected_output_resize_factor.set(default_output_resize_factor)
     selected_VRAM_limiter.set(default_VRAM_limiter)
@@ -4509,6 +4534,8 @@ if __name__ == "__main__":
 
     info_message.set("AI upscaling Ready")
     selected_input_resize_factor.trace_add('write', update_file_widget)
+    selected_output_resize_factor.trace_add('write', update_file_widget)
+
 
     font   = "Segoe UI"    
     bold8  = CTkFont(family = font, size = 8, weight = "bold")
