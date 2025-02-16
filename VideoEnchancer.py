@@ -15,8 +15,10 @@ from Logger import logging
 from typing    import Callable
 from threading import Thread
 from itertools import repeat
+from concurrent.futures import ThreadPoolExecutor
 from multiprocessing.pool import ThreadPool
 import yt_dlp
+import time
 from multiprocessing import ( 
     Process, 
     Queue          as multiprocessing_Queue,
@@ -266,21 +268,6 @@ supported_video_extensions = [
 
 
 
-#ERRROR
-#[LearnReflect AI] External ffmpeg.exe file found
-#[LearnReflect AI] Preference file exist
-#Started animate
-#open_files_action: C:/Users/didri/AppData/Local/CapCut/Videos/Facebook/Grace.mp4
-#preview started
-#Processing video: C:/Users/didri/AppData/Local/CapCut/Videos/Facebook/Grace.mp4
-#rezise factor: 20%
-#Selected vram: [2.2]
-#vram limiter: [8.0]
-#max resolution: [1760]
-#Running inference now... AI instance details --> [selected Model: RealSRx4_Anime, selected_gpu: Auto, resize_factor: 20, max_resolution: 1760]
-#Preview error:  Unable to allocate 552. MiB for an array with shape (6980, 6912, 3) and data type float32
-
-
 
 
 
@@ -323,8 +310,8 @@ def show_preview_frames(original, upscaled, loading_icon):
     print("Loading stopped. showing images now...")
     
     # Convert to CTkImage
-    original_image = CTkImage(Image.fromarray(original), size=(400,225))
-    upscaled_image = CTkImage(Image.fromarray(upscaled), size=(800,450))
+    original_image = CTkImage(Image.fromarray(original), size=(1280,1920))
+    upscaled_image = CTkImage(Image.fromarray(upscaled), size=(1280,1920))
     
     for widget in window.winfo_children():
         if isinstance(widget,CTkLabel) and widget.cget("text") == "":
@@ -356,80 +343,130 @@ def show_preview_frames(original, upscaled, loading_icon):
 
 
 
+
+# Global cache
+video_cache = {}
+frame_cache = {}
+preview_ai_instance = None
+last_model_config = None
+preview_executor = ThreadPoolExecutor(max_workers=1)
+
+def async_preview(video_path):
+    future = preview_executor.submit(process_and_show_preview, video_path)
+    future.add_done_callback(lambda f: update_ui(f.result()))
+
+def update_ui(result):
+    print("READY (UPDATE_UI)")
+    pass
+
+
+#PROBLEM
+def preload_models():
+    global preview_ai_instance
+    if not preview_ai_instance:
+        preview_ai_instance = AI(default_AI_model, default_gpu, 50, 1000)
+   
+        dummy_input = np.zeros((512, 512, 3), dtype=np.uint8)
+        _ = preview_ai_instance.AI_orchestration(dummy_input)
+
+
+
 def process_and_show_preview(video_path, loading_icon):
+    global preview_ai_instance, last_model_config
+
     if not selected_AI_model or selected_AI_model == AI_LIST_SEPARATOR[0]:
         show_error_message("Select an AI model first!")
-        print("Select an AI model first!")
-        return 
-    
-    cap = cv2.VideoCapture(video_path)
-    ret, frame = cap.read()
-    cap.release()
-
-    if not ret:
-        loading_icon.stop()
-        print("Could not read video")
         return
-    
-    original_frame = opencv_cvtColor(frame, COLOR_BGR2RGB)
 
-    upscaled_frame = None  
     try:
+
+        current_config = (
+            selected_AI_model,
+            selected_gpu,
+            int(float(selected_resize_factor.get())),
+            float(selected_VRAM_limiter.get())
+        )
+
+        # Initialize or reuse AI instance
+        if not preview_ai_instance or last_model_config != current_config:
+            resize_factor = int(float(selected_resize_factor.get()))
+            vram_limiter = float(selected_VRAM_limiter.get())
+
+            if selected_AI_model in RRDB_models_list:
+                vram_multiplier = very_high_VRAM
+            elif selected_AI_model in SRVGGNetCompact_models_list:
+                vram_multiplier = medium_VRAM
+            else:
+                vram_multiplier = very_low_VRAM
+
+            max_resolution = int(vram_multiplier * vram_limiter * 100)
+            
+  
+            preview_ai_instance = AI(
+                selected_AI_model,
+                selected_gpu,
+                resize_factor,
+                max_resolution
+            )
+            preview_ai_instance.inferenceSession.set_providers(
+                ['DmlExecutionProvider'], 
+                [{'device_id': 0}]
+            )
+
      
-        print(f"Processing video: {video_path}")
-        resize_factor = int(float(selected_resize_factor.get()))
-        print(f"rezise factor: {resize_factor}%")
+            dummy_input = np.zeros((512, 512, 3), dtype=np.uint8)
+            _ = preview_ai_instance.AI_orchestration(dummy_input)
+            last_model_config = current_config
 
+   
+        cap = video_cache.get(video_path)
+        if not cap:
+            cap = cv2.VideoCapture(video_path)
+            video_cache[video_path] = cap
 
-        if selected_AI_model in RRDB_models_list:
-            vram_multiplier = very_high_VRAM
-            print(f"Selected vram: [{very_high_VRAM}]\n")
-        elif selected_AI_model in SRVGGNetCompact_models_list:
-            vram_multiplier = medium_VRAM
-            print(F"Selected vram: [{medium_VRAM}]\n")
-        elif selected_AI_model in IRCNN_models_list:
-            vram_multiplier = very_low_VRAM
-            print(f"Selected_ai_model in ircnn_models_list: [{selected_AI_model}]\n")
+        if not cap.isOpened():
+            raise ValueError("Could not open video file")
+
+        # Get cached frame or read new
+        frame = frame_cache.get(video_path)
+        if frame is None:
+            success, frame = cap.read()
+            if not success:
+                raise ValueError("Frame read failed")
+            frame_cache[video_path] = frame
         else:
-            vram_multiplier = very_high_VRAM 
-            print(f"elseblock: [{very_high_VRAM}]\n")
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
-        vram_limiter = float(selected_VRAM_limiter.get())
-        print(f"vram limiter: [{vram_limiter}]\n")
-        max_resolution = int(vram_multiplier * vram_limiter * 100)
-        print(f"max resolution: [{max_resolution}]\n")
+      
+        frame = cv2.resize(frame, (960, 540), interpolation=cv2.INTER_AREA)
 
-        print(f"Running inference now... AI instance details --> [selected Model: {selected_AI_model}, selected_gpu: {selected_gpu}, resize_factor: {resize_factor}, max_resolution: {max_resolution}]")
-        ai_instance = AI(selected_AI_model, selected_gpu, resize_factor, max_resolution)
-        upscaled_frame = ai_instance.AI_orchestration(frame)
-        upscaled_frame = cv2.cvtColor(upscaled_frame, COLOR_BGR2RGB) if upscaled_frame is not None else None
-        window.after(0, lambda: show_preview_frames(original_frame, upscaled_frame, loading_icon))
+   
+        start_time = time.perf_counter()
+        upscaled_frame = preview_ai_instance.AI_orchestration(frame)
+        processing_time = time.perf_counter() - start_time
 
-        
-     
+   
+        original_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        upscaled_rgb = cv2.cvtColor(upscaled_frame, cv2.COLOR_BGR2RGB)
+
+        print(f"Preview processed in {processing_time:.2f}s")
+
+        # Update UI
+        window.after(0, lambda: show_preview_frames(
+            original_rgb,
+            upscaled_rgb,
+            loading_icon
+        ))
+
     except Exception as e:
-        print(f"Preview error:  {str(e)}")
+        print(f"Preview error: {str(e)}")
         loading_icon.stop()
-        return
+        info_message.set("Preview failed")
 
 
 
 
 
-
-####YOUTUBE DOWNLOADING####
-def download_youtube_link(youtube_url,output_path):
-    ydl_opts = {
-        'outtmpl': f'{output_path}/%(title)s.%(ext)s',
-        'format': 'bestvideo+bestaudio/best',
-        'merge_output_format': 'mp4',
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:  
-            ydl.download([youtube_url])
-        return "Download Complete!"
-    except Exception as e:
-        return f"error during download {str(e)}"
 
 
 
@@ -437,9 +474,7 @@ def download_youtube_link(youtube_url,output_path):
 
 # AI -------------------
 class AI:
-
     # CLASS INIT FUNCTIONS
-
     def __init__(
             self, 
             AI_model_name: str, 
@@ -3930,6 +3965,153 @@ def place_video_extension_menu():
     video_extension_menu.place(relx = column2_x- 0.71, rely = row2_y - 0.205, anchor = "center")
 
 
+
+global youtube_progress_var
+
+def place_youtube_download_menu():
+    global youtube_link_entry, youtube_output_path_entry
+
+    #youtube frame
+    youtube_frame = CTkFrame(
+        master=window,
+        fg_color=dark_color,
+        width=400,
+        height=100,
+        corner_radius=10
+    )
+    youtube_frame.place(relx=0.5, rely=0.45, anchor="center")
+
+    progress_label =CTkLabel(
+        master=youtube_frame,
+        textvariable=youtube_progress_var,
+        font=bold12,
+        text_color="#00FF00"
+    )
+    progress_label.place(relx=0.95, rely=0.3, anchor="center")
+
+
+
+
+
+
+    #input for the youtubelink
+    CTkLabel(
+        master=youtube_frame,
+        text="YouTube URL:",
+        font=bold12,
+        text_color="#C0C0C0",
+    ).place(relx=0.05, rely=0.2, anchor="w")
+
+    youtube_link_entry = CTkEntry(
+        master=youtube_frame,
+        width=300,
+        height=25,
+        corner_radius=5,
+        font=bold11
+    ).place(relx=0.05, rely=0.45, anchor="w")
+
+    CTkLabel(
+        master=youtube_frame,
+        text="Save to:",
+        font=bold12,
+        text_color="#C0C0C0",
+    ).place(relx=0.05, rely=0.65, anchor="w")
+
+    youtube_output_path_entry = CTkEntry(
+        master=youtube_frame,
+        width=200,
+        height=25,
+        corner_radius=5,
+        font=bold11
+    )
+    youtube_output_path_entry.place(relx=0.05, rely=0.85, anchor="w")
+    youtube_output_path_entry.insert(0,DOCUMENT_PATH)
+
+    CTkButton(
+        master=youtube_frame,
+        text="Choose path",
+        width=80,
+        height=25,
+        font=bold11,
+        command=lambda: select_youtube_output_path()
+    ).place(relx=0.7, rely=0.85, anchor="w")
+
+
+    CTkButton(
+        master=youtube_frame,
+        text="Download",
+        width=80,
+        height=30,
+        font=bold11,
+        command=lambda: start_youtube_download(),
+        fg_color="#282828",
+        border_color="#0096FF",
+        border_width=1
+    ).place(relx=0.05, rely=0.5, anchor="e")
+
+def select_youtube_output_path():
+    path= filedialog.askdirectory()
+    if path:
+        youtube_output_path_entry.delete(0,'end')
+        youtube_output_path_entry.insert(0,path)
+
+
+
+
+####YOUTUBE DOWNLOADING####
+def download_youtube_link(youtube_url,output_path, progress_callback=None):
+    ydl_opts ={
+        "outtmpl": f'{output_path}/%(title)s.%(ext)s',
+        'format': 'bestvideo+bestaudio/best',
+        'merge_output_format': 'mp4',
+        'progress_hooks': [progress_callback] if progress_callback else [],
+        'noprogress': True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+             ydl.download([youtube_url])
+        return "Download Complete!"
+    except Exception as e:
+        return f"Error: {str(e)}"
+    
+def update_progress(d):
+    if d['status'] == 'downloading':
+        percent = d.get('_percent_str', '0%')
+        window.after(0, lambda: youtube_progress_var.set(percent))
+
+def download_thread(youtube_url, output_path):
+    try:
+        info_message.set("Downloading....")
+        success, message = download_youtube_link(youtube_url, output_path, update_progress)
+        if success:
+            info_message.set(message)
+        else: info_message.set(message)
+    except Exception as e:
+        info_message.set(f"Error: {str(e)}")
+    finally:
+        youtube_progress_var.set("")
+
+def start_youtube_download():
+    url=youtube_link_entry.get()
+    output_path = youtube_output_path_entry.get()
+
+    if not url or 'youtube.com' not in url and 'youtube.be' not in url:
+        info_message.set("Invalid YouTube URL!")
+        return
+    
+    if not output_path:
+        info_message.set("Choose a folder for saving!")
+        return
+    
+    youtube_progress_var.set("0%")
+    Thread(target=download_thread, args=(url, output_path)).start()
+
+        
+
+
+
+
+
 def place_message_label():
     message_label = CTkLabel(
         master  = window, 
@@ -4132,7 +4314,8 @@ class App():
         Master.geometry("1920x1080")
         Master.resizable(False, False)
         Master.iconbitmap(find_by_relative_path("Assets" + os_separator + "logo.ico"))
-
+        preload_models()
+        place_youtube_download_menu()
         place_loadFile_section(Master)
         place_app_name()
         place_output_path_textbox()
@@ -4159,10 +4342,10 @@ if __name__ == "__main__":
     set_appearance_mode("Dark")
     set_default_color_theme("dark-blue")
     
-    processing_queue = multiprocessing_Queue(maxsize=1)
 
     window = CTk() 
-
+    youtube_progress_var = StringVar()
+    processing_queue = multiprocessing_Queue(maxsize=1)
     info_message            = StringVar()
     selected_output_path    = StringVar()
     selected_resize_factor  = StringVar()
