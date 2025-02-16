@@ -136,7 +136,9 @@ def find_by_relative_path(relative_path: str) -> str:
 app_name   = "LearnReflect AI"
 app_name_color = "#DA70D6"
 dark_color     = "#080808"
-
+background_color        = "#000000"
+text_color              = "#B8B8B8"
+widget_background_color = "#181818"
 very_low_VRAM  = 4
 low_VRAM       = 3
 medium_VRAM    = 2.2
@@ -186,6 +188,7 @@ if os_path_exists(USER_PREFERENCE_PATH):
         default_audio_mode        = json_data.get("default_audio_mode",audio_mode_list[0]) 
         default_output_path       = json_data["default_output_path"]
         default_resize_factor     = json_data["default_resize_factor"]
+        default_output_resize_factor = json_data.get("default_output_resize_factor", str(100))
         default_VRAM_limiter      = json_data["default_VRAM_limiter"]
         default_cpu_number        = json_data["default_cpu_number"]
 else:
@@ -200,6 +203,7 @@ else:
     default_audio_mode        = audio_mode_list[0] 
     default_output_path       = OUTPUT_PATH_CODED
     default_resize_factor     = str(50)
+    default_output_resize_factor = str(100)
     default_VRAM_limiter      = str(4)
     default_cpu_number        = str(int(os_cpu_count()/2))
 
@@ -215,11 +219,22 @@ row3_y = row2_y + offset_y_options
 row4_y = row3_y + offset_y_options
 row5_y = row4_y + offset_y_options
 
+
+
 offset_x_options = 0.28
 column1_x = 0.5
 column0_x = column1_x - offset_x_options
 column2_x = column1_x + offset_x_options
 column1_5_x = column1_x + offset_x_options/2
+column_info1  = 0.625
+column_1_5    = column_info1 + 0.08
+column_1_4    = column_1_5 - 0.0127
+column_info2  = 0.858
+column_3      = column_info2 + 0.08
+
+
+little_textbox_width = 74
+little_menu_width = 98
 
 supported_file_extensions = [
     '.heic', '.jpg', '.jpeg', '.JPG', '.JPEG', '.png',
@@ -236,7 +251,6 @@ supported_video_extensions = [
     '.avi', '.AVI', '.mov', '.MOV', '.qt', '.3gp',
     '.mpg', '.mpeg', ".vob"
 ]
-
 
 
 
@@ -303,39 +317,50 @@ class LoadingIcon:
 
 
 
-
+#dada
 def show_preview_frames(original, upscaled, loading_icon):
     global original_preview, upscaled_preview, preview_shown
     loading_icon.stop()
     print("Loading stopped. showing images now...")
-    
-    # Convert to CTkImage
-    original_image = CTkImage(Image.fromarray(original), size=(1280,1920))
-    upscaled_image = CTkImage(Image.fromarray(upscaled), size=(1280,1920))
-    
-    for widget in window.winfo_children():
-        if isinstance(widget,CTkLabel) and widget.cget("text") == "":
-            widget.destroy()
 
+    #clear previous previews
+    for widget in window.preview_frame.winfo_children():
+        widget.destroy()
+
+    container = CTkFrame(window.preview_frame, fg_color=dark_color)
+    container.pack(pady=20, padx=20, fill='both', expand=True)
+
+    original_frame = CTkFrame(container, fg_color=dark_color)
+    original_frame.pack(side='left', fill='both', expand=True, padx=10)
     
-    original_preview = CTkLabel(
-        master=window,
-        image=original_image,
-        text="Original",
-        compound="top",
-        fg_color=dark_color,
-    )
-    original_preview.place(relx=0.5, rely=0.5, anchor="e")
-    
-    upscaled_preview = CTkLabel(
-        master=window,
-        image=upscaled_image,
-        text="Upscaled",
-        compound="top",
-        fg_color=dark_color
-    )
-    upscaled_preview.place(relx=0.5, rely=0.5, anchor="w")
-    
+    CTkLabel(original_frame, 
+             text="Original",
+             font=bold14,
+             text_color=app_name_color).pack(pady=5)
+             
+    original_image = CTkImage(Image.fromarray(original), 
+                            size=(400, 600))
+    original_preview = CTkLabel(original_frame, 
+                              image=original_image,
+                              text="")
+    original_preview.pack()
+
+    # Upscaled frame
+    upscaled_frame = CTkFrame(container, fg_color=dark_color)
+    upscaled_frame.pack(side='right', fill='both', expand=True, padx=10)
+
+    CTkLabel(upscaled_frame, 
+             text="Upscaled Preview",
+             font=bold14,
+             text_color=app_name_color).pack(pady=5)
+             
+    upscaled_image = CTkImage(Image.fromarray(upscaled), 
+                            size=(400, 600))
+    upscaled_preview = CTkLabel(upscaled_frame, 
+                              image=upscaled_image,
+                              text="")
+    upscaled_preview.pack()
+
     preview_shown = True  
     info_message.set("Preview Ready!")
     print("preview ready!")
@@ -383,13 +408,13 @@ def process_and_show_preview(video_path, loading_icon):
         current_config = (
             selected_AI_model,
             selected_gpu,
-            int(float(selected_resize_factor.get())),
+            int(float(selected_input_resize_factor.get())),
             float(selected_VRAM_limiter.get())
         )
 
         # Initialize or reuse AI instance
         if not preview_ai_instance or last_model_config != current_config:
-            resize_factor = int(float(selected_resize_factor.get()))
+            resize_factor = int(float(selected_input_resize_factor.get()))
             vram_limiter = float(selected_VRAM_limiter.get())
 
             if selected_AI_model in RRDB_models_list:
@@ -479,7 +504,8 @@ class AI:
             self, 
             AI_model_name: str, 
             directml_gpu: str, 
-            resize_factor: int,
+            input_resize_factor: int,
+            output_resize_factor: int,
             max_resolution: int,
             audio_model_type: str = None 
             ):
@@ -487,7 +513,8 @@ class AI:
         # Passed variables
         self.AI_model_name  = AI_model_name
         self.directml_gpu   = directml_gpu
-        self.resize_factor  = resize_factor
+        self.input_resize_factor  = input_resize_factor
+        self.output_resize_factor = output_resize_factor
         self.max_resolution = max_resolution
 
         # Calculated variables
@@ -721,20 +748,38 @@ class AI:
 
         return target_height, target_width
 
-    def resize_image_with_resize_factor(self, image: numpy_ndarray) -> numpy_ndarray:
+    def resize_with_input_factor(self, image: numpy_ndarray) -> numpy_ndarray:
         
         old_height, old_width = self.get_image_resolution(image)
 
-        new_width  = int(old_width * self.resize_factor)
-        new_height = int(old_height * self.resize_factor)
+        new_width  = int(old_width * self.input_resize_factor)
+        new_height = int(old_height * self.input_resize_factor)
 
-        match self.resize_factor:
+        match self.input_resize_factor:
             case factor if factor > 1:
                 return opencv_resize(image, (new_width, new_height), interpolation = INTER_LINEAR)
             case factor if factor < 1:
                 return opencv_resize(image, (new_width, new_height), interpolation = INTER_AREA)
             case _:
                 return image
+            
+
+    def resize_with_output_factor(self, image: numpy_ndarray) -> numpy_ndarray:
+        
+        old_height, old_width = self.get_image_resolution(image)
+
+        new_width  = int(old_width * self.output_resize_factor)
+        new_height = int(old_height * self.output_resize_factor)
+
+        new_width  = new_width if new_width % 2 == 0 else new_width + 1
+        new_height = new_height if new_height % 2 == 0 else new_height + 1
+
+        if self.output_resize_factor > 1:
+            return opencv_resize(image, (new_width, new_height), interpolation = INTER_CUBIC)
+        elif self.output_resize_factor < 1:
+            return opencv_resize(image, (new_width, new_height), interpolation = INTER_AREA)
+        else:
+            return image
 
     def resize_image_with_target_resolution(
             self,
@@ -769,7 +814,7 @@ class AI:
 
  # VIDEO CLASS FUNCTIONS
     def calculate_multiframes_supported_by_gpu(self, video_frame_path: str) -> int:
-        resized_video_frame  = self.resize_image_with_resize_factor(image_read(video_frame_path))
+        resized_video_frame  = self.resize_with_input_factor(image_read(video_frame_path))
         height, width        = self.get_image_resolution(resized_video_frame)
         image_pixels         = height * width
         max_supported_pixels = self.max_resolution * self.max_resolution
@@ -788,7 +833,7 @@ class AI:
 
     # TILLING FUNCTIONS
     def video_need_tilling(self, video_frame_path: str) -> bool:       
-        resized_video_frame  = self.resize_image_with_resize_factor(image_read(video_frame_path))
+        resized_video_frame  = self.resize_with_input_factor(image_read(video_frame_path))
         height, width        = self.get_image_resolution(resized_video_frame)
         image_pixels         = height * width
         max_supported_pixels = self.max_resolution * self.max_resolution
@@ -1026,7 +1071,7 @@ class AI:
     # EXTERNAL FUNCTION
     def AI_orchestration(self, image: numpy_ndarray) -> numpy_ndarray:
 
-        resized_image = self.resize_image_with_resize_factor(image)
+        resized_image = self.resize_with_input_factor(image)
         
         if self.image_need_tilling(resized_image):
             return self.AI_upscale_with_tilling(resized_image)
@@ -1288,16 +1333,18 @@ class FileWidget(CTkScrollableFrame):
             self, 
             master,
             selected_file_list, 
-            resize_factor = 0,
+            input_resize_factor  = 0,
             upscale_factor = 1,
+            output_resize_factor = 0,
             **kwargs
             ) -> None:
        
-        super().__init__(master, **kwargs)
+        super().__init__(master, height=300,**kwargs)
 
         self.file_list      = selected_file_list
-        self.resize_factor  = resize_factor
+        self.input_resize_factor  = input_resize_factor
         self.upscale_factor = upscale_factor
+        self.output_resize_factor = output_resize_factor
 
         self.label_list = []
         self._create_widgets()
@@ -1436,14 +1483,14 @@ class FileWidget(CTkScrollableFrame):
             file_infos = (f"{video_name}\n"
                           f"Resolution {width}x{height} • {minutes}m:{round(seconds)}s • {num_frames}frames\n")
             
-            if self.resize_factor != 0 and self.upscale_factor != 0:
-                resized_height  = int(height * (self.resize_factor/100))
-                resized_width   = int(width * (self.resize_factor/100))
+            if self.input_resize_factor != 0 and self.upscale_factor != 0:
+                resized_height  = int(height * (self.input_resize_factor/100))
+                resized_width   = int(width * (self.input_resize_factor/100))
 
                 upscaled_height = int(resized_height * self.upscale_factor)
                 upscaled_width  = int(resized_width * self.upscale_factor)
 
-                file_infos += (f"AI input {self.resize_factor}% ➜ {resized_width}x{resized_height} \n"
+                file_infos += (f"AI input {self.input_resize_factor}% ➜ {resized_width}x{resized_height} \n"
                                f"AI output x{self.upscale_factor} ➜ {upscaled_width}x{upscaled_height}")
 
         else:
@@ -1454,14 +1501,14 @@ class FileWidget(CTkScrollableFrame):
             file_infos = (f"{image_name}\n"
                           f"Resolution {width}x{height}\n")
             
-            if self.resize_factor != 0 and self.upscale_factor != 0:
-                resized_height = int(height * (self.resize_factor/100))
-                resized_width  = int(width * (self.resize_factor/100))
+            if self.input_resize_factor != 0 and self.upscale_factor != 0:
+                resized_height = int(height * (self.input_resize_factor/100))
+                resized_width  = int(width * (self.input_resize_factor/100))
 
                 upscaled_height = int(resized_height * self.upscale_factor)
                 upscaled_width  = int(resized_width * self.upscale_factor)
 
-                file_infos += (f"AI input {self.resize_factor}% ➜ {resized_width}x{resized_height} \n"
+                file_infos += (f"AI input {self.input_resize_factor}% ➜ {resized_width}x{resized_height} \n"
                                f"AI output x{self.upscale_factor} ➜ {upscaled_width}x{upscaled_height}")
 
         return file_infos, file_icon
@@ -1513,7 +1560,7 @@ class FileWidget(CTkScrollableFrame):
         self.upscale_factor = upscale_factor
 
     def set_resize_factor(self, resize_factor) -> None:
-        self.resize_factor = resize_factor
+        self.input_resize_factor = resize_factor
  
  
  
@@ -1555,14 +1602,25 @@ class FileWidget(CTkScrollableFrame):
  
  
  
+def get_values_for_file_widget() -> tuple:
+    # Upscale factor
+    upscale_factor = get_upscale_factor()
+
+    # Input resolution %
+    try:
+        input_resize_factor = int(float(str(selected_input_resize_factor.get())))
+    except:
+        input_resize_factor = 0
+
+    # Output resolution %
+    try:
+        output_resize_factor = int(float(str(selected_output_resize_factor.get())))
+    except:
+        output_resize_factor = 0
+
+    return upscale_factor, input_resize_factor, output_resize_factor
  
- 
- 
- 
- 
- 
- 
- 
+
  
  
 
@@ -1576,7 +1634,7 @@ def update_file_widget(a, b, c) -> None:
     upscale_factor = get_upscale_factor()
 
     try:
-        resize_factor = int(float(str(selected_resize_factor.get())))
+        resize_factor = int(float(str(selected_input_resize_factor.get())))
     except:
         resize_factor = 0
     
@@ -2521,7 +2579,7 @@ def upscale_button_command() -> None:
     global selected_image_extension
     global selected_video_extension
     global tiles_resolution
-    global resize_factor
+    global input_resize_factor
     global cpu_number
     global selected_audio_mode
     global process_upscale_orchestrator
@@ -2542,7 +2600,7 @@ def upscale_button_command() -> None:
         print(f"  Selected image output extension: {selected_image_extension}")
         print(f"  Selected video output extension: {selected_video_extension}")
         print(f"  Tiles resolution for selected GPU VRAM: {tiles_resolution}x{tiles_resolution}px")
-        print(f"  Resize factor: {int(resize_factor * 100)}%")
+        print(f"  Resize factor: {int(input_resize_factor * 100)}%")
         print(f"  Cpu number: {cpu_number}")
         print(f" Save frames: {selected_keep_frames}")
         print("=" * 50)
@@ -2559,7 +2617,7 @@ def upscale_button_command() -> None:
                 selected_gpu,
                 selected_image_extension,
                 tiles_resolution, 
-                resize_factor, 
+                input_resize_factor, 
                 cpu_number, 
                 selected_video_extension,
                 selected_interpolation_factor,
@@ -3136,7 +3194,7 @@ def user_input_checks() -> bool:
     global selected_AI_model
     global selected_image_extension
     global tiles_resolution
-    global resize_factor
+    global input_resize_factor
     global cpu_number
 
     # Selected files 
@@ -3156,15 +3214,26 @@ def user_input_checks() -> bool:
         return False
 
 
-    # File resize factor 
-    try: resize_factor = int(float(str(selected_resize_factor.get())))
+    # Input resize factor 
+    try: input_resize_factor = int(float(str(selected_input_resize_factor.get())))
     except:
         info_message.set("Resize % must be a numeric value")
         return False
 
-    if resize_factor > 0: resize_factor = resize_factor/100
+    if input_resize_factor > 0: input_resize_factor = input_resize_factor/100
     else:
         info_message.set("Resize % must be a value > 0")
+        return False
+    
+    #Output resize factor 
+    try: output_resize_factor = int(float(str(selected_output_resize_factor.get())))
+    except:
+        info_message.set("Output resolution % must be a number")
+        return False
+
+    if output_resize_factor > 0: output_resize_factor = output_resize_factor/100
+    else:
+        info_message.set("Output resolution % must be a value > 0")
         return False
 
     
@@ -3228,36 +3297,39 @@ def get_upscale_factor() -> int:
     return upscale_factor
 
 def open_files_action():
-    global  preview_shown, original_preview,upscaled_preview
+
+
+    def check_supported_selected_files(uploaded_file_list: list) -> list:
+        return [file for file in uploaded_file_list if any(supported_extension in file for supported_extension in supported_file_extensions)]
+
     info_message.set("Selecting files")
 
-    uploaded_files_list = list(filedialog.askopenfilenames())
-    supported_files_list = check_supported_selected_files(uploaded_files_list)
-    if len(supported_files_list) > 0:
-        loading_icon = LoadingIcon(window)
-        loading_icon.label.place(relx=0.5, rely=0.5,anchor="center")
-        loading_icon.start()
+    uploaded_files_list    = list(filedialog.askopenfilenames())
+    uploaded_files_counter = len(uploaded_files_list)
 
-        window.update()
+    supported_files_list    = check_supported_selected_files(uploaded_files_list)
+    supported_files_counter = len(supported_files_list)
+    
+    print("> Uploaded files: " + str(uploaded_files_counter) + " => Supported files: " + str(supported_files_counter))
 
-        video_path = next((f for f in supported_files_list if check_if_file_is_video(f)), None)
+    if supported_files_counter > 0:
 
-        if video_path:
-            print(f"open_files_action: {video_path}")
+        upscale_factor, input_resize_factor, output_resize_factor = get_values_for_file_widget()
 
-            preview_thread = threading.Thread(
-                target = process_and_show_preview,
-                args=(video_path,loading_icon)
-            )
-            preview_thread.start()
-            print("preview started")
-        else: 
-            loading_icon.stop()
-            info_message.set("No video found")
-            print("no video found...")
+        global file_widget
+        file_widget = FileWidget(
+            master               = window, 
+            selected_file_list   = supported_files_list,
+            upscale_factor       = upscale_factor,
+            input_resize_factor  = input_resize_factor,
+            output_resize_factor = output_resize_factor,
+            fg_color             = background_color, 
+            bg_color             = background_color
+        )
+        file_widget.place(relx = 0.0, rely = 0.0, relwidth = 0.5, relheight = 0.4)
+        info_message.set("Ready")
     else: 
         info_message.set("Not supported files :(")
-        print("No supported files. ")
     
 
 def open_output_path_action():
@@ -3795,47 +3867,25 @@ def open_info_cpu():
 
 # GUI place functions ---------------------------
 def place_loadFile_section(window):
-    global background, preview_container
+    background = CTkFrame(master = window, fg_color = background_color, corner_radius = 1)
 
 
-    preview_container = CTkFrame(
-        window,
-        fg_color=dark_color,
-        width=int(window.winfo_width() * 0.25),
-        height=int(window.winfo_height() * 0.42)
-    )
-    preview_container.place(relx=0.0, rely=0.0)
-
-
-
-    logo_image = CTkImage(pillow_image_open(find_by_relative_path("Assets" + os_separator + "bedre.jpg")),
-                          size=(window.winfo_width(), window.winfo_height()))
-    
-    background = CTkLabel(
-        master   = window,
-        image    = logo_image,
-        text     = "",  # No text, just the image
-        width    = window.winfo_width(),
-        height   = window.winfo_height()
-    )
-    background.pack(fill="both",expand=True)
 
     
+#dada
+    preview_frame = CTkFrame(
+    master=window,
+    width=800,
+    height=445,
+    fg_color=dark_color,
+    corner_radius=10
+)
+    preview_frame.place(relx=0.80, rely=0.215, anchor="center")
 
-   
 
-    input_file_text_image = CTkImage(pillow_image_open(find_by_relative_path("Assets" + os_separator + "ROBOT.PNG")),
-                                     size=(300,150))
-    global input_file_text, input_file_button
-    input_file_text = CTkLabel(
-        master = window, 
-        image      = input_file_text_image, 
-        width      = 300,
-        height     = 150,
-        text       = "",  # Make sure no text is set here
-        font       = bold12,
-        anchor     = "center"
-    )
+
+    global  input_file_button
+
     
     input_file_button = CTkButton(
         master = window,
@@ -3849,10 +3899,22 @@ def place_loadFile_section(window):
         text_color   = "#E0E0E0",
         border_color = "#0096FF"
         )
+    preview_frame_button = CTkButton(
+        master = window,
+        command  = show_preview_frames(), 
+        text     = "Preview Frames",
+        width    = 140,
+        height   = 30,
+        font     = bold11,
+        border_width = 1,
+        fg_color     = "#282828",
+        text_color   = "#E0E0E0",
+        border_color = "#0096FF"
+        )
     
     background.place(relx = 0.0, rely = 0.0, relwidth = 1.0, relheight = 0.42)
-    input_file_text.place(relx = 0.5, rely = 0.20,  anchor = "center")
-    input_file_button.place(relx = 0.5, rely = 0.35, anchor = "center")
+    input_file_button.place(relx = 0.55, rely = 0.4, anchor = "center")
+    preview_frame_button.place(relx= 0.55, rely=0.36, anchor = "center")
 
 def place_app_name():
     app_name_label = CTkLabel(
@@ -3904,7 +3966,7 @@ def place_AI_multithreading_menu():
 
 def place_input_resolution_textbox():
     resize_factor_button  = create_info_button(open_info_input_resolution, "Input resolution %")
-    resize_factor_textbox = create_text_box(selected_resize_factor) 
+    resize_factor_textbox = create_text_box(selected_input_resize_factor) 
 
     resize_factor_button.place(relx = column0_x- 0.15, rely = row4_y - 0.05, anchor = "center")
     resize_factor_textbox.place(relx = column0_x- 0.15, rely = row4_y, anchor = "center")
@@ -3966,8 +4028,106 @@ def place_video_extension_menu():
 
 
 
-global youtube_progress_var
+def place_message_label():
+    message_label = CTkLabel(
+        master  = window, 
+        textvariable = info_message,
+        height       = 25,
+        font         = bold11,
+        fg_color     = "#ffbf00",
+        text_color   = "#000000",
+        anchor       = "center",
+        corner_radius = 12
+    )
+    message_label.place(relx = column2_x - 0.55, rely = row4_y - 0.032, anchor = "center")
 
+def place_stop_button(): 
+    stop_button = create_active_button(
+        command = stop_button_command,
+        text    = "STOP",
+        icon    = stop_icon,
+        width   = 140,
+        height  = 30,
+        border_color = "#EC1D1D"
+    )
+    stop_button.place(relx = column2_x- 0.5 , rely = row4_y , anchor = "center")
+
+def place_upscale_button(): 
+    upscale_button = create_active_button(
+        command = upscale_button_command,
+        text    = "UPSCALE",
+        icon    = upscale_icon,
+        width   = 140,
+        height  = 30
+    )
+    upscale_button.place(relx = column2_x - 0.55, rely = row4_y, anchor = "center")
+   
+def create_option_background():
+    return CTkFrame(
+        master   = window,
+        bg_color = background_color,
+        fg_color = widget_background_color,
+        height   = 46,
+        corner_radius = 10
+    )
+
+def place_input_output_resolution_textboxs():
+
+    def open_info_input_resolution():
+        option_list = [
+            " A high value (>70%) will create high quality photos/videos but will be slower",
+            " While a low value (<40%) will create good quality photos/videos but will much faster",
+
+            " \n For example, for a 1080p (1920x1080) image/video\n" + 
+            " • Input resolution 25% => input to AI 270p (480x270)\n" +
+            " • Input resolution 50% => input to AI 540p (960x540)\n" + 
+            " • Input resolution 75% => input to AI 810p (1440x810)\n" + 
+            " • Input resolution 100% => input to AI 1080p (1920x1080) \n",
+        ]
+
+        MessageBox(
+            messageType   = "info",
+            title         = "Input resolution %",
+            subtitle      = "This widget allows to choose the resolution input to the AI",
+            default_value = None,
+            option_list   = option_list
+        )
+
+    def open_info_output_resolution():
+        option_list = [
+            " TBD ",
+        ]
+
+        MessageBox(
+            messageType   = "info",
+            title         = "Output resolution %",
+            subtitle      = "This widget allows to choose upscaled files resolution",
+            default_value = None,
+            option_list   = option_list
+        )
+
+
+    widget_row = row4_y
+
+    background = create_option_background()
+    background.place(relx = 0.75, rely = widget_row, relwidth = 0.48, anchor = "center")
+
+    # Input resolution %
+    info_button = create_info_button(open_info_input_resolution, "Input resolution")
+    option_menu = create_text_box(selected_input_resize_factor, width = little_textbox_width) 
+
+    info_button.place(relx = column_info1, rely = widget_row - 0.003, anchor = "center")
+    option_menu.place(relx = column_1_5,   rely = widget_row,         anchor = "center")
+
+    # Output resolution %
+    info_button = create_info_button(open_info_output_resolution, "Output resolution")
+    option_menu = create_text_box(selected_output_resize_factor, width = little_textbox_width)  
+
+    info_button.place(relx = column_info2, rely = widget_row - 0.003, anchor = "center")
+    option_menu.place(relx = column_3,     rely = widget_row,         anchor = "center")
+
+
+global youtube_progress_var
 def place_youtube_download_menu():
     global youtube_link_entry, youtube_output_path_entry
 
@@ -3975,11 +4135,11 @@ def place_youtube_download_menu():
     youtube_frame = CTkFrame(
         master=window,
         fg_color=dark_color,
-        width=400,
-        height=100,
+        width=500,
+        height=150,
         corner_radius=10
     )
-    youtube_frame.place(relx=0.5, rely=0.45, anchor="center")
+    youtube_frame.place(relx=0.87, rely=0.49, anchor="center")
 
     progress_label =CTkLabel(
         master=youtube_frame,
@@ -3990,17 +4150,13 @@ def place_youtube_download_menu():
     progress_label.place(relx=0.95, rely=0.3, anchor="center")
 
 
-
-
-
-
     #input for the youtubelink
     CTkLabel(
         master=youtube_frame,
         text="YouTube URL:",
         font=bold12,
         text_color="#C0C0C0",
-    ).place(relx=0.05, rely=0.2, anchor="w")
+    ).place(relx=0.18, rely=0.2, anchor="w")
 
     youtube_link_entry = CTkEntry(
         master=youtube_frame,
@@ -4008,14 +4164,14 @@ def place_youtube_download_menu():
         height=25,
         corner_radius=5,
         font=bold11
-    ).place(relx=0.05, rely=0.45, anchor="w")
+    ).place(relx=0.18, rely=0.45, anchor="w")
 
     CTkLabel(
         master=youtube_frame,
         text="Save to:",
         font=bold12,
         text_color="#C0C0C0",
-    ).place(relx=0.05, rely=0.65, anchor="w")
+    ).place(relx=0.18, rely=0.65, anchor="w")
 
     youtube_output_path_entry = CTkEntry(
         master=youtube_frame,
@@ -4024,7 +4180,7 @@ def place_youtube_download_menu():
         corner_radius=5,
         font=bold11
     )
-    youtube_output_path_entry.place(relx=0.05, rely=0.85, anchor="w")
+    youtube_output_path_entry.place(relx=0.18, rely=0.8, anchor="w")
     youtube_output_path_entry.insert(0,DOCUMENT_PATH)
 
     CTkButton(
@@ -4034,7 +4190,7 @@ def place_youtube_download_menu():
         height=25,
         font=bold11,
         command=lambda: select_youtube_output_path()
-    ).place(relx=0.7, rely=0.85, anchor="w")
+    ).place(relx=0.8, rely=0.83, anchor="w")
 
 
     CTkButton(
@@ -4047,7 +4203,7 @@ def place_youtube_download_menu():
         fg_color="#282828",
         border_color="#0096FF",
         border_width=1
-    ).place(relx=0.05, rely=0.5, anchor="e")
+    ).place(relx=0.96, rely=0.45, anchor="e")
 
 def select_youtube_output_path():
     path= filedialog.askdirectory()
@@ -4112,44 +4268,6 @@ def start_youtube_download():
 
 
 
-def place_message_label():
-    message_label = CTkLabel(
-        master  = window, 
-        textvariable = info_message,
-        height       = 25,
-        font         = bold11,
-        fg_color     = "#ffbf00",
-        text_color   = "#000000",
-        anchor       = "center",
-        corner_radius = 12
-    )
-    message_label.place(relx = column2_x - 0.55, rely = row4_y - 0.032, anchor = "center")
-
-def place_stop_button(): 
-    stop_button = create_active_button(
-        command = stop_button_command,
-        text    = "STOP",
-        icon    = stop_icon,
-        width   = 140,
-        height  = 30,
-        border_color = "#EC1D1D"
-    )
-    stop_button.place(relx = column2_x- 0.5 , rely = row4_y , anchor = "center")
-
-def place_upscale_button(): 
-    upscale_button = create_active_button(
-        command = upscale_button_command,
-        text    = "UPSCALE",
-        icon    = upscale_icon,
-        width   = 140,
-        height  = 30
-    )
-    upscale_button.place(relx = column2_x - 0.55, rely = row4_y, anchor = "center")
-   
-
-
-
-
 
 
 
@@ -4209,7 +4327,7 @@ def on_app_close() -> None:
     global selected_image_extension
     global selected_video_extension
     global tiles_resolution
-    global resize_factor
+    global input_resize_factor
     global cpu_number
     global selected_audio_mode 
 
@@ -4243,7 +4361,8 @@ def on_app_close() -> None:
         "default_interpolation":     interpolation_to_save,
         "default_audio_mode":         Audio_option_to_save,
         "default_output_path":       selected_output_path.get(),
-        "default_resize_factor":     str(selected_resize_factor.get()),
+        "default_resize_factor":     str(selected_input_resize_factor.get()),
+        "default_output_resize_factor": str(selected_output_resize_factor.get()),
         "default_VRAM_limiter":      str(selected_VRAM_limiter.get()),
         "default_cpu_number":        str(selected_cpu_number.get()),
     }
@@ -4314,7 +4433,7 @@ class App():
         Master.geometry("1920x1080")
         Master.resizable(False, False)
         Master.iconbitmap(find_by_relative_path("Assets" + os_separator + "logo.ico"))
-        preload_models()
+        #preload_models()
         place_youtube_download_menu()
         place_loadFile_section(Master)
         place_app_name()
@@ -4348,9 +4467,10 @@ if __name__ == "__main__":
     processing_queue = multiprocessing_Queue(maxsize=1)
     info_message            = StringVar()
     selected_output_path    = StringVar()
-    selected_resize_factor  = StringVar()
+    selected_input_resize_factor  = StringVar()
     selected_VRAM_limiter   = StringVar()
     selected_cpu_number     = StringVar()
+    selected_output_resize_factor = StringVar()
 
     global selected_file_list
     global selected_AI_model
@@ -4361,7 +4481,7 @@ if __name__ == "__main__":
     global selected_video_extension
     global selected_interpolation_factor
     global tiles_resolution
-    global resize_factor
+    global input_resize_factor
     global cpu_number
 
     selected_file_list = []
@@ -4381,13 +4501,14 @@ if __name__ == "__main__":
         "High": 0.7,
     }.get(default_interpolation)
 
-    selected_resize_factor.set(default_resize_factor)
+    selected_input_resize_factor.set(default_resize_factor)
+    selected_output_resize_factor.set(default_output_resize_factor)
     selected_VRAM_limiter.set(default_VRAM_limiter)
     selected_cpu_number.set(default_cpu_number)
     selected_output_path.set(default_output_path)
 
     info_message.set("AI upscaling Ready")
-    selected_resize_factor.trace_add('write', update_file_widget)
+    selected_input_resize_factor.trace_add('write', update_file_widget)
 
     font   = "Segoe UI"    
     bold8  = CTkFont(family = font, size = 8, weight = "bold")
