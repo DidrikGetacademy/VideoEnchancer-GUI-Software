@@ -18,6 +18,12 @@
 
 9. konvertere load_llama_instruct til onnx for raskere inference.
 
+10. YOUTUBE--> mulighet til og laste ned flere filer på en gang.
+
+11. youtube ---> video format og audio format må bli tilbake stilt til default etter video er nedlastet
+
+12. Sette opp kryptering så man ikke kan kjøre/få tilgang til  videoenchancer.exe  hvor mindre man har abonnoment og kjører videoenchancer fra brukerens konto sin GUI
+
 [ERROR LISTE] --> Oppdateres underveis og tas til slutt for mer effeketivitet
 
 1. Når man skal laste ned video etter og ha fetcha format details, så blir bare lyd lasta ned, jeg må evt sette opp checkboks for om bare lyd eller om begge deler skal lastes ned. 
