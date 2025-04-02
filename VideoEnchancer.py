@@ -104,7 +104,8 @@ from numpy import (
 )
 
 # GUI imports
-from tkinter import StringVar, DISABLED, NORMAL,END
+import tkinter as tk
+from tkinter import StringVar, DISABLED, NORMAL,END,scrolledtext
 from customtkinter import (
     CTk,
     CTkButton,
@@ -295,52 +296,92 @@ supported_video_extensions = [
 
 
 
-def load_llama_instruct():
-    from transformers import AutoTokenizer, AutoModelForCausalLM,pipeline
-    import os
-    import torch 
 
-    model_path = r"C:\Users\didri\Desktop\Programmering\Programvarer\LearnReflect VideoEnchancer System\llama3\Llama-3.2-3B-Instruct\models--meta-llama--Llama-3.2-3B-Instruct\snapshots\0cb88a4f764b7a12671c53f0838cd831a0843b95"
 
-    try:
-        # Check if  path exists
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model directory '{model_path}' does not exist.")
-        
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
-        model = AutoModelForCausalLM.from_pretrained(model_path)
-        
-        print("Model and tokenizer loaded successfully.")
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class AI_Auto_creator():
+    """Ai-Agent that can download videos, edit and cut videos, add subtitles, and upload automatically from a given text prompt"""
+    def __init__(self,parent_container):
+        self.parent_container = parent_container
+        self.container = CTkFrame(
+            master=self.parent_container,
+            fg_color="#000000",
+            border_width=2,
+            border_color="#404040",
+            corner_radius=10
+        )
+        self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.create_widgets()
     
-        pipe = pipeline(
-            "text-generation",
-            model=model,
-            tokenizer=tokenizer,
-            device_map="cuda",
-            torch_dtype=torch.bfloat16,
+    def create_widgets(self):
             
+            self.top_bar = CTkFrame(
+            master=self.container,
+            fg_color="#282828"
+             )
+            
+            self.top_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+            self.Generate_Btn = CTkButton(
+            master=self.top_bar,
+            text="Generate Metadata",
+            width=140,
+            height=30,
+            font=bold11,
+            border_width=1,
+            fg_color="#282828",
+            text_color="#E0E0E0",
+            border_color="#0096FF",
+           # command=
         )
-        
+            self.Generate_Btn.pack(side="left", padx=10, pady=5)
 
-        messages = [
-        {"role": "system", "content": "You are a pirate chatbot who always responds in pirate speak!"},
-        {"role": "user", "content": "Who are you?"},
-        ]
-        outputs = pipe(
-            messages,
-            max_new_tokens=256,
-        )
 
-        # Print the generated response
-        print(outputs[0]["generated_text"])
 
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
-    except OSError as e:
-        print(f"OS error occurred: {e}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -352,9 +393,7 @@ class Agent_GUI():
         print("Initializing LR_AGENT")
         self.parent_container = parent_container
         self.uploaded_files = []
-        self.load_llama_instruct = load_llama_instruct()
 
-        # Container setup
         self.container = CTkFrame(
             master=self.parent_container,
             fg_color="#000000",
@@ -401,7 +440,7 @@ class Agent_GUI():
             fg_color="#282828",
             text_color="#E0E0E0",
             border_color="#0096FF",
-            command=self.load_llama_instruct()
+            command=lambda: self.load_llama_instruct()
         )
         self.metadata_btn.pack(side="left", padx=10, pady=5)
 
@@ -415,20 +454,190 @@ class Agent_GUI():
         self.info_button_LearnReflect_Agent.pack(side="left", padx=10, pady=5)
 
   
-        self.details_text = CTkTextbox(
-            master=self.container,
-            width=1000,
-            height=500,
-            font=("Arial", 20),
-            corner_radius=10,
-            state="disabled"
+        self.chat_display  = scrolledtext.ScrolledText(
+          self.container,
+          wrap=tk.WORD,
+          width=55,
+          height=25,
+          font=("Helvetica",12),
+          bg="black",  
+          fg="white",
+          state="disabled",
         )
-        self.details_text.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-
-   
+        self.chat_display.config(
+            insertbackground="yellow",
+            selectbackground="#444444",
+            selectforeground="white",
+            borderwidth=2,
+            relief="sunken"
+        )
+        self.chat_display.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        self.chat_display.yview(END)
         self.container.columnconfigure(0, weight=1)
         self.container.rowconfigure(1, weight=1)
 
+
+    def load_llama_instruct(self, chat_display, uploaded_file=None):
+        from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+        import torch 
+
+        model_path = r"C:\Users\didri\Desktop\Programmering\Programvarer\LearnReflect VideoEnchancer System\llama3\Llama-3.2-3B-Instruct\models--meta-llama--Llama-3.2-3B-Instruct\snapshots\0cb88a4f764b7a12671c53f0838cd831a0843b95"
+        try:
+            if not os.path.exists(model_path):
+                raise FileNotFoundError(f"Model directory '{model_path}' does not exist.")
+            
+            #Loading tokenizer and model...
+            tokenizer = AutoTokenizer.from_pretrained(model_path)
+            model = AutoModelForCausalLM.from_pretrained(model_path)
+            
+            print("Model and tokenizer loaded successfully.")
+
+        
+            pipe = pipeline(
+                "text-generation",
+                model=model,
+                tokenizer=tokenizer,
+                device_map="cuda",
+                torch_dtype=torch.bfloat16,
+                
+            )
+            uploaded_file = self.file_menu_var.get()
+
+            if uploaded_file: 
+                file_extension = os.path.splitext(uploaded_file)[1].lower()
+                if file_extension in ['.mp4', '.avi', '.mov', '.mkv']:
+                    file = "video"
+                elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+                    file = "image"
+
+            tools = [
+                {
+                    
+                }
+            ]
+
+
+            function_definitions = """[
+                {
+                    "name": "get_user_info",
+                    "description": "Retrieve details for a specific user by their unique identifier. Note that the provided function is in Python 3 syntax.",
+                    "parameters": {
+                        "type": "dict",
+                        "required": [
+                            "user_id"
+                        ],
+                        "properties": {
+                            "user_id": {
+                            "type": "integer",
+                            "description": "The unique identifier of the user. It is used to fetch the specific user details from the database."
+                        },
+                        "special": {
+                            "type": "string",
+                            "description": "Any special information or parameters that need to be considered while fetching user details.",
+                            "default": "none"
+                            }
+                        }
+                    }
+                }
+            ]
+            """
+
+            system_prompt = """
+
+            
+                You are an intelligent metadata generation assistant designed to help create effective
+                titles, descriptions, keywords, and hashtags for videos and images.
+
+                When a user uploads a video or image, your task is to:
+
+                1. Analyze the uploaded content (video or image) to extract key themes, objects, actions,
+                and concepts.
+
+                2. Search for similar content online based on the extracted information to identify relevant
+                trends, keywords, and metadata.
+
+                3. Generate the following metadata for the uploaded content:
+
+                - Title: A clear, concise title that accurately describes the content.
+                - Description: A detailed description that provides context and highlights important aspects of
+                    the content.
+                - Keywords: Relevant keywords that improve discoverability, capturing the core elements and
+                    topics of the content.
+                - Hashtags: Popular and trending hashtags to increase visibility on social media and other
+                    platforms.
+
+                Your responses should be based on the information gathered from the uploaded file and the
+                results of online searches for similar content. Be creative in your approach, ensuring the
+                metadata aligns with current trends and best practices for discoverability.
+
+                Please return your response in the following detailed format:
+
+                Title: [your title here]
+                Description: [your description here]
+                Hashtags: [your hashtags here]
+                Keywords: [your keywords here]
+
+
+                Remember that You are an expert in composing functions. You are given a question and a set of possible functions. 
+                Based on the question, you will need to make one or more function/tool calls to achieve the purpose. 
+                If none of the function can be used, point it out. If the given question lacks the parameters required by the function,
+                also point it out. You should only return the function call in tools call sections.
+
+                If you decide to invoke any of the function(s), you MUST put it in the format of [func_name1(params_name1=params_value1, params_name2=params_value2...), func_name2(params)]\n
+                You SHOULD NOT include any other text in the response.
+
+             
+               """
+  # Here is a list of functions in JSON format that you can invoke.\n\n{functions}\n""".format(functions=function_definitions)
+
+                        
+                        
+            
+
+
+            format = """
+                Title: [your title here]
+                
+                Description: [your description here]
+                
+                Hashtags: [your hashtags here]
+                
+                Keywords: [your keywords here]
+                  """
+
+
+            
+
+            messages = [
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content":  f"Create a metadata set for this {file} Please analyze it with trending and similar videos online and provide a title, description, keywords, and hashtags in the {format} specified."
+                        
+                }
+            ]
+
+
+            
+            outputs = pipe(
+                messages,
+                max_new_tokens=512,
+            )
+            self.chat_display.config(state=tk.NORMAL)
+            self.chat_display.insert(tk.END, outputs[0]["generated_text"] + "\n")
+            self.chat_display.config(state=tk.DISABLED)  
+
+
+
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+        except OSError as e:
+            print(f"OS error occurred: {e}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
     def update_file_list(self, new_files):
         """Update dropdown with new files"""
@@ -641,13 +850,13 @@ def place_youtube_download_menu(parent_container):
         text_color="#00FF00",
         width=100
     )
-    progress_label.place(relx=0.25, rely=0.75, anchor="center")
+    progress_label.place(relx=0.23, rely=0.6, anchor="center")
 
 
 
     CTkLabel(
         master=youtube_frame,
-        text="YouTube URL:",
+        text="YouTube URL:", 
         font=bold12,
         text_color="#C0C0C0",
         bg_color='transparent',
@@ -709,7 +918,8 @@ def place_youtube_download_menu(parent_container):
         border_color="white",
         border_width=1
     )
-    upload_button.place(relx=0.12, rely=0.7, anchor="e")
+    if cookie_file_path is None:
+      upload_button.place(relx=0.12, rely=0.7, anchor="e")
     
     if cookie_file_path is not None:
         upload_button.place_forget()
@@ -794,7 +1004,7 @@ def place_youtube_download_menu(parent_container):
             if audio_formats:
                 audio_format_var.set(audio_formats[0])
 
-            fetch_button.cofigure(state="disabled")
+            fetch_button.configure(state="disabled")
             
 
 
@@ -892,7 +1102,7 @@ def upload_cookie_file():
     
     if cookie_file_path_input:
         try:
-           #cookie_filename = os.path.basename(cookie_file_path_input)
+  
 
            save_path = COOKIE_STORAGE_DIR / fixed_cookie_filename
 
@@ -921,41 +1131,78 @@ def ensure_protocol(youtube_url):
 
 
 def get_available_formats(youtube_url):
-    global cookie_file_path
+    global cookie_file_path,backup
+    backup = False
     ensure_protocol(youtube_url)
     ydl_opts = {
-            'quiet': True,
+             'quiet': True,
              "nocheckcertificate": True,
              'format': 'best',
-             
             }
+    ydl_opts_backup = {
+        'quiet': True,
+        'nocheckcertificate': True,
+        'format': 'best',
+        'no_signature': True,  
+    }
+    ydl_opts_fallback = {
+        'quiet': True,
+        'nocheckcertificate': True,
+        'format': 'best',
+        'force_generic_extractor': True, 
+        'ignoreerrors': True,
+    }
+
     if cookie_file_path:
         ydl_opts["cookiefile"] = cookie_file_path
+        ydl_opts_backup["cookiefile"] = cookie_file_path
+        ydl_opts_fallback["cookiefile"] = cookie_file_path
 
     print(f"cookie_file_path when getting available format: {cookie_file_path}")
 
+    def try_fetching_format(ydl_opts_variable):
+                with yt_dlp.YoutubeDL(ydl_opts_variable) as ydl:
+                    info = ydl.extract_info(youtube_url, download=False)
+                    formats = info.get('formats', [])
+
+                    video_formats = ['Video Formats...','None']
+                    audio_formats = []
+
+                    for f in formats:
+                        if f.get('vcodec') != 'none' and f.get('acodec') == 'none':  
+                            video_formats.append(f"{f['format_id']} - {f.get('resolution', 'Unknown')} ({f['ext']})")
+                        elif f.get('acodec') != 'none' and f.get('vcodec') == 'none': 
+                            audio_formats.append(f"{f['format_id']} - {f.get('abr', 'Unknown')}kbps ({f['ext']})")
+                    
+
+                return video_formats, audio_formats
+    
     try: 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=False)
-            formats = info.get('formats', [])
-
-            video_formats = ['Video Formats...','None']
-            audio_formats = []
-
-            for f in formats:
-                if f.get('vcodec') != 'none' and f.get('acodec') == 'none':  
-                    video_formats.append(f"{f['format_id']} - {f.get('resolution', 'Unknown')} ({f['ext']})")
-                elif f.get('acodec') != 'none' and f.get('vcodec') == 'none': 
-                    audio_formats.append(f"{f['format_id']} - {f.get('abr', 'Unknown')}kbps ({f['ext']})")
-
+            video_formats, audio_formats = try_fetching_format(ydl_opts)
             return video_formats, audio_formats
-        
-    except yt_dlp.utils.DownloadError  as e:
+    
+    except yt_dlp.utils.DownloadError as e:
         print(f"Error fetching formats: {e}")
-        if "cookies" in str(e).lower() or "403" in str(e):
-            print("⚠️ Cookie file seems broken or expired. Resetting...")
-            delete_cookie_file_and_reset_button()
-        return [], []
+        backup = True
+        try:
+            print("⚙️ Switching to backup method...")
+            video_formats, audio_formats = try_fetching_format(ydl_opts_backup)
+
+        except yt_dlp.utils.DownloadError as e:
+            print(f"❌ Backup method failed: {e}")
+            print("🛠️ Trying final fallback method (force_generic_extractor)...")
+
+        try:
+                video_formats, audio_formats = try_fetching_format(ydl_opts_fallback)
+                return video_formats, audio_formats
+    
+        except  yt_dlp.utils.DownloadError  as e:
+                print(f"Error fetching formats: {e}")
+
+                if "cookies" in str(e).lower() or "403" in str(e):
+                    print("⚠️ Cookie file seems broken or expired. Resetting...")
+                    delete_cookie_file_and_reset_button()
+                return [], []
 
 
 def download_youtube_link(youtube_url,output_path, progress_callback=None):
@@ -993,6 +1240,7 @@ def update_progress(d):
         percent = d.get('_percent_str', '0%')
         window.after(0, lambda: youtube_progress_var.set(percent))
 
+
 def download_thread(youtube_url, output_path):
     try:
         info_message.set("Downloading....")
@@ -1003,7 +1251,7 @@ def download_thread(youtube_url, output_path):
     except Exception as e:
         info_message.set(f"Error: {str(e)}")
     finally:
-        youtube_progress_var.set("")
+        youtube_progress_var.set("Download Complete!")
 
 def start_youtube_download():
     global youtube_link_entry, youtube_output_path_entry
@@ -1385,7 +1633,7 @@ class ToolWindowClass:
         self.menu_frame.pack(side="top", fill="x", pady=(0, 10))
 
   
-        self.tool_list = ['Mediainfo_analyst', 'LR Agent', 'YouTube Downloader','Social Media Uploading']
+        self.tool_list = ['YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','LR AutoCreator Agent']
         self.tool_menu_var = StringVar(value=self.tool_list[0])
         self.tool_menu = CTkOptionMenu(
             master=self.menu_frame,
@@ -1411,7 +1659,7 @@ class ToolWindowClass:
      
         for widget in self.content_frame.winfo_children():
             widget.destroy()
-        if selected_tool == 'LR Agent':
+        if selected_tool == 'LR Metadata Agent':
             self.create_smol_agent()
         elif selected_tool == 'YouTube Downloader':
             self.create_youtube_downloader()
@@ -1419,6 +1667,8 @@ class ToolWindowClass:
             self.create_mediainfo_Analysist()
         elif selected_tool == "Social Media Uploading":
             self.Create_Social_Media_uploading()
+        elif selected_tool == "create_AI_Auto_creator":
+            self.create_AI_Auto_creator()
 
     def create_smol_agent(self):
         self.smol_agent = Agent_GUI(self.content_frame)
@@ -1438,6 +1688,11 @@ class ToolWindowClass:
     def Create_Social_Media_uploading(self):
         self.socialMediaUploading = SocialMediaUploading(self.content_frame)
         self.socialMediaUploading.container.pack(fill="both", expand=True, padx=10, pady=10)
+
+    def create_AI_Auto_creator(self):
+        self.AI_Auto_creator = AI_Auto_creator(self.content_frame)
+        self.AI_Auto_creator.container.pack(fill="both",expand=True,padx=10,pady=10)
+
 
     
 
@@ -5381,6 +5636,7 @@ class VideoEnhancer():
         self.background_label = CTkLabel(Master, image=self.bg_image, fg_color="black")
         self.background_label.place(relx=0  , rely=0, relwidth=1, relheight=1.5) 
         self.background_label.lower() 
+        load_cookie_file_path()
         self.ToolWindowClass = ToolWindowClass(Master)
         self.ToolWindowClass.create_widgets()
         load_model_inference()
@@ -5393,7 +5649,6 @@ class VideoEnhancer():
         place_image_output_menu()
         place_message_label()
         place_upscale_button()
-        load_cookie_file_path()
         selected_VRAM_limiter.set(str(round(get_gpu_vram() / 1000)) if get_gpu_vram() else "4")
  
 
