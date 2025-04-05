@@ -202,7 +202,7 @@ keep_frames_list       = [ "Disabled", "Enabled" ]
 image_extension_list   = [ ".png", ".jpg", ".bmp", ".tiff" ]
 video_extension_list   = [ ".mp4 (x264)", ".mp4 (x265)", ".avi" ]
 interpolation_list     = [ "Low", "Medium", "High", "Disabled" ]
-audio_mode_list        = ["Disabled", "Vocal Isolation", "Audio Enchancement"] 
+audio_mode_list        = ["Disabled", "Vocal Isolation", "Audio Denoise"] 
 OUTPUT_PATH_CODED    = "Same path as input files"
 DOCUMENT_PATH        = os_path_join(os_path_expanduser('~'), 'Documents')
 USER_PREFERENCE_PATH = find_by_relative_path(f"{DOCUMENT_PATH}{os_separator}{app_name}_UserPreference.json")
@@ -1147,7 +1147,7 @@ def download_thread(youtube_url, output_path):
         youtube_progress_var.set("Download Complete!")
         video_format_var.set("")
         audio_format_var.set("")
-        youtube_url.set("")
+        youtube_link_entry.delete(0, 'end')
 
 def start_youtube_download():
     global youtube_link_entry, youtube_output_path_entry
@@ -1557,13 +1557,13 @@ class MediaInfoAnalyst:
 class ToolWindowClass:
     def __init__(self, master):
         self.master = master
-        self.container = CTkFrame(master, fg_color="transparent")
-        self.container.place(relx=0.595, rely=0.725, relwidth=0.806, relheight=0.61, anchor="center")
+        self.container = CTkFrame(master, fg_color="transparent",border_width=1.5, border_color="blue")
+        self.container.place(relx=0.595, rely=0.71, relwidth=0.806, relheight=0.58, anchor="center")
         self.create_widgets()
 
     def create_widgets(self):
         self.menu_frame = CTkFrame(self.container, fg_color="transparent")
-        self.menu_frame.pack(side="top", fill="x", pady=(0, 10))
+        self.menu_frame.pack(side="top", pady=(20, 10))
 
   
         self.tool_list = ['Tool Menu','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','LR AutoCreator Agent']
@@ -1581,7 +1581,7 @@ class ToolWindowClass:
         self.tool_menu.pack(side="top", pady=10) 
 
         self.content_frame = CTkFrame(self.container, fg_color="transparent")
-        self.content_frame.place(relx=0.5, rely=0.5, anchor="center", relwidth=1, relheight=0.8)
+        self.content_frame.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.9, relheight=0.8)
 
 
 
@@ -2156,31 +2156,12 @@ def place_loadFile_section(window):
     upscaled_preview = CTkLabel(upscaled_frame, image=placeholder_photo, text="", width=340, height=400)
     upscaled_preview.pack()
     
-    input_file_button = CTkButton(
-        master = window,
-        command  = open_files_action,
-        text     = "SELECT FILES",
-        width    = 140,
-        height   = 30,
-        font     = bold11,
-        border_width = 1,
-        fg_color     = "#282828",
-        text_color   = "#E0E0E0",
-        border_color = "#0096FF"
-        )
-    background.place(relx = 0.0, rely = 0.0, relwidth = 1.0, relheight = 0.42)
-    input_file_button.place(relx = 0.55, rely = 0.4, anchor = "center")
 
-def place_upscale_button(): 
-    upscale_button = create_active_button(
-        command = upscale_button_command,
-        text    = "UPSCALE",
-        icon    = upscale_icon,
-        width   = 140,
-        height  = 30
-    )
-    upscale_button.place(relx = 0.55, rely = 0.362, anchor = "center")
-    upscale_button.lift()
+    background.place(relx = 0.0, rely = 0.0, relwidth = 1.0, relheight = 0.42)
+
+
+
+ 
 
 
 
@@ -2278,6 +2259,7 @@ class AI:
         # Passed variables
         self.AI_model_name  = AI_model_name
         self.audio_model_name = "Vocal_Isolation"
+        self.denoise_model_name = "Audio_Denoiser"
         self.directml_gpu   = directml_gpu
         self.input_resize_factor  = input_resize_factor
         self.max_resolution = max_resolution
@@ -2287,7 +2269,7 @@ class AI:
         self.inferenceSession = self._load_inferenceSession()
         self.upscale_factor   = self._get_upscale_factor()
         self.audio_model_path = find_by_relative_path(f"AI-onnx{os_separator}{self.audio_model_name}.onnx")
-
+        self.Denoise_Modelpath = find_by_relative_path(f"AI-onnx{os_separator}{self.denoise_model_name}.onnx")
         
     def _get_upscale_factor(self) -> int:
         if   "x1" in self.AI_model_name: return 1
@@ -2382,7 +2364,7 @@ class AI:
         ]       
         subprocess_run(command, check=True)
         print(f"Returning audio_output_path for extracted audio at: {audio_output_path}")
-        return audio_output_path #Returns the extracted audio from video_path in wav format 
+        return audio_output_path
      
 
   
@@ -2403,6 +2385,51 @@ class AI:
         return isolated_output_path
     
 
+    def run_audio_denoise(self,video_path: str) -> str:
+        import torch
+        import soundfile as sf
+        from librosa import istft
+        import onnxruntime
+        import numpy as np
+        video_dir = os.path.dirname(video_path)
+        audio_output_path = os.path.join(video_dir, "extracted_audio.wav")
+        command = [
+            "ffmpeg",
+            "-y",               # Overwrite without asking
+            "-i", video_path,   # Input video
+            "-ac", "2",         # Force audio to stereo (2 channels)
+            "-ar", "16000",     # Set sample rate to 44100 Hz
+            "-q:a", "0",        # Best audio quality for VBR formats (optional here)
+            "-map", "0:a",      # Map only the audio stream
+            audio_output_path   # Output path
+        ]       
+        subprocess_run(command, check=True)
+        x = torch.from_numpy(sf.read(audio_output_path, dtype='float32')[0])
+        x = torch.stft(x, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=False)[None]
+        session =  self._load_audio_inferenceSession()
+
+        conv_cache = np.zeros([2, 1, 16, 16, 33], dtype="float32")
+        tra_cache = np.zeros([2, 3, 1, 1, 16], dtype="float32")
+        inter_cache = np.zeros([2, 1, 33, 16], dtype="float32")
+
+        T_list = []
+        outputs = []
+
+        inputs = x.numpy()
+        for i in range(inputs.shape[-2]):
+
+            out_i, conv_cache, tra_cache, inter_cache \
+                = session.run([], {'mix': inputs[..., i:i + 1, :],
+                                'conv_cache': conv_cache,
+                                'tra_cache': tra_cache,
+                                'inter_cache': inter_cache})
+            outputs.append(out_i)
+        outputs = np.concatenate(outputs, axis=2)
+        enhanced = istft(outputs[..., 0] + 1j * outputs[..., 1], n_fft=512, hop_length=256, win_length=512,
+                 window=np.hanning(512) ** 0.5)
+        sf.write('output_denoise.wav', enhanced.squeeze(), 16000)
+        denoised_output_path = audio_output_path.replace("extracted_audio", "output_denoise")
+        return denoised_output_path
 
 
     def process_Audio_Inference(self, video_path,selected_audio_mode):
@@ -2414,6 +2441,13 @@ class AI:
             except Exception as e:
                 print(f"Audio inference vocal isolation failed: {str(e)}")
                 return None
+            
+        elif selected_audio_mode == "Audio Denoise":
+            try: 
+                Denoised_audio = self.run_audio_denoise(video_path)
+                return Denoised_audio
+            except Exception as e:
+                print(f"Audio inference audio denoise failed: {str(e)}")
         else: 
             print("Normal audio returning None")
             return None
@@ -4867,7 +4901,7 @@ def select_audio_mode_from_menu(selected_mode):
     if selected_audio_mode == "Vocal Isolation":
         print(f"Selected Audio Mode:  {selected_audio_mode}")
     
-    if selected_audio_mode == "Audio Enchancement":
+    if selected_audio_mode == "Audio Denoise":
         print(f"Selected audio mode is: {selected_audio_mode}")
         
     if selected_audio_mode == "Disabled":
@@ -5066,8 +5100,8 @@ def open_info_audio_mode():
     
     MessageBox(
         messageType= "info",
-        title = "Audio Enchancement",
-        subtitle = "This Widget allows to choose Vocal isolation or Audio Enchancement",
+        title = "Audio Denoise",
+        subtitle = "This Widget allows to choose Vocal isolation or Audio Denoise",
         default_value = default_audio_mode,
         option_list = option_list
     )
@@ -5266,10 +5300,10 @@ def place_AI_menu():
     AI_menu.place(relx=0.5, rely=0.65, anchor="center") 
 
 
-
+#didrik
 def place_AI_interpolation_menu():
     AI_interpolation_frame = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
-    AI_interpolation_frame.place(relx=column0_x - 0.1235, rely=row1_y + 0.00, anchor="center")
+    AI_interpolation_frame.place(relx=column0_x - 0.1235, rely=row1_y - 0.022, anchor="center")
 
     interpolation_button = create_info_button(open_info_AI_interpolation, "AI Interpolation",width=335,master=AI_interpolation_frame)
     interpolation_menu   = create_option_menu_2(select_interpolation_from_menu, interpolation_list, default_interpolation,master=AI_interpolation_frame)
@@ -5281,23 +5315,10 @@ def place_AI_interpolation_menu():
 
 
 
-
-
-def place_input_resolution_textbox():
-    resize_factor_frame = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
-    resize_factor_frame.place(relx=column0_x - 0.1235, rely=row1_y + 0.32, anchor="center")
-    resize_factor_button  = create_info_button(open_info_input_resolution, "Input resolution %",master=resize_factor_frame)
-    resize_factor_textbox = create_text_box(selected_input_resize_factor,master=resize_factor_frame) 
-
-    resize_factor_button.place(relx=0.5, rely=0.25, anchor="center")
-    resize_factor_textbox.place(relx=0.5, rely=0.65, anchor="center")
-
-
-
     
 def place_Audio_Selection_menu():
     audio_mode_frame = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
-    audio_mode_frame.place(relx=column0_x - 0.1235, rely=row1_y + 0.111, anchor="center")
+    audio_mode_frame.place(relx=column0_x - 0.1235, rely=row1_y + 0.068, anchor="center")
 
     audio_mode_button = create_info_button(open_info_audio_mode,"Audio Mode",width=335,master=audio_mode_frame)
     Audio_mode_menu = create_option_menu_2(select_audio_mode_from_menu,audio_mode_list,default_audio_mode,master=audio_mode_frame)
@@ -5320,7 +5341,7 @@ def place_keep_frames_menu():
 
 def place_image_output_menu():
     file_extension_video_extension_button_menu = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
-    file_extension_video_extension_button_menu.place(relx=column0_x - 0.1235, rely=row1_y + 0.22, anchor="center")
+    file_extension_video_extension_button_menu.place(relx=column0_x - 0.1235, rely=row1_y + 0.157, anchor="center")
 
     file_extension_button = create_info_button(open_info_image_output, "Image output",master=file_extension_video_extension_button_menu,width=165)
     file_extension_menu   = create_option_menu_2(select_image_extension_from_menu, image_extension_list, default_image_extension,master=file_extension_video_extension_button_menu,width=165)
@@ -5336,6 +5357,39 @@ def place_image_output_menu():
 
 
 
+def place_input_resolution_textbox():
+    resize_factor_frame = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
+    resize_factor_frame.place(relx=column0_x - 0.1235, rely=row1_y + 0.247, anchor="center")
+    resize_factor_button  = create_info_button(open_info_input_resolution, "Input resolution %",master=resize_factor_frame)
+    resize_factor_textbox = create_text_box(selected_input_resize_factor,master=resize_factor_frame) 
+
+    resize_factor_button.place(relx=0.5, rely=0.25, anchor="center")
+    resize_factor_textbox.place(relx=0.5, rely=0.65, anchor="center")
+
+
+
+def place_upscale_button(): 
+    upscale_button = create_active_button(
+        command = upscale_button_command,
+        text    = "UPSCALE",
+        icon    = upscale_icon,
+        width   = 140,
+        height  = 30
+    )
+    upscale_button.place(relx=column0_x - 0.08, rely=row1_y + 0.345, anchor="center")
+    upscale_button.lift()
+
+def place_stop_button(): 
+    stop_button = create_active_button(
+        command = stop_button_command,
+        text    = "STOP",
+        icon    = stop_icon,
+        width   = 140,
+        height  = 30,
+        border_color = "#EC1D1D"
+    )
+    stop_button.place(relx=column0_x - 0.17 , rely=row1_y + 0.345, anchor="center")
+
 
 
 def place_message_label():
@@ -5349,22 +5403,23 @@ def place_message_label():
         anchor       = "center",
         corner_radius = 12
     )
-    message_label.place(relx = column2_x - 0.23, rely = row4_y - 0.615, anchor = "center")
+    message_label.place(relx=column0_x - 0.12, rely=row1_y + 0.31, anchor="center")
 
 
 
-def place_stop_button(): 
-    stop_button = create_active_button(
-        command = stop_button_command,
-        text    = "STOP",
-        icon    = stop_icon,
-        width   = 140,
-        height  = 30,
-        border_color = "#EC1D1D"
-    )
-    stop_button.place(relx = column2_x- 0.7 , rely = row4_y + 0.04, anchor = "center")
-
-
+    input_file_button = CTkButton(
+        master = window,
+        command  = open_files_action,
+        text     = "SELECT FILES",
+        width    = 140,
+        height   = 30,
+        font     = bold11,
+        border_width = 1,
+        fg_color     = "#282828",
+        text_color   = "#E0E0E0",
+        border_color = "#0096FF"
+        )
+    input_file_button.place(relx=column0_x - 0.16 , rely=row1_y + 0.345, anchor="center")
 
 
 
@@ -5450,7 +5505,7 @@ def on_app_close() -> None:
     Audio_option_to_save = {
         0: "Disabled",
         1: "Vocal Isolation",
-        2: "Audio Enchancement",
+        2: "Audio Denoise",
     }.get(selected_audio_mode)
 
     user_preference = {
@@ -5511,7 +5566,7 @@ def on_app_close() -> None:
     
 class VideoEnhancer():
     def __init__(self, Master):
-        Master.attributes('-fullscreen', True)
+        # Master.attributes('-fullscreen', True)
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
@@ -5535,7 +5590,6 @@ class VideoEnhancer():
         place_message_label()
         place_upscale_button()
         selected_VRAM_limiter.set(str(round(get_gpu_vram() / 1000)) if get_gpu_vram() else "4")
-      
 
     
             
@@ -5550,13 +5604,13 @@ if __name__ == "__main__":
     set_appearance_mode("Dark")
     set_default_color_theme("dark-blue")
 
-    def exit_fullscreen( event=None):
-                """Exit fullscreen when ESC is pressed"""
-                window.attributes("-fullscreen", False)
+    # def exit_fullscreen( event=None):
+    #             """Exit fullscreen when ESC is pressed"""
+    #             window.attributes("-fullscreen", False)
     
-    window = CTk() 
-    window.attributes('-fullscreen', True)
-    window.bind("<Escape>", exit_fullscreen) 
+    window = CTk(fg_color="black")
+    # window.attributes('-fullscreen', True)
+    # window.bind("<Escape>", exit_fullscreen) 
 
 
     youtube_progress_var = StringVar()
