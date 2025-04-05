@@ -10,9 +10,6 @@ from timeit     import default_timer as timer
 from PIL import Image, ImageSequence
 import threading
 import cv2
-import requests
-import whisper 
-import ollama
 from Logger import logging
 from typing    import Callable
 from threading import Thread
@@ -205,7 +202,7 @@ keep_frames_list       = [ "Disabled", "Enabled" ]
 image_extension_list   = [ ".png", ".jpg", ".bmp", ".tiff" ]
 video_extension_list   = [ ".mp4 (x264)", ".mp4 (x265)", ".avi" ]
 interpolation_list     = [ "Low", "Medium", "High", "Disabled" ]
-audio_mode_list        = ["Disabled", "Audio Enchancement", "Vocal Isolation"] 
+audio_mode_list        = ["Disabled", "Vocal Isolation", "Audio Enchancement"] 
 OUTPUT_PATH_CODED    = "Same path as input files"
 DOCUMENT_PATH        = os_path_join(os_path_expanduser('~'), 'Documents')
 USER_PREFERENCE_PATH = find_by_relative_path(f"{DOCUMENT_PATH}{os_separator}{app_name}_UserPreference.json")
@@ -477,168 +474,64 @@ class Agent_GUI():
         self.container.rowconfigure(1, weight=1)
 
 
+
+      
     def load_llama_instruct(self, chat_display, uploaded_file=None):
-        from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-        import torch 
+        from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel
+        import yaml
+        model_path = "./local_qwen2.5_coder_7b"
+        model = TransformersModel(model_path)
+        final_answer = FinalAnswerTool()
 
-        model_path = r"C:\Users\didri\Desktop\Programmering\Programvarer\LearnReflect VideoEnchancer System\llama3\Llama-3.2-3B-Instruct\models--meta-llama--Llama-3.2-3B-Instruct\snapshots\0cb88a4f764b7a12671c53f0838cd831a0843b95"
-        try:
-            if not os.path.exists(model_path):
-                raise FileNotFoundError(f"Model directory '{model_path}' does not exist.")
-            
-            #Loading tokenizer and model...
-            tokenizer = AutoTokenizer.from_pretrained(model_path)
-            model = AutoModelForCausalLM.from_pretrained(model_path)
-            
-            print("Model and tokenizer loaded successfully.")
+        with open("./Agent/prompts.yaml", 'r') as stream:
+            prompt_templates = yaml.safe_load(stream)
 
-        
-            pipe = pipeline(
-                "text-generation",
-                model=model,
-                tokenizer=tokenizer,
-                device_map="cuda",
-                torch_dtype=torch.bfloat16,
-                
-            )
-            uploaded_file = self.file_menu_var.get()
+        uploaded_file = self.file_menu_var.get()
 
-            if uploaded_file: 
+        if uploaded_file: 
                 file_extension = os.path.splitext(uploaded_file)[1].lower()
                 if file_extension in ['.mp4', '.avi', '.mov', '.mkv']:
-                    file = "video"
+                        file = "video"
                 elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
-                    file = "image"
-
-            tools = [
-                {
-                    
-                }
-            ]
+                        file = "image"
 
 
-            function_definitions = """[
-                {
-                    "name": "get_user_info",
-                    "description": "Retrieve details for a specific user by their unique identifier. Note that the provided function is in Python 3 syntax.",
-                    "parameters": {
-                        "type": "dict",
-                        "required": [
-                            "user_id"
-                        ],
-                        "properties": {
-                            "user_id": {
-                            "type": "integer",
-                            "description": "The unique identifier of the user. It is used to fetch the specific user details from the database."
-                        },
-                        "special": {
-                            "type": "string",
-                            "description": "Any special information or parameters that need to be considered while fetching user details.",
-                            "default": "none"
-                            }
-                        }
-                    }
-                }
-            ]
-            """
-
-            system_prompt = """
-
-            
-                You are an intelligent metadata generation assistant designed to help create effective
-                titles, descriptions, keywords, and hashtags for videos and images.
-
-                When a user uploads a video or image, your task is to:
-
-                1. Analyze the uploaded content (video or image) to extract key themes, objects, actions,
-                and concepts.
-
-                2. Search for similar content online based on the extracted information to identify relevant
-                trends, keywords, and metadata.
-
-                3. Generate the following metadata for the uploaded content:
-
-                - Title: A clear, concise title that accurately describes the content.
-                - Description: A detailed description that provides context and highlights important aspects of
-                    the content.
-                - Keywords: Relevant keywords that improve discoverability, capturing the core elements and
-                    topics of the content.
-                - Hashtags: Popular and trending hashtags to increase visibility on social media and other
-                    platforms.
-
-                Your responses should be based on the information gathered from the uploaded file and the
-                results of online searches for similar content. Be creative in your approach, ensuring the
-                metadata aligns with current trends and best practices for discoverability.
-
-                Please return your response in the following detailed format:
-
-                Title: [your title here]
-                Description: [your description here]
-                Hashtags: [your hashtags here]
-                Keywords: [your keywords here]
-
-
-                Remember that You are an expert in composing functions. You are given a question and a set of possible functions. 
-                Based on the question, you will need to make one or more function/tool calls to achieve the purpose. 
-                If none of the function can be used, point it out. If the given question lacks the parameters required by the function,
-                also point it out. You should only return the function call in tools call sections.
-
-                If you decide to invoke any of the function(s), you MUST put it in the format of [func_name1(params_name1=params_value1, params_name2=params_value2...), func_name2(params)]\n
-                You SHOULD NOT include any other text in the response.
-
-             
-               """
-  # Here is a list of functions in JSON format that you can invoke.\n\n{functions}\n""".format(functions=function_definitions)
-
+        user_message = "Create a metadata set for this {file} Please analyze it with trending and similar videos online and provide a title, description, keywords, and hashtags in the {format} specified."
                         
-                        
-            
+      
+        image_generation_tool = Tool.from_space(
+            "black-forest-labs/FLUX.1-schnell",
+            name="image_generator",
+            description="Generate an image from a prompt"
+        )
 
+        agent = CodeAgent(
+            model=model,
+            tools=[
+                final_answer, 
+                image_generation_tool, 
+                DuckDuckGoSearchTool(), 
+                UserInputTool(),
+                GoogleSearchTool(),
+                VisitWebpageTool(),
+                PythonInterpreterTool()
+            ], 
+            max_steps=6,
+            verbosity_level=1,
+            prompt_templates=prompt_templates
+        )
 
-            format = """
-                Title: [your title here]
-                
-                Description: [your description here]
-                
-                Hashtags: [your hashtags here]
-                
-                Keywords: [your keywords here]
-                  """
-
-
-            
-
-            messages = [
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user",
-                    "content":  f"Create a metadata set for this {file} Please analyze it with trending and similar videos online and provide a title, description, keywords, and hashtags in the {format} specified."
-                        
-                }
-            ]
+        Response = agent.run(user_message)
 
 
             
-            outputs = pipe(
-                messages,
-                max_new_tokens=512,
-            )
-            self.chat_display.config(state=tk.NORMAL)
-            self.chat_display.insert(tk.END, outputs[0]["generated_text"] + "\n")
-            self.chat_display.config(state=tk.DISABLED)  
+        self.chat_display.config(state=tk.NORMAL)
+        self.chat_display.insert(tk.END, Response + "\n")
+        self.chat_display.config(state=tk.DISABLED)  
 
 
 
-        except FileNotFoundError as e:
-            print(f"Error: {e}")
-        except OSError as e:
-            print(f"OS error occurred: {e}")
-        except Exception as e:
-            print(f"An error occurred: {e}")
-
+ 
     def update_file_list(self, new_files):
         """Update dropdown with new files"""
         self.uploaded_files.extend(new_files)
@@ -1252,6 +1145,9 @@ def download_thread(youtube_url, output_path):
         info_message.set(f"Error: {str(e)}")
     finally:
         youtube_progress_var.set("Download Complete!")
+        video_format_var.set("")
+        audio_format_var.set("")
+        youtube_url.set("")
 
 def start_youtube_download():
     global youtube_link_entry, youtube_output_path_entry
@@ -1319,7 +1215,45 @@ def get_ffmpeg_details(file_path):
 
 
 
+class ToolMenu:
+    def __init__(self, parent_container):
+        self.parent_container = parent_container
 
+        self.container = CTkFrame(
+            master=self.parent_container,
+            fg_color="black",
+            border_width=2,
+            border_color="#404040",
+            corner_radius=10
+        )
+        self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+        self.create_widgets()
+     
+
+    def create_widgets(self):
+        top_bar = CTkFrame(
+            master=self.container,
+            fg_color="#282828"
+        )
+        top_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+
+      
+    
+      
+   
+        self.info_button_mediainfo_analyst = create_info_button(
+            open_mediaInfo_Analyst,
+            text="INFO",
+            width=15,
+            master=top_bar
+        )
+        self.info_button_mediainfo_analyst.pack(side="left", padx=10, pady=5)
+
+   
+
+        self.container.columnconfigure(0, weight=1)
+        self.container.rowconfigure(1, weight=1)
 
 
 
@@ -1623,7 +1557,6 @@ class MediaInfoAnalyst:
 class ToolWindowClass:
     def __init__(self, master):
         self.master = master
-  
         self.container = CTkFrame(master, fg_color="transparent")
         self.container.place(relx=0.595, rely=0.725, relwidth=0.806, relheight=0.61, anchor="center")
         self.create_widgets()
@@ -1633,7 +1566,7 @@ class ToolWindowClass:
         self.menu_frame.pack(side="top", fill="x", pady=(0, 10))
 
   
-        self.tool_list = ['YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','LR AutoCreator Agent']
+        self.tool_list = ['Tool Menu','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','LR AutoCreator Agent']
         self.tool_menu_var = StringVar(value=self.tool_list[0])
         self.tool_menu = CTkOptionMenu(
             master=self.menu_frame,
@@ -1659,7 +1592,9 @@ class ToolWindowClass:
      
         for widget in self.content_frame.winfo_children():
             widget.destroy()
-        if selected_tool == 'LR Metadata Agent':
+        if selected_tool == 'Tool Menu':
+            self.CreateToolMenu_info()
+        elif selected_tool == 'LR Metadata Agent':
             self.create_smol_agent()
         elif selected_tool == 'YouTube Downloader':
             self.create_youtube_downloader()
@@ -1669,6 +1604,7 @@ class ToolWindowClass:
             self.Create_Social_Media_uploading()
         elif selected_tool == "create_AI_Auto_creator":
             self.create_AI_Auto_creator()
+        
 
     def create_smol_agent(self):
         self.smol_agent = Agent_GUI(self.content_frame)
@@ -1677,6 +1613,11 @@ class ToolWindowClass:
 
     def create_youtube_downloader(self):
         place_youtube_download_menu(self.content_frame)
+
+    def CreateToolMenu_info(self):
+       self.ToolMenu = ToolMenu(self.content_frame)
+       self.ToolMenu.container.pack(fill="both",expand=True,padx=10,pady=10)
+
 
 
 
@@ -2332,26 +2273,21 @@ class AI:
             directml_gpu: str, 
             input_resize_factor: int,
             max_resolution: int,
-            audio_model_type: str = None 
             ):
         
         # Passed variables
         self.AI_model_name  = AI_model_name
+        self.audio_model_name = "Vocal_Isolation"
         self.directml_gpu   = directml_gpu
         self.input_resize_factor  = input_resize_factor
         self.max_resolution = max_resolution
 
         # Calculated variables
         self.AI_model_path    = find_by_relative_path(f"AI-onnx{os_separator}{self.AI_model_name}_fp16.onnx")
-        self.Audio_model_path = None
         self.inferenceSession = self._load_inferenceSession()
         self.upscale_factor   = self._get_upscale_factor()
-        
-        if audio_model_type:
-           self.Audio_model_path = find_by_relative_path(f"AI-onnx{os_separator}{self.getAudioModelName(audio_model_type)}UNet.onnx")
-           self.Audio_inferenceSession = self._load_Audio_inferencesession()
-        else: 
-            self.Audio_model_path = None
+        self.audio_model_path = find_by_relative_path(f"AI-onnx{os_separator}{self.audio_model_name}.onnx")
+
         
     def _get_upscale_factor(self) -> int:
         if   "x1" in self.AI_model_name: return 1
@@ -2410,152 +2346,100 @@ class AI:
 
         return inference_session
 
+    def _load_audio_inferenceSession(self) -> onnxruntime_inferenceSession:
+        import onnxruntime
+        providers = ['CPUExecutionProvider']  # You can reuse logic if needed
 
+        session_options = onnxruntime.SessionOptions()
+        session_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        session_options.execution_mode = onnxruntime.ExecutionMode.ORT_PARALLEL
 
-
-
-
-    def getAudioModelName(self, model_type: str)-> str:
-        if model_type == "Vocal_Isolation_":
-            return "Vocal_Isolation_"
-        elif model_type == "Audio_enchancement_":
-            return  "Audio_enchancement_"
-        else: 
-            raise ValueError(f"Uknown model_type: {model_type}")
-    
-    
-    
-
-    
-    def Run_Audio_inference(self, model_type: str, Model_audio_input_path: str) -> str:
-        self.Audio_model_path = find_by_relative_path(f"AI-onnx{os_separator}{self.getAudioModelName(model_type)}UNet.onnx")
-
-        if model_type == "Vocal_Isolation_":
-           self.Audio_inferenceSession = self._load_Audio_inferencesession()
-           return self.run_vocal_isolation(Model_audio_input_path)
-           
-        elif model_type == "Audio_enchancement_":
-           self.Audio_inferenceSession = self._load_Audio_inferencesession()
-           return self.run_Audio_Enchancement(Model_audio_input_path)
-        else:
-            raise ValueError(F"Uknown model_type: {model_type}")
-   
-        
-        
-
-    def _load_Audio_inferencesession(self) -> onnxruntime_inferenceSession:  
-        match self.directml_gpu:
-           case 'GPU 1': directml_backend = [('DmlExecutionProvider', {"device_id": "0"})]
-           case 'GPU 2': directml_backend = [('DmlExecutionProvider', {"device_id": "1"})]
-           case 'GPU 3': directml_backend = [('DmlExecutionProvider', {"device_id": "2"})]
-           case 'GPU 4': directml_backend = [('DmlExecutionProvider', {"device_id": "3"})]
-           case 'CPU': directml_backend = [('DmlExecutionProvider')]
-        inference_Session_Audio = onnxruntime_inferenceSession(path_or_bytes=self.Audio_model_path,providers=directml_backend)
-        return inference_Session_Audio
-    
-    
-    
-    
+        try:
+            return onnxruntime.InferenceSession(
+                path_or_bytes=self.audio_model_path,
+                providers=providers,
+                sess_options=session_options
+            )
+        except Exception as e:
+            print(f"[AudioSession Error] {e}")
+            return onnxruntime.InferenceSession(
+                path_or_bytes=self.audio_model_path,
+                providers=['CPUExecutionProvider']
+            )
 
     def extract_audio_from_video(self, video_path: str) -> str:
         video_dir = os.path.dirname(video_path)
         audio_output_path = os.path.join(video_dir, "extracted_audio.wav")
-        command = ["ffmpeg",  "-y", "-i", video_path, "-q:a", "0", "-map", "0:a", audio_output_path]
+        command = [
+            "ffmpeg",
+            "-y",               # Overwrite without asking
+            "-i", video_path,   # Input video
+            "-ac", "2",         # Force audio to stereo (2 channels)
+            "-ar", "44100",     # Set sample rate to 44100 Hz
+            "-q:a", "0",        # Best audio quality for VBR formats (optional here)
+            "-map", "0:a",      # Map only the audio stream
+            audio_output_path   # Output path
+        ]       
         subprocess_run(command, check=True)
         print(f"Returning audio_output_path for extracted audio at: {audio_output_path}")
         return audio_output_path #Returns the extracted audio from video_path in wav format 
-    
-    
+     
+
   
-    def run_vocal_isolation(self, Model_audio_input_path: str) -> str:
-        from scipy.io.wavfile import write, read
-        sample_rate, audio_data = read(Model_audio_input_path)
-        if len(audio_data.shape) > 1:
-            audio_data = np.mean(audio_data, axis=1)
-        audio_data = (audio_data.astype(np.float32) / 32767.0) 
-        target_height = 513
-        target_width = 10000
-        audio_flattened = audio_data.flatten()
-        audio_padded = np.zeros((target_height, target_width), dtype=np.float32)
-        num_samples = min(audio_flattened.size, target_height * target_width)
-        audio_padded.flat[:num_samples] = audio_flattened[:num_samples]
-        audio_input = np.expand_dims(audio_padded, axis=0)
-        audio_input = np.expand_dims(audio_input,axis=1)
-        input_name = self.Audio_inferenceSession.get_inputs()[0].name
-        output_name = self.Audio_inferenceSession.get_outputs()[0].name
-        isolated_audio = self.Audio_inferenceSession.run([output_name], {input_name: audio_input})[0]
-        isolated_audio = np.squeeze(isolated_audio) 
-        isolated_audio = (isolated_audio * 32767).astype(np.int32) 
-        isolated_output_path = Model_audio_input_path.replace("extracted_audio", "isolated_audio")
-        write(isolated_output_path,sample_rate,isolated_audio)
+    def run_vocal_isolation(self,video_path: str) -> str:
+        import soundfile as sf
+        from Vocal_Isolation.app import main
+        audio_file_path = self.extract_audio_from_video(video_path)
+        audio_session = self._load_audio_inferenceSession()
+        vocals_array, samplerate = main(self.audio_model_path,audio_file_path,audio_session)
+        if vocals_array is None or samplerate is None:
+            raise ValueError("Failed to isolate vocals. Received None values from main() function.")
+        sf.write("output_vocals.wav", vocals_array.T, samplerate)  
+        
+    
+        isolated_output_path = audio_file_path.replace("extracted_audio", "isolated_audio")
+        sf.write(isolated_output_path, vocals_array.T, samplerate)
         print(f"isolated audio saved at {isolated_output_path}")
         return isolated_output_path
     
-    
-    
-    def run_Audio_Enchancement(self, Model_audio_input_path: str) -> str:
-        Enchanced_output_path = Model_audio_input_path.replace("extracted_audio", "enhanced_audio")
-        return Enchanced_output_path
-        
-        
 
 
 
-        
-    #Returns AI onnx model that will be run else Stops process (EXPECTS A PARAMETER WITH THE SELECTED AUDIO MODE FROM GUI)
-    def Return_AI_Audio_model_name(self, selected_audio_mode: str) -> str: 
-        global Audio_model_name
-        print(f"Selected Audio Mode before proccessing audio: {selected_audio_mode}")
+    def process_Audio_Inference(self, video_path,selected_audio_mode):
         if selected_audio_mode == "Vocal Isolation":
-               Audio_model_name = "Vocal_Isolation_"
-               print(f"selected is vocal isolation, Audio_model_name: {Audio_model_name}")
-               return Audio_model_name
-        elif selected_audio_mode == "Audio Enchancement":
-                Audio_model_name = "Audio_enchancement_"
-                print(f"selected is Audio Enchncement:  Audio_model_name: {Audio_model_name}")
-                return Audio_model_name
-        elif selected_audio_mode == "Disabled":
-             print("Audio Mode Disabled")
-             return None
-       
-       
-         
-         
-    #Returns the upscaled audio
-    def process_Audio_Inference(self,video_path: str, selected_audio_mode: str) -> str:
-        if selected_audio_mode == "Disabled":
-            print("Audio inference is disabled. Skipping audio processing...")
-            return None
-        
+            try: 
+                Enchanced_audiofile =  self.run_vocal_isolation(video_path)
 
-        print(f"Selected audio mode before model_type: {selected_audio_mode}")
-        Model_type = self.Return_AI_Audio_model_name(selected_audio_mode)
-        print(f"Model_type returned: {Model_type}")
-        if Model_type is None:
-            print("Selected mode for Audio Infernece: Normal")
+                return Enchanced_audiofile
+            except Exception as e:
+                print(f"Audio inference vocal isolation failed: {str(e)}")
+                return None
+        else: 
+            print("Normal audio returning None")
             return None
-        
-        #Extracts the audio from video
-        extracted_audio_path = self.extract_audio_from_video(video_path)
-        
-        #Running Audio Inference
-        print(f"Running audio inference with the extracted audio: {extracted_audio_path}")
-        Audio_Inference_output = self.Run_Audio_inference(Model_type, extracted_audio_path) 
+   
+    
 
-        #Remove extracted Audio
-        print(f"Audio Inference Successfully finished.")
-        if os.path.exists(extracted_audio_path):
-            print(f"Removing extracted audio at: {extracted_audio_path}")
-            os.remove(extracted_audio_path)
-            
-        print(f"Returning Enchanced audio at: {Audio_Inference_output}")
-        if Audio_Inference_output != None:
-            return Audio_Inference_output
-        else:
-            return None
+
+
+
+
 
     
           
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4357,7 +4241,7 @@ def upscale_button_command() -> None:
     global selected_audio_mode
     global process_upscale_orchestrator
     global selected_audio_mode
-    selected_audio_mode = default_audio_mode
+    selected_audio_mode = selected_audio_mode
 
     if user_input_checks():
         info_message.set("Loading")
@@ -4585,7 +4469,9 @@ def upscale_video(
     target_directory  = prepare_output_video_directory_name(video_path, selected_output_path, selected_AI_model, input_resize_factor, selected_interpolation_factor)
     video_output_path = prepare_output_video_filename(video_path, selected_output_path, selected_AI_model, input_resize_factor, selected_video_extension, selected_interpolation_factor)
     
-    Audio_Inference_output = AI_instance.process_Audio_Inference(video_path,selected_audio_mode,) 
+    Audio_Inference_output = AI_instance.process_Audio_Inference(video_path,selected_audio_mode) 
+    if Audio_Inference_output == None:
+        print(f"Error: no enchanced audio recieved, audio inference output is {Audio_Inference_output}")
     
     # 2. Resume upscaling OR Extract video frames
     video_upscale_continue = check_video_upscaling_resume(target_directory, selected_AI_model)
@@ -4973,20 +4859,19 @@ def open_output_path_action():
 
 
 
-
 # GUI select from menus functions ---------------------------
 def select_audio_mode_from_menu(selected_mode):
     global selected_audio_mode
     selected_audio_mode = selected_mode
     print(f"Print global selected audio mode: {selected_audio_mode}, print selected_mode: {selected_mode}")
     if selected_audio_mode == "Vocal Isolation":
-        print(f"Selected Audio Mode: Vocal isolation:  {selected_audio_mode}")
+        print(f"Selected Audio Mode:  {selected_audio_mode}")
     
     if selected_audio_mode == "Audio Enchancement":
-        print(f"Selected audio mode is Vocal Enchancement: {selected_audio_mode}")
+        print(f"Selected audio mode is: {selected_audio_mode}")
         
     if selected_audio_mode == "Disabled":
-        print(f"Selected audio mode is disabled: {selected_audio_mode}")
+        print(f"Selected audio mode is: {selected_audio_mode}")
     
     return selected_audio_mode
     
@@ -5626,6 +5511,7 @@ def on_app_close() -> None:
     
 class VideoEnhancer():
     def __init__(self, Master):
+        Master.attributes('-fullscreen', True)
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
@@ -5638,7 +5524,6 @@ class VideoEnhancer():
         self.background_label.lower() 
         load_cookie_file_path()
         self.ToolWindowClass = ToolWindowClass(Master)
-        self.ToolWindowClass.create_widgets()
         load_model_inference()
         place_loadFile_section(Master)
         place_output_path_textbox()
@@ -5650,9 +5535,10 @@ class VideoEnhancer():
         place_message_label()
         place_upscale_button()
         selected_VRAM_limiter.set(str(round(get_gpu_vram() / 1000)) if get_gpu_vram() else "4")
- 
+      
 
-        
+    
+            
         
 if __name__ == "__main__":
    # from Decryption import validate_jwt
@@ -5663,9 +5549,14 @@ if __name__ == "__main__":
     multiprocessing_freeze_support()
     set_appearance_mode("Dark")
     set_default_color_theme("dark-blue")
-    
 
+    def exit_fullscreen( event=None):
+                """Exit fullscreen when ESC is pressed"""
+                window.attributes("-fullscreen", False)
+    
     window = CTk() 
+    window.attributes('-fullscreen', True)
+    window.bind("<Escape>", exit_fullscreen) 
 
 
     youtube_progress_var = StringVar()
