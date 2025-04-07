@@ -476,17 +476,19 @@ class Agent_GUI():
 
 
       
-    def load_llama_instruct(self, chat_display, uploaded_file=None):
-        from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel
+    def load_llama_instruct(self, uploaded_file=None):
+        from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel,HfApiModel
         import yaml
         model_path = "./local_qwen2.5_coder_7b"
-        model = TransformersModel(model_path)
+        #model = TransformersModel(model_path)
+        model = HfApiModel(model_path)
         final_answer = FinalAnswerTool()
-
-        with open("./Agent/prompts.yaml", 'r') as stream:
+        prompts = find_by_relative_path(f"Assets{os_separator}prompts.yaml")
+        with open(prompts, 'r') as stream:
             prompt_templates = yaml.safe_load(stream)
 
         uploaded_file = self.file_menu_var.get()
+
 
         if uploaded_file: 
                 file_extension = os.path.splitext(uploaded_file)[1].lower()
@@ -495,8 +497,39 @@ class Agent_GUI():
                 elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
                         file = "image"
 
+        format = """"
+        Title:  
+        [Provide a catchy, optimized title for the video]
 
-        user_message = "Create a metadata set for this {file} Please analyze it with trending and similar videos online and provide a title, description, keywords, and hashtags in the {format} specified."
+        Description:  
+        [A brief, concise description that summarizes the content, highlights key aspects of the video, and includes relevant keywords naturally]
+
+        Keywords:  
+        [A list of relevant keywords separated by commas. These are key terms that help categorize and improve the searchability of the video]
+
+        Hashtags:  
+        [A set of relevant hashtags that improve discoverability on social media platforms. Use trending hashtags that align with the video's content]
+
+        Example:
+
+        ------------------------------------------------
+        **Title:**  
+        "Discipline is Key: Unlock Your Full Potential"
+
+        **Description:**  
+        "In this motivational video, Chris Williamson shares powerful insights on how discipline plays a crucial role in achieving success. Whether you're pursuing personal growth or professional achievements, learn why self-discipline is the foundation for unlocking your true potential."
+
+        **Keywords:**  
+        "motivation, discipline, success, personal growth, self-improvement, productivity, unlock potential, Chris Williamson, success mindset"
+
+        **Hashtags:**  
+        "#DisciplineIsKey #Motivation #SuccessMindset #PersonalGrowth #SelfImprovement #AchieveGreatness #StayFocused #ChrisWilliamson"
+        ------------------------------------------------
+
+        """
+
+
+        user_message = f"Create a metadata set for this {file} Please analyze it with trending and similar videos online and provide a title, description, keywords, and hashtags in the {format} specified."
                         
       
         image_generation_tool = Tool.from_space(
