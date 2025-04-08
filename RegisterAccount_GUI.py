@@ -117,10 +117,13 @@ class RegistrationFrame(ctk.CTkFrame):
         Password = self.password_entry.get()
         Name = self.name_entry.get()
         status_message = register_user(Email, Password, Name)
-        self.status_label.configure(text=status_message)
+        print("REGISTRATION STATUS:", status_message)
 
         if "success" in status_message.lower():
-            self.switch_to_login()
+            self.status_label.configure(text="Registration successful. Please log in.")
+            self.switch_to_login(skip_auto_login=True)
+        else:
+            self.status_label.configure(text=status_message)
 
     def go_back(self):
         logging.info("Going back to main window")

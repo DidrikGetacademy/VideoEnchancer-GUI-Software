@@ -22,21 +22,17 @@ def register_user(Email,Pasword,Name):
             json=payload,
             headers=headers,
             )
-        response.raise_for_status()
-        
-        try: 
-           data = response.json()
-           if response.status_code == 201:
-               return "success"
-           if response.status_code == 400:
-               return "Bad request."
-           elif response.status_code == 500:
-               return "Server error"
-           return data.get("message", "No message provided")
-       
+        try:
+    
+            data = response.json()
         except ValueError:
-            print(f"Unexpected response format: {response.text}")
-            return
+            return f"Unexpected response format: {response.text}"
         
+       
+        if response.status_code == 201:
+            return "success"
+        else:
+            return data.get("message", f"Error {response.status_code}")
+  
     except requests.exceptions.RequestException as e:
             return f"Invalid Details: {str(e)}"

@@ -7,10 +7,11 @@ from Logger import logging
 from PIL import Image, ImageTk
 from File_path import resource_path  
 class LoginFrame(ctk.CTkFrame):
-    def __init__(self, master, Connect_UserAccount):
+    def __init__(self, master, Connect_UserAccount,skip_auto_login=False):
         super().__init__(master, fg_color="transparent") 
 
-     
+        if not skip_auto_login:
+            self.after(100, self.auto_login)
         image_path = resource_path("Assets/background1.png")
         self.background_image = Image.open(image_path)
         self.background_photo = ImageTk.PhotoImage(self.background_image)
