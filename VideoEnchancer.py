@@ -5,6 +5,9 @@ from time       import sleep
 from webbrowser import open as open_browser
 from subprocess import run  as subprocess_run
 import ffmpeg
+from moviepy import VideoFileClip
+from faster_whisper import WhisperModel
+
 from shutil     import rmtree as remove_directory
 from timeit     import default_timer as timer
 from PIL import Image, ImageSequence
@@ -390,6 +393,7 @@ class Agent_GUI():
         print("Initializing LR_AGENT")
         self.parent_container = parent_container
         self.uploaded_files = []
+        self.uploaded_files = selected_file_list
 
         self.container = CTkFrame(
             master=self.parent_container,
@@ -402,6 +406,10 @@ class Agent_GUI():
 
    
         self.create_widgets()
+        file_names = [os_path_basename(f) for f in self.uploaded_files]
+        self.file_menu.configure(values=file_names)
+        if file_names:
+           self.file_menu_var.set(file_names[0])
 
     def create_widgets(self):
         self.top_bar = CTkFrame(
@@ -477,11 +485,14 @@ class Agent_GUI():
 
       
     def load_llama_instruct(self, uploaded_file=None):
-        from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel,HfApiModel
+        from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel,HfApiModel,tool
         import yaml
-        model_path = "./local_qwen2.5_coder_7b"
+        from dotenv import load_dotenv
+        load_dotenv()
+
+        #model_path = "./local_qwen2.5_coder_7b"
         #model = TransformersModel(model_path)
-        model = HfApiModel(model_path)
+        model = HfApiModel("Qwen/Qwen2.5-Coder-32B-Instruct")
         final_answer = FinalAnswerTool()
         prompts = find_by_relative_path(f"Assets{os_separator}prompts.yaml")
         with open(prompts, 'r') as stream:
@@ -493,9 +504,32 @@ class Agent_GUI():
         if uploaded_file: 
                 file_extension = os.path.splitext(uploaded_file)[1].lower()
                 if file_extension in ['.mp4', '.avi', '.mov', '.mkv']:
-                        file = "video"
+                        file = "Video file"
                 elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
-                        file = "image"
+                        file = "Image file"
+
+
+        @tool
+        def TranscribeVideo(video_path: str) -> str:
+            """Extracts audio from the video and transcribes it using Whisper.
+                Args:
+                    video_path (str): The full path to the video file to be transcribed.
+
+                Returns:
+                    str: The transcribed text from the video.
+            """
+            audio_path = "temp_audio.wav"
+            clip = VideoFileClip(video_path)
+            clip.audio.write_audiofile(audio_path)
+
+            model = WhisperModel("base",device="cpu")
+            segments, _ = model.transcribe(audio_path)
+            transcript = " ".join([segment.text for segment in segments])
+            os.remove(audio_path)
+            return transcript
+
+
+
 
         format = """"
         Title:  
@@ -525,36 +559,70 @@ class Agent_GUI():
         **Hashtags:**  
         "#DisciplineIsKey #Motivation #SuccessMindset #PersonalGrowth #SelfImprovement #AchieveGreatness #StayFocused #ChrisWilliamson"
         ------------------------------------------------
-
         """
 
 
-        user_message = f"Create a metadata set for this {file} Please analyze it with trending and similar videos online and provide a title, description, keywords, and hashtags in the {format} specified."
-                        
+        uploaded_file_name = self.file_menu_var.get()
+        Video_path = next((f for f in self.uploaded_files if os_path_basename(f) == uploaded_file_name), None)
+        if not Video_path:
+            print("Error: File not found!")
+            self.chat_display.config(state=tk.NORMAL)
+            self.chat_display.insert(tk.END, "Not a valid file path" + "\n")
+            self.chat_display.config(state=tk.DISABLED)  
+            return
+
+        #user_task = f"Transcribe the video and generate metadata based on the transcription and similar trending videos,  your final answear need too have this structure: {format}"
+        user_task = f"""
+                You are an intelligent video metadata assistant.
+
+                1. Begin by transcribing the video provided in `video_path`.
+                2. Then search online for **trending and similar videos** using relevant queries derived from the transcription.
+                3. Analyze patterns, keywords, and hashtags from those trending videos.
+                4. Finally, create an **original, non-copied** metadata set that is optimized for discoverability, SEO, and engagement.
+
+                Your output must strictly follow the structure provided in the `format` variable, and should include:
+                - A catchy, optimized **title**
+                - A natural, keyword-rich **description**
+                - A set of relevant, trend-aware **keywords**
+                - A well-curated list of popular and unique **hashtags**
+
+                Ensure the metadata feels **fresh, human-written, and tailored specifically to the video content**, not generic or templated. Do not reuse exact text from online examples.
+                Always complete all sections in the format, even if you have to creatively infer them from the video content and trends.
+                """
+
+        context_vars = {
+                "video_path": Video_path,
+                "format": format,
+                "file_type": file 
+            }       
       
-        image_generation_tool = Tool.from_space(
-            "black-forest-labs/FLUX.1-schnell",
-            name="image_generator",
-            description="Generate an image from a prompt"
-        )
+        # image_generation_tool = Tool.from_space(
+        #     "black-forest-labs/FLUX.1-schnell",
+        #     name="image_generator",
+        #     description="Generate an image from a prompt"
+        # )
 
         agent = CodeAgent(
             model=model,
             tools=[
                 final_answer, 
-                image_generation_tool, 
-                DuckDuckGoSearchTool(), 
+                #DuckDuckGoSearchTool(), 
                 UserInputTool(),
                 GoogleSearchTool(),
                 VisitWebpageTool(),
-                PythonInterpreterTool()
+                PythonInterpreterTool(),
+                TranscribeVideo
+                #image_generation_tool
             ], 
             max_steps=6,
             verbosity_level=1,
             prompt_templates=prompt_templates
         )
 
-        Response = agent.run(user_message)
+        Response = agent.run(
+            task=user_task,
+            additional_args=context_vars
+        )
 
 
             
@@ -583,9 +651,6 @@ class Agent_GUI():
 
 
 
-    def generate_metadata(self):
-        """Placeholder method for metadata generation — extend this logic."""
-        print("Generating video metadata...")
 
 
 

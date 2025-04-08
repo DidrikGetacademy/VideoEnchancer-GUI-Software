@@ -82,8 +82,13 @@ class MainApp(ctk.CTk):
         self.register_frame.pack(fill="both", expand=True)
 
 
-    def open_login_Account(self):     
+    def open_login_Account(self,skip_auto_login=False):     
         self.hide_frames()
+        self.login_frame = LoginFrame(
+        self,
+        self.Connect_User_Account,
+        skip_auto_login=skip_auto_login
+    )
         self.login_frame.pack(fill="both", expand=True)
 
 
