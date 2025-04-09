@@ -445,7 +445,7 @@ class Agent_GUI():
             fg_color="#282828",
             text_color="#E0E0E0",
             border_color="#0096FF",
-            command=lambda: self.load_llama_instruct()
+            command=lambda: self.start_metadata_thread()
         )
         self.metadata_btn.pack(side="left", padx=10, pady=5)
 
@@ -482,7 +482,9 @@ class Agent_GUI():
         self.container.rowconfigure(1, weight=1)
 
 
-
+    def start_metadata_thread(self):
+        thread = threading.Thread(target=self.load_llama_instruct, daemon=True)
+        thread.start()
       
     def load_llama_instruct(self, uploaded_file=None):
         from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel,HfApiModel,tool
