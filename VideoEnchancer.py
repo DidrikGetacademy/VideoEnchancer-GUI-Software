@@ -491,6 +491,7 @@ class Agent_GUI():
         import yaml
         from dotenv import load_dotenv
         load_dotenv()
+        #https://huggingface.co/docs/smolagents/guided_tour?build-a-tool=Decorate+a+function+with+%40tool&Pick+a+LLM=Local+Transformers+Model#default-toolbox
 
         #model_path = "./local_qwen2.5_coder_7b"
         #model = TransformersModel(model_path)
@@ -511,6 +512,11 @@ class Agent_GUI():
                         file = "Image file"
 
 
+        self.chat_display.config(state=tk.NORMAL)
+        self.chat_display.insert(tk.END, "1. 🤖 AI-agenten transcribes video now...\n")
+        self.chat_display.update()
+
+
         @tool
         def TranscribeVideo(video_path: str) -> str:
             """Extracts audio from the video and transcribes it using Whisper.
@@ -528,6 +534,9 @@ class Agent_GUI():
             segments, _ = model.transcribe(audio_path)
             transcript = " ".join([segment.text for segment in segments])
             os.remove(audio_path)
+            self.chat_display.insert(tk.END, f"📜 Transkripsjonseksempel: {transcript[:120]}...\n")
+            self.chat_display.update()
+            
             return transcript
 
 
@@ -549,16 +558,16 @@ class Agent_GUI():
         Example:
 
         ------------------------------------------------
-        **Title:**  
+        Title:  
         "Discipline is Key: Unlock Your Full Potential"
 
-        **Description:**  
+         Description:
         "In this motivational video, Chris Williamson shares powerful insights on how discipline plays a crucial role in achieving success. Whether you're pursuing personal growth or professional achievements, learn why self-discipline is the foundation for unlocking your true potential."
 
-        **Keywords:**  
+         Keywords:  
         "motivation, discipline, success, personal growth, self-improvement, productivity, unlock potential, Chris Williamson, success mindset"
 
-        **Hashtags:**  
+        Hashtags:
         "#DisciplineIsKey #Motivation #SuccessMindset #PersonalGrowth #SelfImprovement #AchieveGreatness #StayFocused #ChrisWilliamson"
         ------------------------------------------------
         """
@@ -608,28 +617,35 @@ class Agent_GUI():
             model=model,
             tools=[
                 final_answer, 
-                #DuckDuckGoSearchTool(), 
+                DuckDuckGoSearchTool(), 
                 UserInputTool(),
-                GoogleSearchTool(),
+                #GoogleSearchTool(),
                 VisitWebpageTool(),
                 PythonInterpreterTool(),
                 TranscribeVideo
                 #image_generation_tool
             ], 
+            add_base_tools=True,
             max_steps=6,
             verbosity_level=1,
             prompt_templates=prompt_templates
         )
+        agent.write_memory_to_messages()  # writes the agent’s memory as list of chat messages for the Model to view.
 
         Response = agent.run(
             task=user_task,
             additional_args=context_vars
         )
 
+        self.chat_display.insert(tk.END, "2. 🌍 The AI agent is searching for similar videos and trending content...\n")
+        self.chat_display.update()
 
-            
+        self.chat_display.insert(tk.END, "3. ✍️ Generating optimized metadata based on current trends...\n")
+        self.chat_display.update()
+
+        self.chat_display.insert(tk.END, "✅ Done!\n\n")
         self.chat_display.config(state=tk.NORMAL)
-        self.chat_display.insert(tk.END, Response + "\n")
+        self.chat_display.insert(tk.END, str(Response) + "\n")
         self.chat_display.config(state=tk.DISABLED)  
 
 
@@ -1327,6 +1343,9 @@ class ToolMenu:
             corner_radius=10
         )
         self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
+        self.container.update_idletasks()
+
 
         self.create_widgets()
      
@@ -1336,19 +1355,43 @@ class ToolMenu:
             master=self.container,
             fg_color="#282828"
         )
-        top_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
 
+
+
+        top_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+  
+
+        tools_intro = [
+            ("✔️YouTube Downloader", "Download videos and audio with all available format selection for det video. \n"),
+            ("✔️LR Metadata Agent", "AI-Agent: Generates SEO-optimized Title, Description, Hashtags, Keywords  choosen video in uploaded files. \n"),
+            ("✔️Mediainfo Analyst", "View technical metadata from media files. \n"),
+            ("✔️Social Media Uploading", "Upload to platforms like YouTube, TikTok. \n"),
+            ("✔️AI AutoCreator", "AI agent to transcribe, edit and upload videos. \n"),
+            ("📍Future Updates", "The program is under development, Program updates will be released in the future. \n"),
+
+        ]
+        intro_text = "\n\n".join([f"• {name}:\n  {desc}" for name, desc in tools_intro])
       
-    
-      
-   
-        self.info_button_mediainfo_analyst = create_info_button(
-            open_mediaInfo_Analyst,
+        intro_label = CTkLabel(
+            master=self.container,
+            text="Available Tools:\n\n" + intro_text,
+            font=("Arial", 14),
+            justify="left",
+            text_color="#FFFFFF",
+            wraplength=600,
+            fg_color="transparent",
+            anchor="nw"
+        )
+        intro_label.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+
+
+        self.info_button_ToolMenu_info = create_info_button(
+            open_ToolMenu_Info,
             text="INFO",
             width=15,
             master=top_bar
         )
-        self.info_button_mediainfo_analyst.pack(side="left", padx=10, pady=5)
+        self.info_button_ToolMenu_info.pack(side="left", padx=10, pady=5)
 
    
 
@@ -1651,14 +1694,17 @@ class MediaInfoAnalyst:
 
 
 
-
 ####TOOLCLASS#####
 ### a class with list of available tools that changes window for each tool on the main window.
 class ToolWindowClass:
     def __init__(self, master):
         self.master = master
+
         self.container = CTkFrame(master, fg_color="transparent",border_width=1.5, border_color="blue")
         self.container.place(relx=0.595, rely=0.71, relwidth=0.806, relheight=0.58, anchor="center")
+
+
+    
         self.create_widgets()
 
     def create_widgets(self):
@@ -1683,8 +1729,6 @@ class ToolWindowClass:
         self.content_frame = CTkFrame(self.container, fg_color="transparent")
         self.content_frame.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.9, relheight=0.8)
 
-
-
   
         self.on_tool_select(self.tool_list[0])
 
@@ -1694,6 +1738,9 @@ class ToolWindowClass:
             widget.destroy()
         if selected_tool == 'Tool Menu':
             self.CreateToolMenu_info()
+
+
+     
         elif selected_tool == 'LR Metadata Agent':
             self.create_smol_agent()
         elif selected_tool == 'YouTube Downloader':
@@ -5100,6 +5147,19 @@ def open_mediaInfo_Analyst():
         default_value = "",
         option_list   = option_list
     )
+def open_ToolMenu_Info():
+    option_list = [
+        "\n NOTES\n" 
+        "\n open_mediaInfo_Analyst\n" 
+
+    ]
+    MessageBox(
+        messageType = "info",
+        title       = "open_mediaInfo_Analyst",
+        subtitle    = "open_mediaInfo_Analyst",
+        default_value = "",
+        option_list   = option_list
+    )
 
 
 def open_LR_Agent_tool_info():
@@ -5708,7 +5768,8 @@ if __name__ == "__main__":
     #             """Exit fullscreen when ESC is pressed"""
     #             window.attributes("-fullscreen", False)
     
-    window = CTk(fg_color="black")
+    #window = CTk(fg_color="black")
+    window = CTk()
     # window.attributes('-fullscreen', True)
     # window.bind("<Escape>", exit_fullscreen) 
 
