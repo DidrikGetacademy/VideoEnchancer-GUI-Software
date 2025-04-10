@@ -7,8 +7,12 @@ from subprocess import run  as subprocess_run
 import ffmpeg
 from moviepy import VideoFileClip
 from faster_whisper import WhisperModel
-
+from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel,HfApiModel,tool,SpeechToTextTool
+import yaml
+from dotenv import load_dotenv
 from shutil     import rmtree as remove_directory
+import subprocess
+
 from timeit     import default_timer as timer
 from PIL import Image, ImageSequence
 import threading
@@ -195,8 +199,8 @@ global original_preview
 global upscaled_preview
 preview_instance = None  
 global Smol_agent
-
-
+file_list_update_callback = None
+media_info_update_callback = None
 
 
 model_loading_lock = threading.Lock()
@@ -300,38 +304,6 @@ supported_video_extensions = [
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class AI_Auto_creator():
     """Ai-Agent that can download videos, edit and cut videos, add subtitles, and upload automatically from a given text prompt"""
     def __init__(self,parent_container):
@@ -373,26 +345,12 @@ class AI_Auto_creator():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 class Agent_GUI():
     """Agent that retrieves transcripts, searches the web, and generates optimized metadata for videos."""
 
     def __init__(self, parent_container):
         print("Initializing LR_AGENT")
         self.parent_container = parent_container
-        self.uploaded_files = []
         self.uploaded_files = selected_file_list
 
         self.container = CTkFrame(
@@ -406,6 +364,8 @@ class Agent_GUI():
 
    
         self.create_widgets()
+        global file_list_update_callback
+        file_list_update_callback = self.sync_uploaded_files
         file_names = [os_path_basename(f) for f in self.uploaded_files]
         self.file_menu.configure(values=file_names)
         if file_names:
@@ -434,6 +394,11 @@ class Agent_GUI():
         )
         self.file_menu.pack(side="left", padx=10, pady=5)
 
+
+    def sync_uploaded_files(self):
+        """Sync uploaded_files with global list and refresh the dropdown"""
+        self.uploaded_files = selected_file_list
+        self.update_file_list()
     
         self.metadata_btn = CTkButton(
             master=self.top_bar,
@@ -487,16 +452,12 @@ class Agent_GUI():
         thread.start()
       
     def load_llama_instruct(self, uploaded_file=None):
-        from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel,HfApiModel,tool
-        import yaml
-        from dotenv import load_dotenv
         load_dotenv()
         #https://huggingface.co/docs/smolagents/guided_tour?build-a-tool=Decorate+a+function+with+%40tool&Pick+a+LLM=Local+Transformers+Model#default-toolbox
-
         #model_path = "./local_qwen2.5_coder_7b"
         #model = TransformersModel(model_path)
+
         model = HfApiModel("Qwen/Qwen2.5-Coder-32B-Instruct")
-        final_answer = FinalAnswerTool()
         prompts = find_by_relative_path(f"Assets{os_separator}prompts.yaml")
         with open(prompts, 'r') as stream:
             prompt_templates = yaml.safe_load(stream)
@@ -518,42 +479,49 @@ class Agent_GUI():
 
 
         @tool
-        def TranscribeVideo(video_path: str) -> str:
-            """Extracts audio from the video and transcribes it using Whisper.
+        def ExtractAudioFromVideo(video_path: str) -> str:
+            """Extracts  mono 16kHz WAV audio from a video using ffmpeg.
                 Args:
-                    video_path (str): The full path to the video file to be transcribed.
+                    video_path (str): The full path to the video file.
 
                 Returns:
-                    str: The transcribed text from the video.
+                    str:  the path to the extracted audio file.
             """
             audio_path = "temp_audio.wav"
-            clip = VideoFileClip(video_path)
-            clip.audio.write_audiofile(audio_path)
+            audio_path = "temp_audio.wav"
+            command = [
+                "ffmpeg",
+                "-y",  #
+                "-i", video_path,
+                "-ac", "1", 
+                "-ar", "16000",  
+                "-vn", 
+                "-f", "wav",
+                audio_path
+            ]
+            subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            model = WhisperModel("base",device="cpu")
-            segments, _ = model.transcribe(audio_path)
-            transcript = " ".join([segment.text for segment in segments])
-            os.remove(audio_path)
-            self.chat_display.insert(tk.END, f"📜 Transkripsjonseksempel: {transcript[:120]}...\n")
+            self.chat_display.insert(tk.END, f"📜 snart ferdig....\n")
             self.chat_display.update()
-            
-            return transcript
+            return audio_path
 
 
 
 
         format = """"
-        Title:  
-        [Provide a catchy, optimized title for the video]
+        your final answear need too have this structure:
 
-        Description:  
-        [A brief, concise description that summarizes the content, highlights key aspects of the video, and includes relevant keywords naturally]
+        Title:  \n
+        [Provide a catchy, optimized title for the video]\n
 
-        Keywords:  
-        [A list of relevant keywords separated by commas. These are key terms that help categorize and improve the searchability of the video]
+        Description:  \n
+        [A brief, concise description that summarizes the content, highlights key aspects of the video, and includes relevant keywords naturally]\n
 
-        Hashtags:  
-        [A set of relevant hashtags that improve discoverability on social media platforms. Use trending hashtags that align with the video's content]
+        Keywords:  \n
+        [A list of relevant keywords separated by commas. These are key terms that help categorize and improve the searchability of the video]\n
+
+        Hashtags:  \n
+        [A set of relevant hashtags that improve discoverability on social media platforms. Use trending hashtags that align with the video's content]\n
 
         Example:
 
@@ -582,61 +550,49 @@ class Agent_GUI():
             self.chat_display.config(state=tk.DISABLED)  
             return
 
-        #user_task = f"Transcribe the video and generate metadata based on the transcription and similar trending videos,  your final answear need too have this structure: {format}"
         user_task = f"""
-                You are an intelligent video metadata assistant.
-
-                1. Begin by transcribing the video provided in `video_path`.
-                2. Then search online for **trending and similar videos** using relevant queries derived from the transcription.
-                3. Analyze patterns, keywords, and hashtags from those trending videos.
-                4. Finally, create an **original, non-copied** metadata set that is optimized for discoverability, SEO, and engagement.
-
-                Your output must strictly follow the structure provided in the `format` variable, and should include:
-                - A catchy, optimized **title**
-                - A natural, keyword-rich **description**
-                - A set of relevant, trend-aware **keywords**
-                - A well-curated list of popular and unique **hashtags**
-
-                Ensure the metadata feels **fresh, human-written, and tailored specifically to the video content**, not generic or templated. Do not reuse exact text from online examples.
-                Always complete all sections in the format, even if you have to creatively infer them from the video content and trends.
-                """
+        1. extract audio from videopath with this function you have available: ExtractAudioFromVideo
+        2. transcribe the audio with this function you have available: speechtotexttool
+        3. search the web, youtube, and other sources for the video's title, description, and keywords that are trending and popular that is similar too the transcribed video
+        4. use your cretivity when generating the content of title, description, keywrods, hashtag from the  metadata needs to be unique  for social platform so it will go viral and similar trending videos, 
+       """
 
         context_vars = {
                 "video_path": Video_path,
                 "format": format,
                 "file_type": file 
             }       
-      
-        # image_generation_tool = Tool.from_space(
-        #     "black-forest-labs/FLUX.1-schnell",
-        #     name="image_generator",
-        #     description="Generate an image from a prompt"
-        # )
 
-        agent = CodeAgent(
+
+
+        manager_agent  = CodeAgent(
             model=model,
             tools=[
-                final_answer, 
-                DuckDuckGoSearchTool(), 
-                UserInputTool(),
-                #GoogleSearchTool(),
+                FinalAnswerTool(), 
+                SpeechToTextTool(),
                 VisitWebpageTool(),
-                PythonInterpreterTool(),
-                TranscribeVideo
-                #image_generation_tool
+                GoogleSearchTool(),
+                ExtractAudioFromVideo,
             ], 
-            add_base_tools=True,
-            max_steps=6,
+            max_steps=10,
             verbosity_level=1,
-            prompt_templates=prompt_templates
+            prompt_templates=prompt_templates,
+            add_base_tools=True
         )
-        agent.write_memory_to_messages()  # writes the agent’s memory as list of chat messages for the Model to view.
 
-        Response = agent.run(
+        Response = manager_agent .run(
             task=user_task,
             additional_args=context_vars
         )
 
+        try:
+            if os.path.exists("temp_audio.wav"):
+                os.remove("temp_audio.wav")
+                print("🗑️ temp_audio.wav deleted successfully.")
+        except Exception as e:
+            print(f"⚠️ Error deleting temp audio: {e}")
+
+        
         self.chat_display.insert(tk.END, "2. 🌍 The AI agent is searching for similar videos and trending content...\n")
         self.chat_display.update()
 
@@ -645,15 +601,22 @@ class Agent_GUI():
 
         self.chat_display.insert(tk.END, "✅ Done!\n\n")
         self.chat_display.config(state=tk.NORMAL)
-        self.chat_display.insert(tk.END, str(Response) + "\n")
-        self.chat_display.config(state=tk.DISABLED)  
+        if isinstance(Response, dict):
+            formatted_response = (
+                f"🎬 Title:\n{Response.get('Title', 'N/A')}\n\n"
+                f"📝 Description:\n{Response.get('Description', 'N/A')}\n\n"
+                f"🔑 Keywords:\n{Response.get('Keywords', 'N/A')}\n\n"
+                f"🏷️ Hashtags:\n{Response.get('Hashtags', 'N/A')}\n"
+            )
+            self.chat_display.insert(tk.END, formatted_response + "\n")
+        else:
+            self.chat_display.insert(tk.END, str(Response) + "\n")
 
 
 
  
-    def update_file_list(self, new_files):
-        """Update dropdown with new files"""
-        self.uploaded_files.extend(new_files)
+    def update_file_list(self):
+        """Update dropdown with current files"""
         file_names = [os_path_basename(f) for f in self.uploaded_files]
         self.file_menu.configure(values=file_names)
         if file_names:
@@ -666,47 +629,6 @@ class Agent_GUI():
         self.uploaded_files = []
         self.file_menu.configure(values=[])
         self.file_menu_var.set("No files uploaded")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -780,32 +702,6 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
         self.info_button_Social_media_uploading.pack(side="left", padx=10, pady=5)
 
   
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1305,32 +1201,6 @@ def get_ffmpeg_details(file_path):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class ToolMenu:
     def __init__(self, parent_container):
         self.parent_container = parent_container
@@ -1405,32 +1275,12 @@ class ToolMenu:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ####TOOL(1) FOR TOOLCLASS#####
 class MediaInfoAnalyst:
     def __init__(self, parent_container):
         self.parent_container = parent_container
         self.selected_file_list = selected_file_list
+        self.truncated_to_full = {}
 
 
         self.container = CTkFrame(
@@ -1443,6 +1293,8 @@ class MediaInfoAnalyst:
         self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         self.create_widgets()
+        global media_info_update_callback
+        media_info_update_callback = self.sync_uploaded_files
         self.populate_dropdown()
 
     def create_widgets(self):
@@ -1466,7 +1318,8 @@ class MediaInfoAnalyst:
         )
         self.file_menu.pack(side="left", padx=10, pady=5)
 
-  
+
+
         self.get_details_btn = CTkButton(
             master=top_bar,
             text="Fetch MediaInfo",
@@ -1504,16 +1357,30 @@ class MediaInfoAnalyst:
         self.container.columnconfigure(0, weight=1)
         self.container.rowconfigure(1, weight=1)
 
+
+    def sync_uploaded_files(self):
+            """Sync file list with global and refresh dropdown"""
+            self.selected_file_list = selected_file_list
+            self.populate_dropdown()
+
+
     def populate_dropdown(self):
         max_length = 20
-        file_names = [f.split("/")[-1] for f in self.selected_file_list]
+        self.truncated_to_full = {}  # reset mapping
 
-        truncated_names = [name if len(name) <= max_length else name[:max_length] + '...' for name in file_names]
+        file_names = [f.split("/")[-1] for f in self.selected_file_list]
+        truncated_names = []
+
+        for original, full_path in zip(file_names, self.selected_file_list):
+            truncated = original if len(original) <= max_length else original[:max_length] + '...'
+            truncated_names.append(truncated)
+            self.truncated_to_full[truncated] = full_path  # store mapping
 
         self.file_menu.configure(values=truncated_names)
 
         if truncated_names:
             self.file_menu_var.set(truncated_names[0])
+
 
     def place_mediainfo_analyst_textbox(self):
         Info_button_mediainfo_analyst = create_info_button(
@@ -1535,26 +1402,36 @@ class MediaInfoAnalyst:
         self.file_menu.configure(values=[])
         self.file_menu_var.set("No files uploaded")
 
+
     def get_details(self):
         """
         Retrieves detailed metadata for the selected video file using ffmpeg.
         """
+        print("[DEBUG] Fetch button clicked")
+
         selected_file = self.file_menu_var.get()
-        file_path = next((f for f in self.selected_file_list if f.split("/")[-1] == selected_file), None)
+        file_path = self.truncated_to_full.get(selected_file)
+        print(f"[DEBUG] Selected file: {selected_file}")
+        print(f"[DEBUG] Full path: {file_path}")
+
+        self.details_text.configure(state="normal")
+        self.details_text.delete("1.0", END)
+
         if file_path:
             details = get_ffmpeg_details(file_path)
-            self.details_text.delete("1.0", END)
-            if details.startswith("Error") or details.startswith("An unexpected"):
-               self.details_text.insert(END, details)
-            else: 
+            print(f"[DEBUG] Raw details returned:\n{details}")
+
+            if not details:
+                self.details_text.insert(END, "No data received from ffmpeg.")
+            elif details.startswith("Error") or details.startswith("An unexpected"):
+                self.details_text.insert(END, details)
+            else:
                 formatted_data = self.format_details(details)
-                self.details_text.insert(END,formatted_data)
+                self.details_text.insert(END, formatted_data or "No readable metadata found.")
         else:
-            self.details_text.delete("1.0", END)
             self.details_text.insert(END, "No file selected or file not found.")
 
-
-
+        self.details_text.configure(state="disabled")
 
     def format_details(self, details):
         """
@@ -1623,70 +1500,6 @@ class MediaInfoAnalyst:
 
         except json.JSONDecodeError:
             return "Error: Failed to parse the details."
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1783,71 +1596,6 @@ class ToolWindowClass:
 
 
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2095,64 +1843,6 @@ def check_model_loading_progress():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ###Loading-ICON####
 class LoadingIcon:
     def __init__(self,master):
@@ -2181,63 +1871,6 @@ class LoadingIcon:
             self.label.configure(image=self.frames[self.current_frame])
             self.current_frame = (self.current_frame + 1) % len(self.frames)
             self.master.after(50,self.animate)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2333,56 +1966,6 @@ def select_AI_from_menu(selected_option: str) -> None:
         daemon=True
     )
     model_loading_thread.start()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2600,26 +2183,6 @@ class AI:
             return None
    
     
-
-
-
-
-
-
-    
-          
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2944,65 +2507,6 @@ class AI:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # GUI utils ---------------------------
 class MessageBox(CTkToplevel):
 
@@ -3172,50 +2676,6 @@ class MessageBox(CTkToplevel):
         self.placeInfoMessageTitleSubtitle()
         self.placeInfoMessageOptionsText()
         self.placeInfoMessageOkButton()    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -3464,49 +2924,6 @@ class FileWidget(CTkScrollableFrame):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   # EXTERNAL FUNCTIONS
     def clean_file_list(self) -> None:
         for label in self.label_list:
@@ -3737,43 +3154,6 @@ def create_active_button(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # File Utils functions ------------------------
 def create_dir(name_dir: str) -> None:
     if os_path_exists(name_dir):
@@ -3941,52 +3321,6 @@ def prepare_output_video_directory_name(
     output_path += to_append
 
     return output_path
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -4314,44 +3648,6 @@ def copy_file_metadata(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Core functions ------------------------
 def check_upscale_steps() -> None:
     sleep(1)
@@ -4575,45 +3871,6 @@ def upscale_image(
         )
 
     copy_file_metadata(image_path, upscaled_image_path)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -4848,37 +4105,6 @@ def check_forgotten_video_frames(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # GUI utils function ---------------------------
 def check_if_file_is_video(
         file: str
@@ -5007,9 +4233,15 @@ def open_files_action():
 
     if supported_files_counter > 0:
         if supported_files_list:
-   
 
                 selected_file_list = supported_files_list
+                if file_list_update_callback:
+                    file_list_update_callback()
+
+                if media_info_update_callback:
+                    media_info_update_callback()
+
+                
                 update_file_widget(1, 2, 3)  
         upscale_factor = get_values_for_file_widget()
 
@@ -5087,14 +4319,6 @@ def select_image_extension_from_menu(selected_option: str) -> None:
 def select_video_extension_from_menu(selected_option: str) -> None:
     global selected_video_extension   
     selected_video_extension = selected_option
-
-
-
-
-
-
-
-
 
 
 
@@ -5430,14 +4654,6 @@ def place_input_output_resolution_textboxs():
 
 
 
-
-
-
-
-
-
-
-
 def place_output_path_textbox():
     output_path_textbox = create_text_box_output_path(selected_output_path) 
     select_output_path_button = create_active_button(command = open_output_path_action, text = "SELECT",  width   = 85, height  = 25)
@@ -5603,30 +4819,6 @@ def create_option_background():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Main functions ---------------------------
 def on_app_close() -> None:
     window.grab_release()
@@ -5691,31 +4883,6 @@ def on_app_close() -> None:
     
 
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
