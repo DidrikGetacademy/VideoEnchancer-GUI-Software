@@ -205,7 +205,7 @@ preview_instance = None
 global Smol_agent
 file_list_update_callback = None
 media_info_update_callback = None
-
+stop_download_flag = False
 
 model_loading_lock = threading.Lock()
 AI_models_list         = ( SRVGGNetCompact_models_list + AI_LIST_SEPARATOR + RRDB_models_list + AI_LIST_SEPARATOR + IRCNN_models_list )
@@ -877,7 +877,7 @@ def place_youtube_download_menu(parent_container):
             width=100,
             master=youtube_frame
         )
-    Info_button_youtubedownloader.place(relx=0.19, rely=0.60, anchor="e")
+    Info_button_youtubedownloader.place(relx=0.12, rely=0.87, anchor="e")
 
 
 
@@ -901,6 +901,75 @@ def place_youtube_download_menu(parent_container):
         width=100
     )
     progress_label.place(relx=0.23, rely=0.6, anchor="center")
+
+
+    # CTkButton(
+    #     master=youtube_frame,
+    #     text="Clear List",
+    #     command=clear_download_list
+    # ).place(relx=0.26, rely=0.76, anchor="e")
+
+    # CTkButton(
+    #     master=youtube_frame,
+    #     text="Configure format for each link",
+    #     command=Configure_format_youtube_list
+    # )
+
+    # CTkButton(
+    #     master=youtube_frame,
+    #     text="Download all",
+    #     command=download_all_from_list
+    # ).place(relx=0.4, rely=0.76, anchor="e")
+
+    # def Configure_format_youtube_list():
+    #     return
+    
+
+    # def download_all_from_list():
+    #     output_path = youtube_output_path_entry.get()
+    #     if not output_path:
+    #         info_message.set("Choose a folder for saving!")
+    #         return
+        
+    #     def download_worker():
+    #         for link in youtube_download_list:
+    #             youtube_progress_var.set(f"downloading: {link}")
+    #             download_youtube_link(link, output_path, update_progress)
+    #         youtube_progress_var.set("All downloads complete!")
+
+    #     Thread(target=download_worker).start()
+
+
+    CTkLabel(
+        master=youtube_frame,
+        text="YouTube URL List: ", 
+        font=bold12,
+        text_color="#C0C0C0",
+        bg_color='transparent',
+        fg_color="transparent",
+        justify="center"
+    ).place(relx=0.064, rely=0.35, anchor="w")
+
+
+    youtubelist_variable = StringVar(value=youtube_download_list)
+    CTkOptionMenu(
+            master=youtube_frame,
+            variable=youtubelist_variable,
+            values=youtube_download_list,
+            width=300,
+            button_color="black",
+            bg_color="black",
+            fg_color="black",
+            text_color="#FFFFFF",
+        ).place(relx=0.125, rely=0.35, anchor="w")
+   
+
+
+    # ).place(relx=0.12, rely=0.76, anchor="e")
+    # def clear_download_list():
+    #         youtube_download_list.clear()
+    #         list_display.delete('1.0', END)
+
 
 
 
@@ -953,33 +1022,37 @@ def place_youtube_download_menu(parent_container):
         fg_color="black",
         border_color="white",
         border_width=1
-    ).place(relx=0.12, rely=0.6, anchor="e")
-
-
-    CTkButton(
+    ).place(relx=0.12, rely=0.725, anchor="e")
+    
+    global stop_youtube_download_btn
+    stop_youtube_download_btn = CTkButton(
         master=youtube_frame,
-        text="Add link to List",
-        command=add_link_to_download_list
-    ).place(relx=0.12, rely=0.76, anchor="e")
-
-    CTkButton(
-        master=youtube_frame,
-        text="Clear List",
-        command=clear_download_list
-    ).place(relx=0.26, rely=0.76, anchor="e")
-
-    CTkButton(
-        master=youtube_frame,
-        text="Configure format for each link",
-        command=Configure_format_youtube_list
+        text="Stop Downloading...",
+        width=100,
+        height=30,
+        font=bold11,
+        command=lambda: Stop_Youtube_Downloading(),
+        fg_color="black",
+        border_color="white",
+        border_width=1,
+        state="DISABLED"
     )
+    
+
+
 
     CTkButton(
         master=youtube_frame,
-        text="Download all",
-        command=download_all_from_list
-    ).place(relx=0.4, rely=0.76, anchor="e")
-  
+        text="Add List",
+        width=100,
+        height=30,
+        fg_color="black",
+        border_color="white",
+        border_width=1,
+        command=add_link_to_download_list
+    ).place(relx=0.12, rely=0.8, anchor="e")
+
+
 
     global upload_button
     upload_button = CTkButton(
@@ -1005,7 +1078,7 @@ def place_youtube_download_menu(parent_container):
         font=bold12,
         text_color="#C0C0C0",
         bg_color="transparent",
-    ).place(relx=0.064, rely=0.35, anchor="w")
+    ).place(relx=0.064, rely=0.45, anchor="w")
 
 
 
@@ -1015,17 +1088,9 @@ def place_youtube_download_menu(parent_container):
         values=["None"],
         width=300
     )
-    video_format_dropdown.place(relx=0.125, rely=0.35, anchor="w")
+    video_format_dropdown.place(relx=0.125, rely=0.45, anchor="w")
 
-    CTkOptionMenu(
-        master=youtube_frame,
-        variable=youtube_download_list
-        ).place(relx=0.125, rely=0.45, anchor="w")
-    
-    CTkEntry(
-        master=youtube_frame,
-    )
-    
+
 
 
 
@@ -1037,24 +1102,7 @@ def place_youtube_download_menu(parent_container):
             fetch_button.configure(state="disabled")
        
 
-    def Configure_format_youtube_list():
-        return
     
-
-    def download_all_from_list():
-        output_path = youtube_output_path_entry.get()
-        if not output_path:
-            info_message.set("Choose a folder for saving!")
-            return
-        
-        def download_worker():
-            for link in youtube_download_list:
-                youtube_progress_var.set(f"downloading: {link}")
-                download_youtube_link(link, output_path, update_progress)
-            youtube_progress_var.set("All downloads complete!")
-
-        Thread(target=download_worker).start()
-
 
     youtube_link_entry = CTkEntry(
         master=youtube_frame,
@@ -1080,7 +1128,7 @@ def place_youtube_download_menu(parent_container):
         font=bold12,
         text_color="#C0C0C0",
         bg_color="transparent",
-    ).place(relx=0.064, rely=0.42, anchor="w")
+    ).place(relx=0.064, rely=0.55, anchor="w")
 
 
     audio_format_var = StringVar()
@@ -1090,7 +1138,7 @@ def place_youtube_download_menu(parent_container):
         values=["Enter Link First..."],
         width=300
     )
-    audio_format_dropdown.place(relx=0.125, rely=0.42, anchor="w")
+    audio_format_dropdown.place(relx=0.125, rely=0.55, anchor="w")
 
     def update_format_list():
         url = youtube_link_entry.get()
@@ -1124,7 +1172,7 @@ def place_youtube_download_menu(parent_container):
         border_width=1,
         state="disabled"  
     )
-    fetch_button.place(relx=0.12, rely=0.5, anchor="e")
+    fetch_button.place(relx=0.12, rely=0.65, anchor="e")
 
 
     def select_youtube_output_path():
@@ -1134,19 +1182,13 @@ def place_youtube_download_menu(parent_container):
                 youtube_output_path_entry.insert(0,path)
 
 
+
+
 def add_link_to_download_list():
-    url = youtube_link_entry.get().strip()
-    if url and url not in youtube_download_list:
-        youtube_download_list.append(url)
-        link.display.insert(END, url + "\n")
-        youtube_link_entry.delete(0, END)
-
-def clear_download_list():
-    youtube_download_list.clear()
-    list_display.delete('1.0', END)
-
-
-
+        url = youtube_link_entry.get().strip()
+        if url and url not in youtube_download_list:
+            youtube_download_list.append(url)
+            youtube_link_entry.delete(0, END)
 
 def delete_cookie_file_and_reset_button():
     """ Deletes the cookie file if it exists and resets the upload button visibility. """
@@ -1160,7 +1202,7 @@ def delete_cookie_file_and_reset_button():
             print(f"Cookie file {COOKIE_PATH_FILE} deleted successfully.")
         except Exception as e:
             print(f"Error deleting cookie file: {e}")
-    upload_button.place(relx=0.12, rely=0.7, anchor="e")
+    upload_button.place(relx=0.12, rely=0.94, anchor="e")
 
 
 def load_cookie_file_path():
@@ -1354,25 +1396,59 @@ def download_youtube_link(youtube_url,output_path, progress_callback=None):
         return f"Error: {str(e)}"
     
 def update_progress(d):
+    if stop_download_flag:
+        raise yt_dlp.utils.DownloadError("User stopped the download.")
     if d['status'] == 'downloading':
         percent = d.get('_percent_str', '0%')
         window.after(0, lambda: youtube_progress_var.set(percent))
 
 
 def download_thread(youtube_url, output_path):
+    global stop_download_flag
     try:
         info_message.set("Downloading....")
         message = download_youtube_link(youtube_url, output_path, update_progress)
+        if stop_download_flag:
+            info_message.set("Removing temporary files...")
+         
+            for file in os.listdir(output_path):
+                if file.endswith(".part"):
+                    try:
+                        os.remove(os.path.join(output_path, file))
+                        info_message.set("Done cleaning up files.")
+                    except Exception as e:
+                        info_message.set(f"Error cleaning up files: {str(e)}")
+            return
+        
+        
         if message == "Download Complete!":
             info_message.set(message)
-        else: info_message.set(message)
+        else: 
+            info_message.set(message)
+    except yt_dlp.utils.DownloadError as e:
+        if "User stopped the download." in str(e):
+            info_message.set("YouTube downloader is ready :)")
+
+          
+      
+        else:
+            info_message.set(f"Error:  {str(e)}")
+
     except Exception as e:
         info_message.set(f"Error: {str(e)}")
     finally:
-        youtube_progress_var.set("Download Complete!")
+        youtube_progress_var.set("" if stop_download_flag else "Download Complete!")
         video_format_var.set("")
         audio_format_var.set("")
         youtube_link_entry.delete(0, 'end')
+
+def Stop_Youtube_Downloading():
+    global youtube_link_entry
+    global stop_download_flag 
+    stop_download_flag = True
+    stop_youtube_download_btn.place_forget()
+    info_message.set("Stopping Download, cleaning up...")
+
 
 def start_youtube_download():
     global youtube_link_entry, youtube_output_path_entry
@@ -1386,9 +1462,10 @@ def start_youtube_download():
     if not output_path:
         info_message.set("Choose a folder for saving!")
         return
-    
+    stop_youtube_download_btn.place(relx=0.12, rely=0.8, anchor="e")
     youtube_progress_var.set("0%")
     Thread(target=download_thread, args=(url, output_path)).start()
+    
 
         
 
@@ -4881,7 +4958,7 @@ def place_AI_menu():
     AI_menu.place(relx=0.5, rely=0.65, anchor="center") 
 
 
-#didrik
+
 def place_AI_interpolation_menu():
     AI_interpolation_frame = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
     AI_interpolation_frame.place(relx=column0_x - 0.1235, rely=row1_y - 0.022, anchor="center")
