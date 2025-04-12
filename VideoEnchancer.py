@@ -5,14 +5,17 @@ from time       import sleep
 from webbrowser import open as open_browser
 from subprocess import run  as subprocess_run
 import ffmpeg
-from moviepy import VideoFileClip
-from faster_whisper import WhisperModel
 from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel,HfApiModel,tool,SpeechToTextTool
 import yaml
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+
+import pickle
 from dotenv import load_dotenv
+from typing import Literal
 from shutil     import rmtree as remove_directory
 import subprocess
-
 from timeit     import default_timer as timer
 from PIL import Image, ImageSequence
 import threading
@@ -190,6 +193,7 @@ cookie_file_path = None
 
 
 #Video Preview
+youtube_download_list = []
 frame_cache = {}
 last_model_config =  None
 preview_ai_instance = None
@@ -304,52 +308,12 @@ supported_video_extensions = [
 
 
 
-class AI_Auto_creator():
-    """Ai-Agent that can download videos, edit and cut videos, add subtitles, and upload automatically from a given text prompt"""
-    def __init__(self,parent_container):
-        self.parent_container = parent_container
-        self.container = CTkFrame(
-            master=self.parent_container,
-            fg_color="#000000",
-            border_width=2,
-            border_color="#404040",
-            corner_radius=10
-        )
-        self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        self.create_widgets()
-    
-    def create_widgets(self):
-            
-            self.top_bar = CTkFrame(
-            master=self.container,
-            fg_color="#282828"
-             )
-            
-            self.top_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
-            self.Generate_Btn = CTkButton(
-            master=self.top_bar,
-            text="Generate Metadata",
-            width=140,
-            height=30,
-            font=bold11,
-            border_width=1,
-            fg_color="#282828",
-            text_color="#E0E0E0",
-            border_color="#0096FF",
-           # command=
-        )
-            self.Generate_Btn.pack(side="left", padx=10, pady=5)
-
-
-
-
 
 
 class Agent_GUI():
     """Agent that retrieves transcripts, searches the web, and generates optimized metadata for videos."""
 
     def __init__(self, parent_container):
-        print("Initializing LR_AGENT")
         self.parent_container = parent_container
         self.uploaded_files = selected_file_list
 
@@ -395,10 +359,7 @@ class Agent_GUI():
         self.file_menu.pack(side="left", padx=10, pady=5)
 
 
-    def sync_uploaded_files(self):
-        """Sync uploaded_files with global list and refresh the dropdown"""
-        self.uploaded_files = selected_file_list
-        self.update_file_list()
+
     
         self.metadata_btn = CTkButton(
             master=self.top_bar,
@@ -410,7 +371,8 @@ class Agent_GUI():
             fg_color="#282828",
             text_color="#E0E0E0",
             border_color="#0096FF",
-            command=lambda: self.start_metadata_thread()
+            command=lambda: self.start_metadata_thread(),
+            state="DISABLED"
         )
         self.metadata_btn.pack(side="left", padx=10, pady=5)
 
@@ -446,11 +408,19 @@ class Agent_GUI():
         self.container.columnconfigure(0, weight=1)
         self.container.rowconfigure(1, weight=1)
 
+    def sync_uploaded_files(self):
+        """Sync uploaded_files with global list and refresh the dropdown"""
+        self.uploaded_files = selected_file_list
+        self.update_file_list()
+        if self.uploaded_files:
+            self.metadata_btn.configure(state="normal")
 
     def start_metadata_thread(self):
         thread = threading.Thread(target=self.load_llama_instruct, daemon=True)
         thread.start()
       
+
+
     def load_llama_instruct(self, uploaded_file=None):
         load_dotenv()
         #https://huggingface.co/docs/smolagents/guided_tour?build-a-tool=Decorate+a+function+with+%40tool&Pick+a+LLM=Local+Transformers+Model#default-toolbox
@@ -471,10 +441,16 @@ class Agent_GUI():
                         file = "Video file"
                 elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
                         file = "Image file"
+                                    
+                        self.chat_display.config(state=tk.NORMAL)
+                        self.chat_display.insert(tk.END, "Sorry we do not read any pitcures at this moment, this will be available in later updates\n")
+                        self.chat_display.update()
+                        return
 
 
         self.chat_display.config(state=tk.NORMAL)
         self.chat_display.insert(tk.END, "1. 🤖 AI-agenten transcribes video now...\n")
+        self.chat_display.configure(state="disabled")
         self.chat_display.update()
 
 
@@ -500,46 +476,70 @@ class Agent_GUI():
                 audio_path
             ]
             subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            self.chat_display.insert(tk.END, f"📜 snart ferdig....\n")
-            self.chat_display.update()
             return audio_path
 
 
+        @tool
+        def Log_Agent_Progress(stage: str, message: str) -> str:
+            """
+            A tool for logging agent thoughts, actions, and reflections during task execution.
+
+            Args:
+                stage (str): One of "info", "action", "reflection".
+                message (str): A descriptive message of what the agent is doing or thinking.
+
+            Returns:
+                str: Confirmation that the message has been logged.
+            """
+            valid_stages = {"info", "action", "reflection"}
+            if stage not in valid_stages:
+                stage = "info"  # fallback or error handling
+
+            log_entry = {
+                "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
+                "stage": stage,
+                "message": message
+            }
+
+            self.chat_display.config(state=tk.NORMAL)
+            self.chat_display.insert(tk.END, f"{log_entry['timestamp']} [{stage.upper()}] {message}\n")
+            self.chat_display.config(state=tk.DISABLED)
+            self.chat_display.see(tk.END)
+
+            print(f"[{stage.upper()}] {log_entry['timestamp']}: {message}")
+            return "Log recorded successfully."
 
 
-        format = """"
-        your final answear need too have this structure:
+        
+        @tool
+        def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
+                """
+                A tool for fetching metadata from top trending YouTube videos in a specific category or topic.
 
-        Title:  \n
-        [Provide a catchy, optimized title for the video]\n
+                Args:
+                    Search_Query (str): A keyword or topic to search for trending YouTube videos (e.g., "Motivational", "Funny", "Tech Reviews").
 
-        Description:  \n
-        [A brief, concise description that summarizes the content, highlights key aspects of the video, and includes relevant keywords naturally]\n
+                Returns:
+                    dict: A dictionary containing video metadata including title, description, view count, like count, comment count,
+                    thumbnails, and channel title for each top trending video.
+                """
+                
+                Api_key = os.getenv("YOUTUBE_API_KEY")
 
-        Keywords:  \n
-        [A list of relevant keywords separated by commas. These are key terms that help categorize and improve the searchability of the video]\n
+                youtube = build("youtube", "v3", developerKey=Api_key)
 
-        Hashtags:  \n
-        [A set of relevant hashtags that improve discoverability on social media platforms. Use trending hashtags that align with the video's content]\n
+                request = youtube.search().list(
+                    part="snippet",
+                    q=Search_Query,
+                    type="video",
+                    maxResults=10
+                )
+                response = request.execute()
 
-        Example:
+                return response 
 
-        ------------------------------------------------
-        Title:  
-        "Discipline is Key: Unlock Your Full Potential"
 
-         Description:
-        "In this motivational video, Chris Williamson shares powerful insights on how discipline plays a crucial role in achieving success. Whether you're pursuing personal growth or professional achievements, learn why self-discipline is the foundation for unlocking your true potential."
-
-         Keywords:  
-        "motivation, discipline, success, personal growth, self-improvement, productivity, unlock potential, Chris Williamson, success mindset"
-
-        Hashtags:
-        "#DisciplineIsKey #Motivation #SuccessMindset #PersonalGrowth #SelfImprovement #AchieveGreatness #StayFocused #ChrisWilliamson"
-        ------------------------------------------------
-        """
-
+       
 
         uploaded_file_name = self.file_menu_var.get()
         Video_path = next((f for f in self.uploaded_files if os_path_basename(f) == uploaded_file_name), None)
@@ -549,19 +549,29 @@ class Agent_GUI():
             self.chat_display.insert(tk.END, "Not a valid file path" + "\n")
             self.chat_display.config(state=tk.DISABLED)  
             return
+                
+        user_task = (
+            "1. Use the ExtractAudioFromVideo tool to extract audio from the video. "
+            "2. Store the returned path to the audio file (e.g., temp_audio.wav). "
+            "3. Use the SpeechToTextTool (called 'transcriber') to transcribe the audio by passing the audio path as input to the tool like: SpeechToTextTool(audio=audio_path). "
+            "4. After you have the transcript, analyze it and create a unique and engaging title, description, keywords, and hashtags. "
+            "5. Search for trending and similar content using Fetch_top_trending_youtube_videos for inspiration. "
+            "6. ALWAYS REMEMBER Log your thoughts and each step using the Log_Agent_Progress tool. "
+            "7. Finally, present your output using this format:\n"
+            "title: ...\ndescription: ...\nkeywords: ...\nhashtags: ..."
+        )
 
-        user_task = f"""
-        1. extract audio from videopath with this function you have available: ExtractAudioFromVideo
-        2. transcribe the audio with this function you have available: speechtotexttool
-        3. search the web, youtube, and other sources for the video's title, description, and keywords that are trending and popular that is similar too the transcribed video
-        4. use your cretivity when generating the content of title, description, keywrods, hashtag from the  metadata needs to be unique  for social platform so it will go viral and similar trending videos, 
-       """
+
+
+
 
         context_vars = {
                 "video_path": Video_path,
-                "format": format,
-                "file_type": file 
+                "file_type": file,
+
             }       
+
+
 
 
 
@@ -573,6 +583,8 @@ class Agent_GUI():
                 VisitWebpageTool(),
                 GoogleSearchTool(),
                 ExtractAudioFromVideo,
+                Fetch_top_trending_youtube_videos,
+                Log_Agent_Progress
             ], 
             max_steps=10,
             verbosity_level=1,
@@ -592,25 +604,27 @@ class Agent_GUI():
         except Exception as e:
             print(f"⚠️ Error deleting temp audio: {e}")
 
-        
+        self.chat_display.config(state=tk.NORMAL)
         self.chat_display.insert(tk.END, "2. 🌍 The AI agent is searching for similar videos and trending content...\n")
         self.chat_display.update()
+        self.chat_display.configure(state="disabled")
 
-        self.chat_display.insert(tk.END, "3. ✍️ Generating optimized metadata based on current trends...\n")
-        self.chat_display.update()
+
 
         self.chat_display.insert(tk.END, "✅ Done!\n\n")
         self.chat_display.config(state=tk.NORMAL)
         if isinstance(Response, dict):
             formatted_response = (
-                f"🎬 Title:\n{Response.get('Title', 'N/A')}\n\n"
-                f"📝 Description:\n{Response.get('Description', 'N/A')}\n\n"
-                f"🔑 Keywords:\n{Response.get('Keywords', 'N/A')}\n\n"
-                f"🏷️ Hashtags:\n{Response.get('Hashtags', 'N/A')}\n"
+                f"🎬 Title:\n{Response.get('title', 'N/A')}\n\n"
+                f"📝 Description:\n{Response.get('description', 'N/A')}\n\n"
+                f"🔑 Keywords:\n{Response.get('keywords', 'N/A')}\n\n"
+                f"🏷️ Hashtags:\n{Response.get('hashtags', 'N/A')}\n"
             )
             self.chat_display.insert(tk.END, formatted_response + "\n")
+            self.chat_display.configure(state="disabled")
         else:
             self.chat_display.insert(tk.END, str(Response) + "\n")
+            self.chat_display.configure(state="disabled")
 
 
 
@@ -655,14 +669,121 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
    
         self.create_widgets()
 
+    def youtube_login(self):
+
+
+        SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+        try:
+            print("🔐 Launching browser for YouTube login...")
+
+            # Use a stable port to avoid firewall issues
+            flow = InstalledAppFlow.from_client_secrets_file(
+                os.path.join(os.path.dirname(__file__), "client_secret.json"),
+                SCOPES
+            )
+
+            # Localhost + open_browser=True ensures automatic login flow
+            credentials = flow.run_local_server(
+                host="localhost",
+                port=8765,
+                open_browser=True
+            )
+
+            with open("youtube_token.pkl", "wb") as token:
+                pickle.dump(credentials, token)
+
+            print("✅ Logged in! You can now upload.")
+
+        except FileNotFoundError:
+            print("❌ ERROR: 'client_secret.json' not found. Please place it in the app folder.")
+        except Exception as e:
+            print(f"❌ Login failed: {e}")
+
+    
+
+    def upload_to_youtube(self,video_path, title, description, tags=None, hashtags=None, schedule_datetime=None):
+        try:
+            credentials = self.load_youtube_credentials()
+            youtube = build("youtube", "v3", credentials=credentials)
+        except Exception as e: 
+            print(f"⚠️ Please login first. Error: {str(e)}")
+            return
+        keywords = []
+        if tags: 
+            keywords.extend(tags)
+        if hashtags: keywords.extend([tag.lstrip('#') for tag in hashtags])
+
+        snippet = {
+            "title": title,
+            "description": description,
+            "tags": keywords,
+        }
+
+        status = {
+            "privacyStatus": "private"
+        }
+
+        if schedule_datetime:
+            status["PublishAt"] = schedule_datetime.isoformat() + "Z"
+            status["privacyStatus"] = "private"
+
+        
+        request = youtube.videos().insert(
+            part="snippet,status",
+            body={
+                "snippet": snippet,
+                "status": status
+                },
+                media_body=MediaFileUpload(video_path)
+        )
+
+        try:
+            response = request.execute()
+            print("✅ Upload complete! Video ID:", response["id"])
+        except Exception as e:
+               print(f"❌ Upload failed: {str(e)}")
+
+    def browse_video_file(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Video Files", "*.mp4 *.mov *.avi *.mkv")])
+        if file_path:
+            self.video_path_entry.delete(0, 'end')
+            self.video_path_entry.insert(0, file_path)
+
+    def handle_upload(self):
+        if self.file_menu.get() != "Youtube":
+            print("⚠️ Only YouTube upload is supported right now.")
+            return
+
+        title = self.title_entry.get()
+        description = self.description_entry.get("1.0", "end").strip()
+        tags = [t.strip() for t in self.tags_entry.get().split(",") if t.strip()]
+        hashtags = [h.strip() for h in self.hashtags_entry.get().split(",") if h.strip()]
+        video_path = self.video_path_entry.get()
+
+        if not video_path:
+            print("⚠️ No video selected.")
+            return
+
+        self.upload_to_youtube(
+            video_path=video_path,
+            title=title,
+            description=description,
+            tags=tags,
+            hashtags=hashtags,
+            schedule_datetime=None  
+        )
+
+            
     def create_widgets(self):
-       
+
+        
         self.top_bar = CTkFrame(
             master=self.container,
             fg_color="#282828"
         )
         self.top_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
 
+        self.LoginYoutube = CTkButton(master=self.top_bar, text="Log in to YouTube",  command=lambda: Thread(target=self.youtube_login).start()).pack(side="right", padx=10, pady=5)
    
         self.file_menu = CTkOptionMenu(
             master=self.top_bar,
@@ -688,7 +809,7 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
             fg_color="#282828",
             text_color="#E0E0E0",
             border_color="#0096FF",
-            command=None
+            command=lambda: Thread(target=self.handle_upload).start()
         )
         self.Upload.pack(side="left", padx=10, pady=5)
 
@@ -701,13 +822,37 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
         )
         self.info_button_Social_media_uploading.pack(side="left", padx=10, pady=5)
 
-  
+
+        self.title_entry = CTkEntry(master=self.container, placeholder_text="Video Title")
+        self.title_entry.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+
+        self.description_entry = CTkTextbox(master=self.container, height=100)
+        self.description_entry.insert("1.0", "Video Description")
+        self.description_entry.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
+
+        self.tags_entry = CTkEntry(master=self.container, placeholder_text="Tags (comma-separated)")
+        self.tags_entry.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
+
+        self.hashtags_entry = CTkEntry(master=self.container, placeholder_text="Hashtags (comma-separated)")
+        self.hashtags_entry.grid(row=4, column=0, padx=10, pady=5, sticky="ew")
+
+        self.video_path_entry = CTkEntry(master=self.container, placeholder_text="Path to video file")
+        self.video_path_entry.grid(row=5, column=0, padx=10, pady=5, sticky="ew")
+
+        self.browse_button = CTkButton(
+            master=self.container,
+            text="Browse...",
+            command=self.browse_video_file
+        )
+        self.browse_button.grid(row=5, column=1, padx=5, pady=5)
+
 
 
 
 
 ####Youtube Download#####
 global youtube_progress_var
+
 def place_youtube_download_menu(parent_container):
     #load_cookie_file_path()
     frame_width = 800
@@ -809,6 +954,31 @@ def place_youtube_download_menu(parent_container):
         border_color="white",
         border_width=1
     ).place(relx=0.12, rely=0.6, anchor="e")
+
+
+    CTkButton(
+        master=youtube_frame,
+        text="Add link to List",
+        command=add_link_to_download_list
+    ).place(relx=0.12, rely=0.76, anchor="e")
+
+    CTkButton(
+        master=youtube_frame,
+        text="Clear List",
+        command=clear_download_list
+    ).place(relx=0.26, rely=0.76, anchor="e")
+
+    CTkButton(
+        master=youtube_frame,
+        text="Configure format for each link",
+        command=Configure_format_youtube_list
+    )
+
+    CTkButton(
+        master=youtube_frame,
+        text="Download all",
+        command=download_all_from_list
+    ).place(relx=0.4, rely=0.76, anchor="e")
   
 
     global upload_button
@@ -847,15 +1017,43 @@ def place_youtube_download_menu(parent_container):
     )
     video_format_dropdown.place(relx=0.125, rely=0.35, anchor="w")
 
+    CTkOptionMenu(
+        master=youtube_frame,
+        variable=youtube_download_list
+        ).place(relx=0.125, rely=0.45, anchor="w")
+    
+    CTkEntry(
+        master=youtube_frame,
+    )
+    
 
 
-    def  update_fetch_button_state(event=None):
+
+    def update_fetch_button_state(event=None):
         url = youtube_link_entry.get()
         if "youtube.com" in url or "youtu.de" in url:
             fetch_button.configure(state="normal")  
         else:       
             fetch_button.configure(state="disabled")
        
+
+    def Configure_format_youtube_list():
+        return
+    
+
+    def download_all_from_list():
+        output_path = youtube_output_path_entry.get()
+        if not output_path:
+            info_message.set("Choose a folder for saving!")
+            return
+        
+        def download_worker():
+            for link in youtube_download_list:
+                youtube_progress_var.set(f"downloading: {link}")
+                download_youtube_link(link, output_path, update_progress)
+            youtube_progress_var.set("All downloads complete!")
+
+        Thread(target=download_worker).start()
 
 
     youtube_link_entry = CTkEntry(
@@ -928,11 +1126,26 @@ def place_youtube_download_menu(parent_container):
     )
     fetch_button.place(relx=0.12, rely=0.5, anchor="e")
 
+
     def select_youtube_output_path():
             path= filedialog.askdirectory()
             if path:
                 youtube_output_path_entry.delete(0,'end')
                 youtube_output_path_entry.insert(0,path)
+
+
+def add_link_to_download_list():
+    url = youtube_link_entry.get().strip()
+    if url and url not in youtube_download_list:
+        youtube_download_list.append(url)
+        link.display.insert(END, url + "\n")
+        youtube_link_entry.delete(0, END)
+
+def clear_download_list():
+    youtube_download_list.clear()
+    list_display.delete('1.0', END)
+
+
 
 
 def delete_cookie_file_and_reset_button():
@@ -1525,7 +1738,7 @@ class ToolWindowClass:
         self.menu_frame.pack(side="top", pady=(20, 10))
 
   
-        self.tool_list = ['Tool Menu','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','LR AutoCreator Agent']
+        self.tool_list = ['Tool Menu','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading']
         self.tool_menu_var = StringVar(value=self.tool_list[0])
         self.tool_menu = CTkOptionMenu(
             master=self.menu_frame,
@@ -1562,8 +1775,7 @@ class ToolWindowClass:
             self.create_mediainfo_Analysist()
         elif selected_tool == "Social Media Uploading":
             self.Create_Social_Media_uploading()
-        elif selected_tool == "create_AI_Auto_creator":
-            self.create_AI_Auto_creator()
+
         
 
     def create_smol_agent(self):
@@ -1589,13 +1801,6 @@ class ToolWindowClass:
     def Create_Social_Media_uploading(self):
         self.socialMediaUploading = SocialMediaUploading(self.content_frame)
         self.socialMediaUploading.container.pack(fill="both", expand=True, padx=10, pady=10)
-
-    def create_AI_Auto_creator(self):
-        self.AI_Auto_creator = AI_Auto_creator(self.content_frame)
-        self.AI_Auto_creator.container.pack(fill="both",expand=True,padx=10,pady=10)
-
-
-    
 
 
 
@@ -4893,7 +5098,7 @@ def on_app_close() -> None:
     
 class VideoEnhancer():
     def __init__(self, Master):
-        # Master.attributes('-fullscreen', True)
+        #Master.attributes('-fullscreen', True)
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
