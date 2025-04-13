@@ -418,6 +418,7 @@ class Agent_GUI():
     def start_metadata_thread(self):
         thread = threading.Thread(target=self.load_llama_instruct, daemon=True)
         thread.start()
+        self.metadata_btn.configure(state="DISABLED")
       
 
 
@@ -554,7 +555,7 @@ class Agent_GUI():
             "1. Use the ExtractAudioFromVideo tool to extract audio from the video. "
             "2. Store the returned path to the audio file (e.g., temp_audio.wav). "
             "3. Use the SpeechToTextTool (called 'transcriber') to transcribe the audio by passing the audio path as input to the tool like: SpeechToTextTool(audio=audio_path). "
-            "4. After you have the transcript, analyze it and create a unique and engaging title, description, keywords, and hashtags. "
+            "4. After you have the transcript, analyze it and create a unique and engaging title, description, keywords, hashtags and emojies "
             "5. Search for trending and similar content using Fetch_top_trending_youtube_videos for inspiration. "
             "6. ALWAYS REMEMBER Log your thoughts and each step using the Log_Agent_Progress tool. "
             "7. Finally, present your output using this format:\n"
@@ -610,7 +611,7 @@ class Agent_GUI():
         self.chat_display.configure(state="disabled")
 
 
-
+        
         self.chat_display.insert(tk.END, "✅ Done!\n\n")
         self.chat_display.config(state=tk.NORMAL)
         if isinstance(Response, dict):
@@ -625,6 +626,7 @@ class Agent_GUI():
         else:
             self.chat_display.insert(tk.END, str(Response) + "\n")
             self.chat_display.configure(state="disabled")
+        self.metadata_btn.configure(state="normal")
 
 
 
@@ -950,9 +952,10 @@ def place_youtube_download_menu(parent_container):
         justify="center"
     ).place(relx=0.064, rely=0.35, anchor="w")
 
-
+    global youtubelist_variable
+    global youtube_list_menu
     youtubelist_variable = StringVar(value=youtube_download_list)
-    CTkOptionMenu(
+    youtube_list_menu = CTkOptionMenu(
             master=youtube_frame,
             variable=youtubelist_variable,
             values=youtube_download_list,
@@ -961,7 +964,8 @@ def place_youtube_download_menu(parent_container):
             bg_color="black",
             fg_color="black",
             text_color="#FFFFFF",
-        ).place(relx=0.125, rely=0.35, anchor="w")
+        )
+    youtube_list_menu.place(relx=0.125, rely=0.35, anchor="w")
    
 
 
@@ -1189,6 +1193,9 @@ def add_link_to_download_list():
         if url and url not in youtube_download_list:
             youtube_download_list.append(url)
             youtube_link_entry.delete(0, END)
+
+            youtubelist_variable.set(youtube_download_list[-1])
+            youtube_list_menu.configure(values=youtube_download_list)
 
 def delete_cookie_file_and_reset_button():
     """ Deletes the cookie file if it exists and resets the upload button visibility. """
@@ -4655,14 +4662,14 @@ def open_mediaInfo_Analyst():
     )
 def open_ToolMenu_Info():
     option_list = [
-        "\n NOTES\n" 
-        "\n open_mediaInfo_Analyst\n" 
+        "\nNOTES\n" 
+        "\n TOOL list information\n" 
 
     ]
     MessageBox(
         messageType = "info",
-        title       = "open_mediaInfo_Analyst",
-        subtitle    = "open_mediaInfo_Analyst",
+        title       = "TOOL list information",
+        subtitle    = "TOOL list information",
         default_value = "",
         option_list   = option_list
     )
@@ -4702,10 +4709,12 @@ def open_YoutubeDownloader_tool_info():
 def open_info_output_path():
     option_list = [
         "\n The default path is defined by the input files."
-        + "\n For example uploading a file from the Download folder,"
-        + "\n the app will save the generated files in the Download folder \n",
-
-        " Otherwise it is possible to select the desired path using the SELECT button",
+        + "\n Upload cookie file from youtube, it will be auto-saved."
+        + "\n 1. go to google crome."
+        + "\n 2.find a cookie extension for exsample: https://chromewebstore.google.com/detail/get-cookiestxt-clean/ahmnmhfbokciafffnknlekllgcnafnie"
+        + "\n Go to youtube, then open the extension and export as, this will download a .txt\n",
+        + "\n upload the .txt file to upload files, and then you are good to go :D \n",
+        "it is possible to select the desired output path using the SELECT button",
     ]
 
     MessageBox(
