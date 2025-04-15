@@ -1,0 +1,45 @@
+
+1. Når man skal laste ned video etter og ha fetcha format details, så blir bare lyd lasta ned, jeg må evt sette opp checkboks for om bare lyd eller om begge deler skal lastes ned. ✅
+
+2. denne erroren kommer og programmet fryser når man trykker noe sted sekundet man fetcher details, det funker fint om man ikke trykker noe sted, evt sette opp en async  og en  en sjekk etter yt feilen og deretter enable upload cookie igjen vis det skulle skje.
+ERROR: [youtube] _pdwlXQ7AyE: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies 
+Error fetching formats: ERROR: [youtube] _pdwlXQ7AyE: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
+⚙️ Switching to backup method...
+ERROR: [youtube] _pdwlXQ7AyE: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies 
+❌ Backup method failed: ERROR: [youtube] _pdwlXQ7AyE: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
+🛠️ Trying final fallback method (force_generic_extractor)...
+ERROR: [youtube] _pdwlXQ7AyE: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies 
+ERROR: [youtube] WbY9LxGkPyY: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies 
+PS C:\Users\didri\Desktop\Programmering\VideoEnchancer program> & "c:/Users/didri/Desktop/Programmering/VideoEnchancer program/venv/Scripts/python.exe" "c:/Users/didri/Desktop/Programmering/VideoEnchancer program/VideoEnchancer.py"
+[LearnReflect AI] External ffmpeg.exe file found
+[LearnReflect AI] Preference file exist
+Cookie file path exsist at: C:\Users\didri\AppData\Roaming\LearnReflect\cookies\youtube.com_cookies.txt
+ preview_ai_instance: None,last model config: None 
+Using providers: ['DmlExecutionProvider', 'CPUExecutionProvider']
+Dummy input shape: (256, 256, 3)
+Dummy inference complete
+cookie_file_path when getting available format: C:\Users\didri\AppData\Roaming\LearnReflect\cookies\youtube.com_cookies.txt
+ERROR: [youtube] _pdwlXQ7AyE: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies 
+Error fetching formats: ERROR: [youtube] _pdwlXQ7AyE: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
+⚙️ Switching to backup method...
+ERROR: [youtube] _pdwlXQ7AyE: Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies 
+❌ Backup method failed: ERROR: [youtube] _pdwlXQ7AyE: Sign in 
+
+
+
+3.
+
+4.
+
+5.
+
+6.
+
+7.
+
+8.
+
+9.
+
+10.
+

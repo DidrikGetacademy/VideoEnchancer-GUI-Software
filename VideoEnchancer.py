@@ -319,7 +319,7 @@ class Agent_GUI():
 
         self.container = CTkFrame(
             master=self.parent_container,
-            fg_color="#000000",
+            fg_color="#282828",
             border_width=2,
             border_color="#404040",
             corner_radius=10
@@ -661,7 +661,7 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
 
         self.container = CTkFrame(
             master=self.parent_container,
-            fg_color="#000000",
+            fg_color="#282828",
             border_width=2,
             border_color="#404040",
             corner_radius=10
@@ -852,6 +852,7 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
 
 
 
+
 ####Youtube Download#####
 global youtube_progress_var
 
@@ -905,11 +906,11 @@ def place_youtube_download_menu(parent_container):
     progress_label.place(relx=0.23, rely=0.6, anchor="center")
 
 
-    # CTkButton(
-    #     master=youtube_frame,
-    #     text="Clear List",
-    #     command=clear_download_list
-    # ).place(relx=0.26, rely=0.76, anchor="e")
+    CTkButton(
+     master=youtube_frame,
+         text="Clear List",
+         #command=clear_download_list
+     ).place(relx=0.29, rely=0.76, anchor="e")
 
     # CTkButton(
     #     master=youtube_frame,
@@ -942,9 +943,14 @@ def place_youtube_download_menu(parent_container):
     #     Thread(target=download_worker).start()
 
 
+    # ).place(relx=0.12, rely=0.76, anchor="e")
+    # def clear_download_list():
+    #         youtube_download_list.clear()
+    #         list_display.delete('1.0', END)
+
     CTkLabel(
         master=youtube_frame,
-        text="YouTube URL List: ", 
+        text="YouTube List: ", 
         font=bold12,
         text_color="#C0C0C0",
         bg_color='transparent',
@@ -968,11 +974,6 @@ def place_youtube_download_menu(parent_container):
     youtube_list_menu.place(relx=0.125, rely=0.35, anchor="w")
    
 
-
-    # ).place(relx=0.12, rely=0.76, anchor="e")
-    # def clear_download_list():
-    #         youtube_download_list.clear()
-    #         list_display.delete('1.0', END)
 
 
 
@@ -1022,7 +1023,7 @@ def place_youtube_download_menu(parent_container):
         width=100,
         height=30,
         font=bold11,
-        command=lambda: start_youtube_download(),
+        command=lambda: Thread(target=start_youtube_download).start(),
         fg_color="black",
         border_color="white",
         border_width=1
@@ -1071,7 +1072,7 @@ def place_youtube_download_menu(parent_container):
         border_width=1
     )
     if cookie_file_path is None:
-      upload_button.place(relx=0.12, rely=0.7, anchor="e")
+      upload_button.place(relx=0.12, rely=0.98, anchor="nw")
     
     if cookie_file_path is not None:
         upload_button.place_forget()
@@ -1305,12 +1306,14 @@ def get_available_formats(youtube_url):
              'quiet': True,
              "nocheckcertificate": True,
              'format': 'best',
+             "cookiefile": cookie_file_path
             }
     ydl_opts_backup = {
         'quiet': True,
         'nocheckcertificate': True,
         'format': 'best',
         'no_signature': True,  
+        "cookiefile": cookie_file_path
     }
     ydl_opts_fallback = {
         'quiet': True,
@@ -1318,21 +1321,25 @@ def get_available_formats(youtube_url):
         'format': 'best',
         'force_generic_extractor': True, 
         'ignoreerrors': True,
+        "cookiefile": cookie_file_path
     }
 
     if cookie_file_path:
         ydl_opts["cookiefile"] = cookie_file_path
         ydl_opts_backup["cookiefile"] = cookie_file_path
         ydl_opts_fallback["cookiefile"] = cookie_file_path
+    if not cookie_file_path:
+        print("Cookie file path is None/Empty")
+        return
 
     print(f"cookie_file_path when getting available format: {cookie_file_path}")
 
     def try_fetching_format(ydl_opts_variable):
                 with yt_dlp.YoutubeDL(ydl_opts_variable) as ydl:
                     info = ydl.extract_info(youtube_url, download=False)
-                    formats = info.get('formats', [])
+                    formats = info.get('formats', []) if info else []
 
-                    video_formats = ['Video Formats...','None']
+                    video_formats = ['Video Formats...','Only Audio']
                     audio_formats = []
 
                     for f in formats:
@@ -1366,17 +1373,17 @@ def get_available_formats(youtube_url):
         except  yt_dlp.utils.DownloadError  as e:
                 print(f"Error fetching formats: {e}")
 
-                if "cookies" in str(e).lower() or "403" in str(e):
+                if "cookies" in str(e).lower() or "403" in str(e)  or "cookies" in str(e) or "cookies" in str(e):
                     print("⚠️ Cookie file seems broken or expired. Resetting...")
                     delete_cookie_file_and_reset_button()
-                return [], []
+                return ["error"], ["error"]
 
 
 def download_youtube_link(youtube_url,output_path, progress_callback=None):
     video_format = video_format_var.get().split(" - ")[0]  
     audio_format = audio_format_var.get().split(" - ")[0]  
 
-    if video_format == "None":
+    if video_format == "Only Audio":
         video_format = "bestaudio"
 
         merge_format = "mp3"
@@ -1469,7 +1476,7 @@ def start_youtube_download():
     if not output_path:
         info_message.set("Choose a folder for saving!")
         return
-    stop_youtube_download_btn.place(relx=0.12, rely=0.8, anchor="e")
+    stop_youtube_download_btn.place(relx=0.12, rely=0.96, anchor="e")
     youtube_progress_var.set("0%")
     Thread(target=download_thread, args=(url, output_path)).start()
     
@@ -1489,8 +1496,6 @@ def get_ffmpeg_details(file_path):
         return f"Error retrieving details: {error_message}"
     except Exception as e:
         return f"An unexpected error occurred: {e}"
-
-
 
 
 
@@ -1582,7 +1587,7 @@ class MediaInfoAnalyst:
 
         self.container = CTkFrame(
             master=self.parent_container,
-            fg_color="black",
+            fg_color="#282828",
             border_width=2,
             border_color="#404040",
             corner_radius=10
@@ -1811,7 +1816,7 @@ class ToolWindowClass:
         self.master = master
 
         self.container = CTkFrame(master, fg_color="transparent",border_width=1.5, border_color="blue")
-        self.container.place(relx=0.595, rely=0.71, relwidth=0.806, relheight=0.58, anchor="center")
+        self.container.place(relx=0.37, rely=0.71, relwidth=0.37, relheight=0.58, anchor="center")
 
 
     
@@ -1892,6 +1897,7 @@ class ToolWindowClass:
 
 
 ####VIDEO PREVIEW CLASS######
+#didrik
 class VideoPreview:
     def __init__(self, parent_container, original_label, upscaled_label, video_path):
         print("Initializing VideoPreview...")
@@ -1900,10 +1906,25 @@ class VideoPreview:
         self.upscaled_label = upscaled_label
         self.video_path = video_path
         self.cap = cv2.VideoCapture(video_path)
-        self.target_size = (1080, 1920)
+        self.target_size = (600, 1200)
         self.fps = int(self.cap.get(cv2.CAP_PROP_FPS))
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        
+
+
+        self.view_mode = StringVar(value="side_by_side")
+        self.slider_position = tk.DoubleVar(value=0.5)
+        self.original_label.bind("<B1-Motion>",self.handle_drag_slider)
+        self.upscaled_label.bind("<Button-1>", self.handle_drag_slider)
+
+
+        self.mode_selector = CTkOptionMenu(
+            self.parent_container,
+            values=["side_by_side","SoloFrame"],
+            variable = self.view_mode,
+            command=self.switch_view_mode
+        )
+        self.mode_selector.pack(pady=10)
+
  
         self.timeline_slider = CTkSlider(
             self.parent_container,
@@ -1911,14 +1932,98 @@ class VideoPreview:
             to=self.total_frames,
             command=self.update_frame_preview
         )
-        self.timeline_slider.pack(padx=0.01, pady=0.01)
+        
         
         self.update_frame_preview(0)
         print("VideoPreview initialized successfully.")
+        if self.total_frames <= 1: 
+            self.timeline_slider.pack_forget()
+            self.timeline_slider.configure(state='disabled')
+        else:
+            self.timeline_slider.pack(padx=0.01, pady=0.01)
+            self.timeline_slider.configure(state='normal')
+    
+    def handle_drag_slider(self,event):
+        widget_width = self.original_label.winfo_width()
+        rel_x = max(0, min(1,event.x / widget_width))
+        self.slider_position.set(rel_x)
 
-    def update_gui(self, original_frame, upscaled_frame):
-        print("Updating GUI with new frames...")
-        preview_size = (340, 400)  
+        if hasattr(self, "last_original") and hasattr(self, "last_upscaled"):
+            self.show_soloFame(self.last_original,self.last_upscaled)
+ 
+
+
+
+#didrik
+#SOLO FRAME MODE
+    def show_soloFame(self, original_frame, upscaled_frame):
+
+        self.last_original = original_frame
+        self.last_upscaled = upscaled_frame
+
+        display_size = (900, 1300)  # Wider to show enough image and slider
+        cut_point = int(original_frame.shape[1] * self.slider_position.get())
+
+        # Merge images
+        combined = original_frame.copy()
+        combined[:, cut_point:] = upscaled_frame[:, cut_point:]
+
+        rgb_frame = cv2.cvtColor(combined, cv2.COLOR_BGR2RGB)
+        resized = cv2.resize(rgb_frame, display_size)
+
+        pil_image = Image.fromarray(resized)
+        draw = ImageDraw.Draw(pil_image)
+
+        cut_point_scaled = int(cut_point * (display_size[0] / original_frame.shape[1]))
+        height = display_size[1]
+        handle_y = height // 2
+        handle_radius = 12
+
+        # TEMP TEST COLOR
+        draw.line([(cut_point_scaled, 0), (cut_point_scaled, height)], fill="red", width=4)
+        draw.ellipse(
+            [cut_point_scaled - handle_radius, handle_y - handle_radius,
+            cut_point_scaled + handle_radius, handle_y + handle_radius],
+            fill="yellow", outline="black"
+        )
+
+        tk_image = CTkImage(pil_image, size=display_size)
+        self.original_label.configure(width=display_size[0], height=display_size[1])
+        self.original_label.configure(image=tk_image)
+        self.original_label.image = tk_image
+
+
+
+
+    
+    
+
+    def switch_view_mode(self, mode):
+        print(f"Switched to {mode} view mode.")
+        self.upscaled_label.pack_forget()
+
+        if mode == "side_by_side":
+            self.original_label.pack(side="left", padx=10)
+            self.upscaled_label.pack(side="left", padx=10)
+        elif mode == "SoloFrame":
+              if original_label_title: original_label_title.pack_forget()
+              if upscaled_label_title: upscaled_label_title.pack_forget()
+              self.original_label.pack_forget()
+              self.original_label.pack(expand=True)
+              self.original_label.pack_configure(anchor="center")
+        else:
+            if original_label_title: original_label_title.pack(pady=5)
+            if upscaled_label_title: upscaled_label_title.pack(pady=5)
+
+
+        
+        if hasattr(self, "last_original") and hasattr(self, "last_upscaled"):
+            self.update_gui(self.last_original, self.last_upscaled)
+    
+
+
+    def show_side_by_side(self,original_frame,upscaled_frame):
+        preview_size = (500, 1300)  
  
         original_image = self.convert_frame_to_ctk(original_frame)
         upscaled_image = self.convert_frame_to_ctk(upscaled_frame)
@@ -1936,7 +2041,19 @@ class VideoPreview:
         self.upscaled_label.update_idletasks()
 
         self.timeline_slider.configure(state='normal')
-        print("GUI updated successfully.")
+        print("Side by side frame updated successfully!")
+
+    def update_gui(self, original_frame, upscaled_frame):
+
+        if self.view_mode.get() == "side_by_side":
+            self.show_side_by_side(original_frame,upscaled_frame)
+
+        elif self.view_mode.get() == "SoloFrame":
+            self.show_soloFame(original_frame,upscaled_frame)
+        
+
+        
+      
 
     def update_frame_preview(self, frame_number):
         print(f"Updating frame preview for frame {frame_number}...")
@@ -1996,7 +2113,7 @@ class VideoPreview:
         return frame
 
     def convert_frame_to_ctk(self, frame):
-        preview_width, preview_height = 340, 400  
+        preview_width, preview_height = 500, 1300  
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         resized_frame = cv2.resize(rgb_frame, (preview_width, preview_height), interpolation=cv2.INTER_AREA)
         
@@ -2120,10 +2237,10 @@ def check_model_loading_progress():
         window.after(100, check_model_loading_progress)
     else:
         if current_loaded_model == selected_AI_model:
-            window.preview_button.configure(state=NORMAL)
+            window.preview_button.configure(state="normal")
             info_message.set("Ready for preview")
         else:
-            window.preview_button.configure(state=DISABLED)
+            window.preview_button.configure(state="disabled")
             info_message.set("Model load failed")
 
 
@@ -2181,53 +2298,54 @@ def create_placeholder_image(width, height):
 
 
 
-
-
-
+#didrik
 def place_loadFile_section(window):
-    background = CTkFrame(master = window, fg_color = background_color, corner_radius = 1)
+    global container, original_preview, upscaled_preview,original_label_title, upscaled_label_title
 
-    global container, original_preview, upscaled_preview
-
-    preview_width = 340  
-    preview_height = 400  
+    preview_width = 1400  
+    preview_height = 1080  
 
 
     window.preview_frame = CTkFrame(
-    master=window, 
-    fg_color=dark_color,
-    width=preview_width * 2 + 40, 
-    height=preview_height + 40, 
-    corner_radius=3
+        master=window, 
+        fg_color=dark_color,
+        width=preview_width,
+        height=preview_height,
+        corner_radius=3
     )
-    window.preview_frame.place(relx=0.80, rely=0.205, anchor="center")
+    window.preview_frame.place(relx=0.78, rely=0.5, relwidth=0.45, relheight=1.0, anchor="center")
+    window.preview_frame.pack_propagate(False)  
 
 
-    # Create placeholder images
-    placeholder_img = create_placeholder_image(340, 400)
+    placeholder_img = create_placeholder_image(1920, 1080)
     placeholder_photo = CTkImage(placeholder_img, size=(preview_width, preview_height))
 
-    # Create container
+ 
     container = CTkFrame(window.preview_frame, fg_color=dark_color)
-    container.pack(pady=13, padx=21, fill='both', expand=True)
+    container.pack(pady=13, padx=21, fill='both', expand=True) 
 
-    # Original frame with placeholder
+
     original_frame = CTkFrame(container, fg_color=dark_color)
     original_frame.pack(side='left', fill='both', expand=True, padx=5)
-    CTkLabel(original_frame, text="Original", font=bold14, text_color=app_name_color).pack(pady=5)
-    original_preview = CTkLabel(original_frame, image=placeholder_photo, text="", width=340, height=400)
-    original_preview.pack()
+    original_frame.pack_propagate(False)
+    original_label_title = CTkLabel(original_frame, text="Original", font=bold18, text_color=app_name_color).pack(pady=5)
 
-    # Upscaled frame with placeholder
+    original_preview = CTkLabel(original_frame, image=placeholder_photo, text="")
+    original_preview.pack(fill='both', expand=True)
+    original_preview.pack_propagate(False)
+    
     upscaled_frame = CTkFrame(container, fg_color=dark_color)
     upscaled_frame.pack(side='right', fill='both', expand=True, padx=10)
-    CTkLabel(upscaled_frame, text="Upscaled Preview", font=bold14, text_color=app_name_color).pack(pady=5)
-    upscaled_preview = CTkLabel(upscaled_frame, image=placeholder_photo, text="", width=340, height=400)
-    upscaled_preview.pack()
-    
+    upscaled_frame.pack_propagate(False)
+    upscaled_label_title = CTkLabel(upscaled_frame, text="Upscaled Preview", font=bold18, text_color=app_name_color).pack(pady=5)
 
-    background.place(relx = 0.0, rely = 0.0, relwidth = 1.0, relheight = 0.42)
-
+    upscaled_preview = CTkLabel(upscaled_frame, image=placeholder_photo, text="")
+    upscaled_preview.pack(fill='both', expand=True)
+    upscaled_preview.pack_propagate(False)
+   
+    globals()['container'] = container
+    globals()['original_preview'] = original_preview
+    globals()['upscaled_preview'] = upscaled_preview
 
 
  
@@ -2256,7 +2374,7 @@ def select_AI_from_menu(selected_option: str) -> None:
     )
     model_loading_thread.start()
 
-
+ 
 
 
 
@@ -3001,6 +3119,7 @@ class FileWidget(CTkScrollableFrame):
             
         if hasattr(self, 'preview_frame') and self.preview_frame:
             self.preview_frame.destroy()
+
         place_loadFile_section(window)  
 
 
@@ -3011,12 +3130,13 @@ class FileWidget(CTkScrollableFrame):
             label = self.add_file_information(file_path, index_row)
             self.label_list.append(label)
             index_row +=1
+
+
     def add_file_information(self, file_path, index_row) -> CTkLabel:
-    
         file_frame = CTkFrame(self, fg_color="transparent")
         file_frame.grid(row=index_row, column=0, sticky="ew", pady=3, padx=3)
 
-        # File information label
+       
         infos, icon = self.extract_file_info(file_path)
         label = CTkLabel(
             file_frame,  
@@ -3032,8 +3152,8 @@ class FileWidget(CTkScrollableFrame):
         )
         label.pack(side="left", fill="x", expand=True)
 
-
-        window.preview_button = CTkButton(
+        global preview_button
+        preview_button = CTkButton(
             file_frame,
             text="Preview",
             width=80,
@@ -3041,7 +3161,7 @@ class FileWidget(CTkScrollableFrame):
             font=bold11,
             command=lambda path=file_path: self.preview_file(path)
         )
-        window.preview_button.pack(side="right", padx=(0, 10))
+        preview_button.pack(side="right", padx=(0, 10))
 
         delete_btn = CTkButton(
             file_frame,
@@ -3071,8 +3191,8 @@ class FileWidget(CTkScrollableFrame):
                 preview_instance.close()
                 preview_instance = None
     
-                placeholder_img = create_placeholder_image(340, 400)
-                placeholder_photo = CTkImage(placeholder_img, size=(340, 400))
+                placeholder_img = create_placeholder_image(500, 2000)
+                placeholder_photo = CTkImage(placeholder_img, size=(500, 2000))
                 original_preview.configure(image=placeholder_photo)
                 upscaled_preview.configure(image=placeholder_photo)
                 original_preview.image = placeholder_photo
@@ -3102,8 +3222,10 @@ class FileWidget(CTkScrollableFrame):
             preview_instance.close()
             preview_instance = None
 
-        # ereate new preview in the existing container and labels
+  
         preview_instance = VideoPreview(container, original_preview, upscaled_preview, file_path)
+        preview_button.configure(state=DISABLED)
+        #DIDRIK
   
     
 
@@ -4542,7 +4664,8 @@ def open_files_action():
             fg_color             = background_color, 
             bg_color             = background_color
         )
-        file_widget.place(relx = 0.0, rely = 0.0, relwidth = 0.5, relheight = 0.4)
+        file_widget.place(relx = 0.0, rely = 0.0, relwidth = 0.555, relheight = 0.42)#didrik
+
         info_message.set("Ready")
     else: 
         info_message.set("Not supported files :(")
@@ -5191,9 +5314,9 @@ class VideoEnhancer():
         Master.geometry("1920x1080")
         Master.resizable(False, False)
         Master.iconbitmap(find_by_relative_path("Assets" + os_separator + "logo.ico"))
-        self.bg_image = CTkImage(Image.open("Assets" + os_separator + "321.png"),size=(1920, 1080))
+        self.bg_image = CTkImage(Image.open("Assets" + os_separator + "prøv.png"),size=(1920, 1080))
         self.background_label = CTkLabel(Master, image=self.bg_image, fg_color="black")
-        self.background_label.place(relx=0  , rely=0, relwidth=1, relheight=1.5) 
+        self.background_label.place(relx=-0.22,rely=-0.25, relwidth=1, relheight=0.64) 
         self.background_label.lower() 
         load_cookie_file_path()
         self.ToolWindowClass = ToolWindowClass(Master)
@@ -5222,14 +5345,13 @@ if __name__ == "__main__":
     set_appearance_mode("Dark")
     set_default_color_theme("dark-blue")
 
-    # def exit_fullscreen( event=None):
-    #             """Exit fullscreen when ESC is pressed"""
-    #             window.attributes("-fullscreen", False)
+    def exit_fullscreen( event=None):
+                 """Exit fullscreen when ESC is pressed"""
+                 window.attributes("-fullscreen", False)
     
-    #window = CTk(fg_color="black")
     window = CTk()
-    # window.attributes('-fullscreen', True)
-    # window.bind("<Escape>", exit_fullscreen) 
+    window.attributes('-fullscreen', True)
+    window.bind("<Escape>", exit_fullscreen) 
 
 
     youtube_progress_var = StringVar()

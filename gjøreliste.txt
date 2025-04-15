@@ -1,50 +1,58 @@
+11. youtube ---> video format og audio format må bli tilbake stilt til default etter video er nedlastet✅
+2. finne ut om cookies for å bruke ytdllp kan brukes generelt, altså ha 1 .txt cookie fil eller om hver bruker må hente ut sin egen youtube cookie på noe måte✅
+3. få trent ferdig unet modell for vokalisolering/evt bruke ferdig trente modeller for vokal isolering og audio enchancement som konverteres over til onnx format for å brukes i programvaren. evt raskere✅
+5. evt lage en dropdown menu (tools) hvor man kan bytte mellom frames på hovedskjermen, for eksempel 1. frame er youtube video/youtube audio nedlastning, mens frame 2 fra listen er generate metadata (en smolagent som leser audioen fra video, omgjør den til tekst. søker via api (youtube,ineternett) på videoer i lik kategori som har fått mye oppmerksomhet, deretter kan smolagenten outpute en detaljert [titel, beskrivelse, hashtag, keywords] eksempler utifra inhold fra teksten på videoen dem genererte metadata på.)✅
 0. sette opp SocialMediaUploading class for og laste opp til youtube, og evt andre plattformer. der det er mulig med api. 
+
+
+
+
+
 
 1. Sette opp ordentlig styling/utseende på programvaren på alle frames, fra brukerkonto,login,registering osv. + videoenchancer programvaren
 
-2. finne ut om cookies for å bruke ytdllp kan brukes generelt, altså ha 1 .txt cookie fil eller om hver bruker må hente ut sin egen youtube cookie på noe måte
 
-3. få trent ferdig unet modell for vokalisolering/evt bruke ferdig trente modeller for vokal isolering og audio enchancement som konverteres over til onnx format for å brukes i programvaren. evt raskere
+
 
 4. sette opp video/tidslinje som beskriver hvor langt inn i videoen man er når man bruker slider i preview window. 
 
-5. evt lage en dropdown menu (tools) hvor man kan bytte mellom frames på hovedskjermen, for eksempel 1. frame er youtube video/youtube audio nedlastning, mens frame 2 fra listen er generate metadata (en smolagent som leser audioen fra video, omgjør den til tekst. søker via api (youtube,ineternett) på videoer i lik kategori som har fått mye oppmerksomhet, deretter kan smolagenten outpute en detaljert [titel, beskrivelse, hashtag, keywords] eksempler utifra inhold fra teksten på videoen dem genererte metadata på.)
 
-6.når jeg skal pakke systemet. så må jeg først pakke videoenchancer.py til en egen exe. sjekk (bulding folder)  deretter må jeg pakke  (bruker,inlogging,activation,registrating,accountmenu etc)  med sammen videoenehcancer.exe. ### Jeg må forsikre meg/løse det sånn at man ikke kan få tilgang til videoenchancer.exe uten og ha gått igjennom (account management og man har gyldig subscription). så jeg må finne ut en måte og låse videoenehcancer.exe sånn at det ikke kan kjøres hvor mindre man er logget inn fra en bruker som har aktiv subscription
+
+6.når jeg skal pakke systemet. så må jeg først pakke videoenchancer.py til en egen exe. sjekk (bulding folder)  deretter må jeg pakke  
+(bruker,inlogging,activation,registrating,accountmenu etc)  med sammen videoenehcancer.exe. ### Jeg må forsikre meg/løse det sånn at man ikke kan få tilgang til videoenchancer.exe uten og ha gått igjennom (account management og man har gyldig subscription). 
+så jeg må finne ut en måte og låse videoenehcancer.exe sånn at det ikke kan kjøres hvor mindre man er logget inn fra en bruker som har aktiv subscription
+
+
+
 
 7. Gå igjennom og løse alle error, evt lage en error liste. og når alt dette er oppfylt og programvaren fungerer. så skal ikke flere ideer/endringer implementeres før programvaren er ute. deretter evt implementere system for å kunne oppdatere programvaren i fremtiden dersom endringer eller bugs skal fikses. 
 
+
+
 8. Finne flere AI modeller for video/audio opskallering, konvertere de til onnx format og implementere de i programvaren
+
+
 
 9. konvertere load_llama_instruct til onnx for raskere inference.
 
+
+
 10. YOUTUBE--> mulighet til og laste ned flere filer på en gang.
 
-11. youtube ---> video format og audio format må bli tilbake stilt til default etter video er nedlastet
+
 
 12. Sette opp kryptering så man ikke kan kjøre/få tilgang til  videoenchancer.exe  hvor mindre man har abonnoment og kjører videoenchancer fra brukerens konto sin GUI
 
-[ERROR LISTE] --> Oppdateres underveis og tas til slutt for mer effeketivitet
 
-1. Når man skal laste ned video etter og ha fetcha format details, så blir bare lyd lasta ned, jeg må evt sette opp checkboks for om bare lyd eller om begge deler skal lastes ned. 
+13. sett opp ai agent som kan generere video basert på brukers ønske, også få ai agenten til og få tilgang til youtube download så den kan laste ned videoer fra youtube. sette opp en slags tool/agent som man kan kjøre så vil den kjøre til man stopper, eller i en vis tidsperiode, for automatisk laging av videoer og evt laste opp 
 
-2.
 
-3.
 
-4.
 
-5.
 
-6.
+[ERROR LISTE] -->  ligger i errors.txt: Oppdateres underveis og tas til slutt for mer effeketivitet
 
-7.
 
-8.
-
-9.
-
-10.
 
 
 
@@ -68,4 +76,3 @@ nettside: http://aiadoptionagents.com/
 
 
 
-ffmpeg -i fear.mp4 -c:v prores_ks -profile:a 3 -c:a pcm_s16le mystery.mov
