@@ -7,6 +7,15 @@ from pathlib import Path
 import os
 
 
+
+if getattr(sys, 'frozen', False):
+        dotenv_base_path = Path(sys._MEIPASS)
+else:
+    dotenv_base_path = Path(__file__).parent.resolve()
+
+dotenv_path = dotenv_base_path / ".env"
+logging.info(f"Resolved .env path: {dotenv_path}")
+
 def load_userdata():
      if User_data_Path.exists():
          try: 

@@ -24,6 +24,7 @@ class ActivationWindow(CTkToplevel):
         stored_key = load_key()
         if stored_key:
             if validate_key(stored_key):  
+                logging.info("Success with activasion")
                 messagebox.showinfo("Success","Activation successful!")
                 self.destroy() 
                 if self.on_activation_success:
@@ -68,6 +69,13 @@ class ActivationWindow(CTkToplevel):
         if key:
             from Validate_key import validate_key
             if validate_key(key):  
+                logging.info("validating key on activasion successful!")
+                try:
+                    from Decryption import validate_jwt
+                    validate_jwt(force_online_check=True)
+                    logging.info("Validated jwt key(force_online_check) success!")
+                except Exception as e:
+                    logging.error(f"Error validating JWT: {e}") 
                 messagebox.showinfo("Success", "Activation Key is valid!")
                 self.destroy()
                 if self.on_activation_success:

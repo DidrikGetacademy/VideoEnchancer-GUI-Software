@@ -5,11 +5,24 @@ from typing import Tuple
 from numpy import ndarray
 import librosa
 import os 
+import sys
+from os import (
+    sep        as os_separator,
 
+)
+from os.path import (
+    dirname    as os_path_dirname,
+    abspath    as os_path_abspath,
+    join       as os_path_join,
+)
+   
+def find_by_relative_path(relative_path: str) -> str:
+    base_path = getattr(sys, '_MEIPASS', os_path_dirname(os_path_abspath(__file__)))
+    return os_path_join(base_path, relative_path)
 
 EXECUTION_PROVIDER_LIST = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 COMPUTATION_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-ONNX_MODEL_PATH = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\AI-onnx\Vocal_Isolation_.onnx"
+ONNX_MODEL_PATH = find_by_relative_path(f"AI-onnx{os_separator}Vocal_Isolation.onnx")
 
 
 class STFT:
