@@ -375,6 +375,21 @@ class Agent_GUI():
             state="DISABLED"
         )
         self.metadata_btn.pack(side="left", padx=10, pady=5)
+        
+        self.Social_media_list = CTkOptionMenu(
+            master=self.top_bar,
+            text="Choose Platform",
+            width=140,
+            height=30,
+            font=bold11,
+            border_width=1,
+            fg_color="#282828",
+            text_color="#E0E0E0",
+            border_color="#0096FF",
+            #command=
+            state="normal"
+        )
+        self.Social_media_list.pack(side="left", padx=10, pady=5)
 
     
         self.info_button_LearnReflect_Agent = create_info_button(
@@ -1023,7 +1038,7 @@ def place_youtube_download_menu(parent_container):
         width=100,
         height=30,
         font=bold11,
-        command=lambda: Thread(target=start_youtube_download).start(),
+        command=start_youtube_download,
         fg_color="black",
         border_color="white",
         border_width=1
@@ -1072,7 +1087,7 @@ def place_youtube_download_menu(parent_container):
         border_width=1
     )
     if cookie_file_path is None:
-      upload_button.place(relx=0.12, rely=0.98, anchor="nw")
+      upload_button.place(relx=0.10, rely=0.95, anchor="nw")
     
     if cookie_file_path is not None:
         upload_button.place_forget()
@@ -1204,8 +1219,8 @@ def delete_cookie_file_and_reset_button():
 
     if COOKIE_PATH_FILE.exists():
         try:
-
-            os.remove(COOKIE_PATH_FILE)
+            corruptedcookiefile_path = str(COOKIE_PATH_FILE)
+            os.remove(corruptedcookiefile_path)
             cookie_file_path = None
             print(f"Cookie file {COOKIE_PATH_FILE} deleted successfully.")
         except Exception as e:
@@ -1357,26 +1372,40 @@ def get_available_formats(youtube_url):
     
     except yt_dlp.utils.DownloadError as e:
         print(f"Error fetching formats: {e}")
+        if "cookie" in str(e).lower() or "sign in" in str(e).lower() or "403" in str(e):
+                print("⚠️ Cookie file seems broken or expired. Resetting...")
+                delete_cookie_file_and_reset_button()
         backup = True
         try:
             print("⚙️ Switching to backup method...")
             video_formats, audio_formats = try_fetching_format(ydl_opts_backup)
 
         except yt_dlp.utils.DownloadError as e:
+            if "cookie" in str(e).lower() or "sign in" in str(e).lower() or "403" in str(e):
+                print("⚠️ Cookie file seems broken or expired. Resetting...")
+                delete_cookie_file_and_reset_button()
+                return [], []
             print(f"❌ Backup method failed: {e}")
             print("🛠️ Trying final fallback method (force_generic_extractor)...")
 
         try:
-                video_formats, audio_formats = try_fetching_format(ydl_opts_fallback)
-                return video_formats, audio_formats
-    
-        except  yt_dlp.utils.DownloadError  as e:
-                print(f"Error fetching formats: {e}")
+            video_formats, audio_formats = try_fetching_format(ydl_opts_fallback)
 
-                if "cookies" in str(e).lower() or "403" in str(e)  or "cookies" in str(e) or "cookies" in str(e):
-                    print("⚠️ Cookie file seems broken or expired. Resetting...")
-                    delete_cookie_file_and_reset_button()
-                return ["error"], ["error"]
+            # Explicit check after fallback
+            if not video_formats or video_formats == ['Video Formats...','Only Audio']:
+                raise Exception("Fallback method returned no formats")
+
+            return video_formats, audio_formats
+
+        except Exception as e:
+            print(f"❌ Final fallback failed: {e}")
+
+            if "cookie" in str(e).lower() or "sign in" in str(e).lower() or "403" in str(e):
+                print("⚠️ Cookie file seems broken or expired. Resetting...")
+                delete_cookie_file_and_reset_button()
+                return [], []
+            return ["error"], ["error"]
+
 
 
 def download_youtube_link(youtube_url,output_path, progress_callback=None):
@@ -1437,6 +1466,7 @@ def download_thread(youtube_url, output_path):
         
         if message == "Download Complete!":
             info_message.set(message)
+            stop_youtube_download_btn.pack_forget()
         else: 
             info_message.set(message)
     except yt_dlp.utils.DownloadError as e:
@@ -1827,7 +1857,7 @@ class ToolWindowClass:
         self.menu_frame.pack(side="top", pady=(20, 10))
 
   
-        self.tool_list = ['Tool Menu','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading']
+        self.tool_list = ['Tool Menu','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','LR-Agent Automation']
         self.tool_menu_var = StringVar(value=self.tool_list[0])
         self.tool_menu = CTkOptionMenu(
             master=self.menu_frame,
@@ -1864,6 +1894,8 @@ class ToolWindowClass:
             self.create_mediainfo_Analysist()
         elif selected_tool == "Social Media Uploading":
             self.Create_Social_Media_uploading()
+        elif selected_tool == "LR-Agent Automation":
+            self.create_LR_Agent_Automation()
 
         
 
@@ -1880,7 +1912,8 @@ class ToolWindowClass:
        self.ToolMenu.container.pack(fill="both",expand=True,padx=10,pady=10)
 
 
-
+    def create_LR_Agent_Automation(self):
+        return
 
     def create_mediainfo_Analysist(self):
         self.mediainfo_analyst = MediaInfoAnalyst(self.content_frame)
@@ -5336,9 +5369,9 @@ class VideoEnhancer():
             
         
 if __name__ == "__main__":
-   # from Decryption import validate_jwt
-   # if not validate_jwt():
-   #   sys.exit(1)
+    from Decryption import validate_jwt
+    if not validate_jwt():
+      sys.exit(1)
     
 
     multiprocessing_freeze_support()

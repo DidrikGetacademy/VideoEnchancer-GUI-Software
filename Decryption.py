@@ -45,22 +45,51 @@ def load_key():
 
 
 
-def validate_jwt():
+def validate_jwt(force_online_check=False):
+    import os 
     from Validate_key import validate_subscription_status
+    from datetime import datetime, timedelta
+    from File_path import get_app_data_path
+    from File_path import dotenv_path
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path)
+    JWT_SECRET = os.getenv("JWT_SECRET")
     try:
         encrypted_token = load_key() #Henter lagret kryptert token
-        decrypted_token = decrypt_key(encrypted_token) #dekrypterer tokenet
-
-        secret = Fernet(load_encryption_key()).decrypt(b'secret_key') #henter hemmlig nøkkel for å dekode JWT
-        payload = jwt.decode(decrypted_token, secret, algorithms=['HS256'])  # Dekoder JWT-tokenet
-
-        if not validate_subscription_status(payload['user_id']):#Sjekker om brukeren har aktivt abonnement
-            raise ValueError("No active Subscription!")
+        if not encrypted_token:
+            logging.info("Activasion key not found")
+            raise ValueError("Activation key not found")
         
-        print(f"Validation JWT VideoEnchancer successful!")
-        return True
+        decrypted_token = decrypt_key(encrypted_token) #dekrypterer tokenet
+        if not decrypted_token:
+            logging.warning("Unable to decrypt activasion key.")
+            raise ValueError("Unable to decrypt activation key")
+        
+        payload = jwt.decode(decrypted_token, JWT_SECRET)
+
+        exp_date = datetime.fromtimestamp(payload["exp"])
+        if exp_date < datetime.now():
+            logging.warning("token has expired.")
+            raise ValueError("Token has expired")
+        
+        validation_file = get_app_data_path() / "last_jwt_validation.txt"
+        validate_with_server = True
+
+        if not force_online_check and validation_file.exists():
+            last_check = datetime.fromisoformat(validation_file.read_text())
+            if datetime.now() - last_check < timedelta(days=7):
+                logging.info("Validation with server is false. still valid local validation by time --->  skipping...")
+                validate_with_server = False
+
+            if validate_with_server:
+                if not validate_subscription_status(payload["user_id"]):
+                    logging.info("Subscription has expired.")
+                    raise ValueError("Subscription has expired")
+                validation_file.write_text(datetime.now().isoformat())
+            
+            logging.info("Validation JWT videoenchancer successful")
+            return True
     except Exception as e:
         logging.error(f"Token Validation Failed: {str(e)}")
-        print(f"Validation JWT VideoEnchancer ERROR!")
         return False
     

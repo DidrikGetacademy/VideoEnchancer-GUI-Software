@@ -1,6 +1,7 @@
 import requests
 from Logger import logging
 import time
+#C:\Users\didri\AppData\Roaming\LearnReflect\Userdata.txt
 #Global userdata
 _user_data = {}
 
@@ -26,8 +27,6 @@ def set_user_data(data,password = None,RememberMe = False):
 def get_user_data():
     return _user_data
 
-
-#C:\Users\didri\AppData\Roaming\LearnReflect\Userdata.txt
 
 
 url = "https://learnreflects.com/Server/UpdateUser.php"

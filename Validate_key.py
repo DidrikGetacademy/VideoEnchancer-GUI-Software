@@ -29,8 +29,13 @@ def validate_key_with_Server(key_code):
             logging.info(f"Program activated successfully! Subscription type: {subscription_type}")
             if subscription_end:
                 logging.info(f"subscription ends at: {subscription_end}")
-            encrypted_key = encrypt_key(key_code)
-            save_key(encrypted_key)
+            jwt_token = data.get("jwt")
+            if jwt_token:
+                try:
+                    encrypted_token = encrypt_key(jwt_token)
+                    save_key(encrypted_token)
+                except Exception as e:
+                    logging.error(f"Error validating key: {e}")
             logging.info("Program activated successfully!")
             return True
         else:
@@ -39,31 +44,6 @@ def validate_key_with_Server(key_code):
     except requests.exceptions.RequestException as e:
         logging.error(f"Error during key validation: {e}")
         return False
-
-
-def validate_key_locally(key_code):
-    decrypted_key = load_key()
-    if decrypted_key and decrypted_key == key_code:
-        logging.info("Local validation successful.")
-        return True
-    else:
-        logging.warning("Local validation failed.")
-        return False
-
-
-
-def validate_key(key_code):
-    stored_key = load_key()
-    if stored_key:
-        if validate_key_locally(stored_key):
-            return True
-        
-    return validate_key_with_Server(key_code)
-
-
-
-
-
 
 
 def validate_subscription_status(user_id):
@@ -86,7 +66,7 @@ def validate_subscription_status(user_id):
         
         #Checks if subscription is active
         if not data.get('active', False):
-            print(f"Subscription is not active.")
+            logging.info(f"Subscription is not active.")
             return False
         
 
@@ -106,3 +86,27 @@ def validate_subscription_status(user_id):
     except requests.exceptions.RequestException as e:
         logging.error(f"Subscription validation error: {str(e)}")
         return False
+
+
+
+
+# def validate_key_locally(key_code):
+#     decrypted_key = load_key()
+#     if decrypted_key and decrypted_key == key_code:
+#         logging.info("Local validation successful.")
+#         return True
+#     else:
+#         logging.warning("Local validation failed.")
+#         return False
+
+
+
+def validate_key(key_code):
+    # stored_key = load_key()
+    # if stored_key:
+    #     if validate_key_locally(stored_key):
+    #         return True
+        
+    return validate_key_with_Server(key_code)
+
+

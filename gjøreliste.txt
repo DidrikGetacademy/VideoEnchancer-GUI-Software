@@ -76,3 +76,5 @@ nettside: http://aiadoptionagents.com/
 
 
 
+
+ffmpeg -i "generation.mp4" -c:v prores_ks -profile:v 3 -pix_fmt yuv422p10le -color_primaries bt2020 -color_trc smpte2084 -colorspace bt2020nc -c:a copy "sleep_davinci_hdr1.mov"
