@@ -14,45 +14,68 @@ class MainApp(ctk.CTk):
         
         
 
+        ImageFront = resource_path("Assets/test_8192x5447.png")
+        self.background_image = Image.open(ImageFront)
+        self.background_photo = ctk.CTkImage(self.background_image, size=(1750, 1500))
 
-        self.canvas = ctk.CTkCanvas(
-            self, 
-            width=200, 
-            height=200, 
-            highlightthickness=0
-            )
-        
-        self.canvas.pack(fill="both", expand=True)
-        ImageFront = resource_path("Assets/background1.png")
-        self.background_image = Image.open(ImageFront)  
-        self.background_photo = ImageTk.PhotoImage(self.background_image)
-        self.canvas.create_image(0, 0, image=self.background_photo, anchor="nw")
+        self.bg_label = ctk.CTkLabel(
+            self,
+            image=self.background_photo,
+            text="",
+            bg_color="black"
+        )
+        self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 
 
-       
+        self.configure(bg="black")  
 
+   
+        self.button_frame = ctk.CTkFrame(
+            self,
+            width=960,
+            height=700,
+            fg_color="black", 
+            bg_color="transparent"
+        )
+        self.button_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+
+        self.title_label = ctk.CTkLabel(
+            self.button_frame,
+            text="Account Manager",
+            font=("Arial", 38, "bold"),
+            text_color="white"
+        )
+        self.title_label.pack(pady=(50, 40))
 
         self.Register_button = ctk.CTkButton(
-            self, 
-            text="Register Account", 
+            self.button_frame,
+            text="Register Account",
             command=self.open_Register_Account,
-            bg_color="black",
-            fg_color="Black",
-            text_color="white"
-            )
-        self.Register_button.place(relx=0.5, rely=0.5, anchor="center")  
+            fg_color="#0d1b2a",         
+            hover_color="#1c2636",     
+            text_color="white",
+            corner_radius=20,
+            width=300,
+            height=60,
+            font=("Arial", 22, "bold")
+        )
+        self.Register_button.pack(pady=30, padx=25)
 
-    
         self.login_button = ctk.CTkButton(
-            self, 
-            text="Login", 
+            self.button_frame,
+            text="Login",
             command=self.open_login_Account,
-            bg_color="black",fg_color="Black",
-            text_color="white"
-            )
-        
-        self.login_button.place(relx=0.5, rely=0.6, anchor="center")  
-        
+            fg_color="#0d1b2a",
+            hover_color="#1c2636",
+            text_color="white",
+            corner_radius=20,
+            width=300,
+            height=60,
+            font=("Arial", 22, "bold")
+        )
+        self.login_button.pack(pady=30,padx=25)
+
         
         self.register_frame = RegistrationFrame(
             self, 
@@ -94,21 +117,14 @@ class MainApp(ctk.CTk):
 
 
     def hide_frames(self):
-        self.Register_button.place_forget()
-        self.login_button.place_forget()
+        self.button_frame.place_forget()
         self.register_frame.pack_forget()
         self.login_frame.pack_forget()
-        self.canvas.pack_forget()
-
-
-
+        self.bg_label.place_forget()
 
     def show_mainwindow(self):
-        self.canvas.pack(fil="both",expand=True)
-        self.canvas.create_image(0, 0, image=self.background_photo, anchor="nw")
-        self.Register_button.place(relx=0.5, rely=0.5, anchor="center")
-        self.login_button.place(relx=0.5, rely=0.6, anchor="center")
-
+        self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+        self.button_frame.place(relx=0.5, rely=0.5, anchor="center")
 
 if __name__ == "__main__":
     app = MainApp()

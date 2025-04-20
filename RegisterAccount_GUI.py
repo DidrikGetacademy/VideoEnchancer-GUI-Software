@@ -7,10 +7,11 @@ class RegistrationFrame(ctk.CTkFrame):
     def __init__(self, master, open_login_account):
         super().__init__(master, fg_color="transparent") 
 
-        # Load and set the background image
-        image_path = resource_path("Assets/background1.png")
-        self.background_image = Image.open(image_path)
+  
+        image_path = resource_path("Assets/test_8192x5447.png")
+        self.background_image = Image.open(image_path).resize((1400, 800), Image.LANCZOS)
         self.background_photo = ImageTk.PhotoImage(self.background_image)
+
 
         self.canvas = ctk.CTkCanvas(self, width=1400, height=800, highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
@@ -18,97 +19,129 @@ class RegistrationFrame(ctk.CTkFrame):
 
         self.switch_to_login = open_login_account
 
-        # Dark gray container for registration elements
+
         self.container = ctk.CTkFrame(
             self, 
-            fg_color="#2C3E50",
-            corner_radius=15,
-            width=400,
-            height=500
-            )  
+            fg_color="black",
+            width=960,
+            height=700
+        )  
         self.container.place(relx=0.5, rely=0.5, anchor="center")
 
-        # Title Label
+   
         self.title_label = ctk.CTkLabel(
             self.container,
-            text="Register New Account",
-            font=("Arial", 24, "bold"),
-            text_color="#FFFFFF"
-            ) 
-        self.title_label.pack(pady=20)
+            text="Register Account",
+            font=("Arial", 25, "bold"),
+            text_color="white"
+        ) 
+        self.title_label.pack(pady=(50, 30))
 
-        # Name Field
-        self.name_label = ctk.CTkLabel(self.container, text="Name", text_color="#FFFFFF")  
 
-        self.name_label.pack(pady=(10, 0))
+        self.name_label = ctk.CTkLabel(
+            self.container,
+            text="Name",
+            text_color="white",
+            font=("Arial", 18)
+        )
+        self.name_label.pack(pady=(10, 0), padx=20)
+
         self.name_entry = ctk.CTkEntry(
-            self.container, 
-            width=300, 
-            fg_color="#FFFFFF",
-            text_color="#2C3E50",
-            border_color="#2C3E50",
+            self.container,
+            width=350,
+            height=40,
             placeholder_text="Enter your name",
+            fg_color="#1c2636",
+            border_color="#0d1b2a",
+            text_color="white",
+            font=("Arial", 16),
+            corner_radius=15,
             justify="center"
-            )
-        self.name_entry.pack(pady=5)
+        )
+        self.name_entry.pack(pady=10,padx=20)
 
-        # Email Field
-        self.email_label = ctk.CTkLabel(self.container, text="Email", text_color="#FFFFFF")  # White text
-        self.email_label.pack(pady=(10, 0))
+
+        self.email_label = ctk.CTkLabel(
+            self.container,
+            text="Email",
+            text_color="white",
+            font=("Arial", 18)
+        )
+        self.email_label.pack(pady=(10, 0),padx=20)
+
         self.email_entry = ctk.CTkEntry(
             self.container,
-            width=300,
-            fg_color="#FFFFFF",
-            text_color="#2C3E50", 
-            border_color="#2C3E50", 
+            width=350,
             placeholder_text="Enter your email",
+            fg_color="#1c2636",
+            border_color="#0d1b2a",
+            text_color="white",
+            height=50,   
+            font=("Arial", 16),
+            corner_radius=15,
             justify="center"
-            )
-        
-        
-        self.email_entry.pack(pady=5)
+        )
+        self.email_entry.pack(pady=10)
 
-        # Password Field
-        self.password_label = ctk.CTkLabel(self.container, text="Password", text_color="#FFFFFF")  # White text
+
+        self.password_label = ctk.CTkLabel(
+            self.container,
+            text="Password",
+            text_color="white",
+            font=("Arial", 18)
+        )
         self.password_label.pack(pady=(10, 0))
+
         self.password_entry = ctk.CTkEntry(
             self.container,
-              width=300,
-              show="*",
-              fg_color="#FFFFFF",
-              text_color="#2C3E50",
-              border_color="#2C3E50",
-              placeholder_text="Enter your password",
-                justify="center"
-              )
-        self.password_entry.pack(pady=5)
+            width=350,
+            show="*",
+            placeholder_text="Enter your password",
+            fg_color="#1c2636",
+            border_color="#0d1b2a",
+            text_color="white",
+            font=("Arial", 16),
+            corner_radius=15,
+            height=50,
+            justify="center"
+        )
+        self.password_entry.pack(pady=10)
 
-        # Register Button
+    
         self.register_button = ctk.CTkButton(
-            self.container, text="Register",
-             command=self.Register_new_user,
-             fg_color="#34495E", 
-             text_color="#FFFFFF",
-             hover_color="#1F2A38"
-            )  
-        self.register_button.pack(pady=20)
+            self.container,
+            text="Register",
+            command=self.Register_new_user,
+            fg_color="#0d1b2a",
+            hover_color="#1c2636",
+            text_color="white",
+            font=("Arial", 20, "bold"),
+            width=300,
+            height=35,
+            corner_radius=20
+        )
+        self.register_button.pack(pady=25)
 
-        #Goback Button
         self.goback_button = ctk.CTkButton(
-            self.container, 
+            self.container,
             text="Go back",
             command=self.go_back,
             fg_color="transparent",
-            text_color="#FFFFFF",
-            hover_color="#1F2A38"
-            ) 
+            text_color="white",
+            hover_color="#1c2636",
+            font=("Arial", 14)
+        )
         self.goback_button.pack(pady=5)
 
-
-        # Status Label
+   
         self.status_label = ctk.CTkLabel(
-            self.container, text="", text_color="#E74C3C")  
+            self.container,
+            text="",
+            text_color="#E74C3C",
+            font=("Arial", 16)
+        )
         self.status_label.pack(pady=10)
+
 
         self.lift()  
         

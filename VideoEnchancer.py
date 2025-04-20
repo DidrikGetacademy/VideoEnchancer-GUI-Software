@@ -378,16 +378,15 @@ class Agent_GUI():
         
         self.Social_media_list = CTkOptionMenu(
             master=self.top_bar,
-            text="Choose Platform",
             width=140,
             height=30,
             font=bold11,
-            border_width=1,
             fg_color="#282828",
             text_color="#E0E0E0",
-            border_color="#0096FF",
             #command=
-            state="normal"
+            state="normal",
+            values=["YouTube", "Instagram", "TikTok"]  
+
         )
         self.Social_media_list.pack(side="left", padx=10, pady=5)
 
@@ -5369,9 +5368,9 @@ class VideoEnhancer():
             
         
 if __name__ == "__main__":
-    from Decryption import validate_jwt
-    if not validate_jwt():
-      sys.exit(1)
+    # from Decryption import validate_jwt
+    # if not validate_jwt():
+    #   sys.exit(1)
     
 
     multiprocessing_freeze_support()
