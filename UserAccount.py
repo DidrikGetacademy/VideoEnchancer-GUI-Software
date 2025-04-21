@@ -27,35 +27,68 @@ class UserAccountFrame(ctk.CTkFrame):
 
 
 
-
     def create_widgets(self):
         for widget in self.winfo_children():
             if widget != self.canvas:
                 widget.destroy()
 
+        # Top menu button (Settings & Check for Updates)
+        self.menu_button = ctk.CTkSegmentedButton(
+            self,
+            values=["Settings", "Check for Updates"],
+            command=self.menu_action,
+            font=("Arial", 14),
+            width=250,
+            height=35,
+            corner_radius=20,
+            fg_color="#0d1b2a",
+            selected_color="#1c2636",
+            unselected_color="#0d1b2a",
+            text_color="white",
+        )
+        self.menu_button.place(relx=0.05, rely=0.05)
 
+        # User info frame
         self.info_frame = ctk.CTkFrame(
-            self, 
-            bg_color="#2C3E50",
-            fg_color="#2C3E50",
-            width=400, 
-            height=300,
-            corner_radius=25
-            )
-        self.info_frame.place(relx=0.5, rely=0.47, anchor="center")
+            self,
+            fg_color="black",
+            width=960,
+            height=700,
+            corner_radius=30
+        )
+        self.info_frame.place(relx=0.5, rely=0.45, anchor="center")
 
+        self.title_label = ctk.CTkLabel(
+            self.info_frame,
+            text="User Dashboard",
+            font=("Arial", 32, "bold"),
+            text_color="white"
+        )
+        self.title_label.pack(pady=(40, 20), padx=15)
 
-        self.title_label = ctk.CTkLabel(self.info_frame, text="User Account", font=("Arial", 20))
-        self.title_label.pack(pady=10)
+        self.name_label = ctk.CTkLabel(
+            self.info_frame,
+            text=f"Name: {self.user_data.get('name', 'N/A')}",
+            font=("Arial", 18),
+            text_color="white"
+        )
+        self.name_label.pack(pady=5, padx=15)
 
-        self.name_label = ctk.CTkLabel(self.info_frame, text=f"Name: {self.user_data.get('name', 'N/A')}")
-        self.name_label.pack(pady=5)
-
-        self.email_label = ctk.CTkLabel(self.info_frame, text=f"Email: {self.user_data.get('email', 'N/A')}")
+        self.email_label = ctk.CTkLabel(
+            self.info_frame,
+            text=f"Email: {self.user_data.get('email', 'N/A')}",
+            font=("Arial", 18),
+            text_color="white"
+        )
         self.email_label.pack(pady=5)
 
-        self.subscription_label = ctk.CTkLabel(self.info_frame, text=f"Subscription: {self.user_data.get('subscription_type', 'N/A')}")
-        self.subscription_label.pack(pady=5)
+        self.subscription_label = ctk.CTkLabel(
+            self.info_frame,
+            text=f"Subscription: {self.user_data.get('subscription_type', 'N/A')}",
+            font=("Arial", 18),
+            text_color="white"
+        )
+        self.subscription_label.pack(pady=5, padx=15)
 
         self.update_buttons()
 
@@ -68,20 +101,31 @@ class UserAccountFrame(ctk.CTkFrame):
             if isinstance(widget, ctk.CTkButton) and widget != self.logout_button:
                 widget.destroy()
 
+        button_style = {
+            "fg_color": "#0d1b2a",
+            "hover_color": "#1c2636",
+            "text_color": "white",
+            "font": ("Arial", 18, "bold"),
+            "width": 350,
+            "height": 50
+        }
+
         if self.is_subscription_active():
-            self.enchancer_button = ctk.CTkButton(self.canvas, text="LearnReflect Video Enhancer", command=self.run_enchancer, state="normal")
-            self.canvas.create_window(700, 550, window=self.enchancer_button)
-            self.logout_button = ctk.CTkButton(self.canvas, text="Logout", command=self.Logout)
-            self.canvas.create_window(700, 600, window=self.logout_button)
+            self.enchancer_button = ctk.CTkButton(self.canvas, text="Launch Video Enhancer", command=self.run_enchancer, **button_style)
+            self.canvas.create_window(700, 570, window=self.enchancer_button)
+
+            self.logout_button = ctk.CTkButton(self.canvas, text="Logout", command=self.Logout, **button_style)
+            self.canvas.create_window(700, 640, window=self.logout_button)
 
         else:
-            self.enchancer_button = ctk.CTkButton(self.canvas, text="LearnReflect Video Enhancer", state="disabled")
-            self.canvas.create_window(700, 500, window=self.enchancer_button)
+            self.enchancer_button = ctk.CTkButton(self.canvas, text="Launch Video Enhancer", state="disabled", **button_style)
+            self.canvas.create_window(700, 520, window=self.enchancer_button)
 
-            self.activation_button = ctk.CTkButton(self.canvas, text="Activate subscription", command=self.open_activation_window)
-            self.canvas.create_window(700, 550, window=self.activation_button)
-            self.logout_button = ctk.CTkButton(self.canvas, text="Logout", command=self.Logout)
-            self.canvas.create_window(700, 600, window=self.logout_button)
+            self.activation_button = ctk.CTkButton(self.canvas, text="Activate Subscription", command=self.open_activation_window, **button_style)
+            self.canvas.create_window(700, 590, window=self.activation_button)
+
+            self.logout_button = ctk.CTkButton(self.canvas, text="Logout", command=self.Logout, **button_style)
+            self.canvas.create_window(700, 660, window=self.logout_button)
 
 
 
@@ -103,6 +147,15 @@ class UserAccountFrame(ctk.CTkFrame):
     
 
 
+    def menu_action(self, value):
+        if value == "Settings":
+            logging.info("Settings option clicked (not yet implemented)")
+            # Placeholder – show settings popup or future config
+        elif value == "Check for Updates":
+            logging.info("Checking for updates...")
+            # You can simulate an update check here
+            from tkinter import messagebox
+            messagebox.showinfo("Update", "Your software is up to date.")
 
 
     def run_enchancer(self):
