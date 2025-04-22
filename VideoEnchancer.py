@@ -2,24 +2,18 @@ import sys
 import os
 from functools  import cache
 from time       import sleep
-from webbrowser import open as open_browser
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel, HfApiModel, tool, SpeechToTextTool
-from transformers import BitsAndBytesConfig
+from smolagents import CodeAgent, FinalAnswerTool,  GoogleSearchTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool
 import yaml
 from tkinter import filedialog
 import os
 import time
-import google_auth_oauthlib.flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-import pickle
 from dotenv import load_dotenv
-from typing import Literal
 from shutil     import rmtree as remove_directory
 import subprocess
 from timeit     import default_timer as timer
@@ -67,7 +61,7 @@ from os.path import (
     expanduser as os_path_expanduser
 )
 
-# Third-party library imports
+
 from natsort          import natsorted
 from moviepy.video.io import ImageSequenceClip 
 from onnxruntime      import InferenceSession as onnxruntime_inferenceSession
@@ -115,10 +109,8 @@ from numpy import (
     float32,
     uint8
 )
-from tkcalendar import DateEntry 
+
 import torch
-
-
 import tkinter as tk
 from tkinter import StringVar, DISABLED, NORMAL,END,scrolledtext
 from customtkinter import (
@@ -251,7 +243,7 @@ def load_model_background():
     Global_offline_model = TransformersModel(model_path, device_map=device, torch_dtype=dtype, trust_remote_code=True, max_new_tokens=2048)
     print("✅ Model loaded successfully in the background!")
 
-
+import onnxruntime as ort
 model_loading_lock = threading.Lock()
 AI_models_list         = ( SRVGGNetCompact_models_list + AI_LIST_SEPARATOR + RRDB_models_list + AI_LIST_SEPARATOR + IRCNN_models_list )
 keep_frames_list       = [ "Disabled", "Enabled" ]
@@ -2974,21 +2966,21 @@ class AI:
 
     def _load_audio_inferenceSession(self) -> onnxruntime_inferenceSession:
         import onnxruntime
-        providers = ['CPUExecutionProvider']  # You can reuse logic if needed
+        providers = ['CPUExecutionProvider'] 
 
         session_options = onnxruntime.SessionOptions()
         session_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         session_options.execution_mode = onnxruntime.ExecutionMode.ORT_PARALLEL
 
         try:
-            return onnxruntime.InferenceSession(
+            return ort.InferenceSession(
                 path_or_bytes=self.audio_model_path,
                 providers=providers,
                 sess_options=session_options
             )
         except Exception as e:
             print(f"[AudioSession Error] {e}")
-            return onnxruntime.InferenceSession(
+            return ort.InferenceSession(
                 path_or_bytes=self.audio_model_path,
                 providers=['CPUExecutionProvider']
             )

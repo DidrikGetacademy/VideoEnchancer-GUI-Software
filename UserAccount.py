@@ -97,9 +97,11 @@ class UserAccountFrame(ctk.CTkFrame):
 
 
     def update_buttons(self):
-        for widget in self.winfo_children():
-            if isinstance(widget, ctk.CTkButton) and widget != self.logout_button:
-                widget.destroy()
+
+        if hasattr(self, 'button_windows'):
+            for window_id in self.button_windows:
+                self.canvas.delete(window_id)
+        self.button_windows = []
 
         button_style = {
             "fg_color": "#0d1b2a",
@@ -112,21 +114,25 @@ class UserAccountFrame(ctk.CTkFrame):
 
         if self.is_subscription_active():
             self.enchancer_button = ctk.CTkButton(self.canvas, text="Launch Video Enhancer", command=self.run_enchancer, **button_style)
-            self.canvas.create_window(700, 570, window=self.enchancer_button)
+            window_id = self.canvas.create_window(700, 570, window=self.enchancer_button)
+            self.button_windows.append(window_id)
 
             self.logout_button = ctk.CTkButton(self.canvas, text="Logout", command=self.Logout, **button_style)
-            self.canvas.create_window(700, 640, window=self.logout_button)
+            window_id = self.canvas.create_window(700, 640, window=self.logout_button)
+            self.button_windows.append(window_id)
 
         else:
             self.enchancer_button = ctk.CTkButton(self.canvas, text="Launch Video Enhancer", state="disabled", **button_style)
-            self.canvas.create_window(700, 520, window=self.enchancer_button)
+            window_id = self.canvas.create_window(700, 520, window=self.enchancer_button)
+            self.button_windows.append(window_id)
 
             self.activation_button = ctk.CTkButton(self.canvas, text="Activate Subscription", command=self.open_activation_window, **button_style)
-            self.canvas.create_window(700, 590, window=self.activation_button)
+            window_id = self.canvas.create_window(700, 590, window=self.activation_button)
+            self.button_windows.append(window_id)
 
             self.logout_button = ctk.CTkButton(self.canvas, text="Logout", command=self.Logout, **button_style)
-            self.canvas.create_window(700, 660, window=self.logout_button)
-
+            window_id = self.canvas.create_window(700, 660, window=self.logout_button)
+            self.button_windows.append(window_id)
 
 
     def is_subscription_active(self):
