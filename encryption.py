@@ -2,8 +2,8 @@ from Logger import logging
 from File_path import secret_key_path, activation_key_path
 from cryptography.fernet import Fernet
 import json
-
-
+from File_path import app_data_path
+import pickle
 def encrypt_key(key_code):
     encryption_key = load_encryption_key()
     if encryption_key:
@@ -36,7 +36,39 @@ def save_key(encrypted_key):
     logging.info("Saved encrypted key to activation_key.json")
 
 
+def get_token_path(channel_name):
+    token_folder = app_data_path / "youtube_tokens"
+    token_folder.mkdir(parents=True, exist_ok=True)
+    return token_folder / f"{channel_name}.pickle.enc"
 
+def save_encrypted_token(channel_name, credentials):
+    encryption_key = load_encryption_key()
+    fernet = Fernet(encryption_key)
+
+    serialized = pickle.dumps(credentials)
+    encrypted = fernet.encrypt(serialized)
+
+    path = get_token_path(channel_name)
+    print(f"[DEBUG] Saving token to: {path}")
+    with open(path, "wb") as file:
+        file.write(encrypted)
+
+def load_encrypted_token(channel_name):
+    token_path = get_token_path(channel_name)
+    print(f"[DEBUG] Loading token from: {token_path}")
+    if not token_path.exists():
+        print(f"[ERROR] Token file not found: {token_path}")
+
+        return None
+
+    encryption_key = load_encryption_key()
+    fernet = Fernet(encryption_key)
+
+    with open(token_path, "rb") as file:
+        encrypted_data = file.read()
+        decrypted = fernet.decrypt(encrypted_data)
+        credentials = pickle.loads(decrypted)
+        return credentials
 
 #NOT IN USE GENERATES WITH SERVER INSTEAD.
 # def generate_jwt(user_data):

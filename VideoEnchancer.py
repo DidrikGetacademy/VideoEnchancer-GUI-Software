@@ -5,12 +5,18 @@ from time       import sleep
 from webbrowser import open as open_browser
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel,HfApiModel,tool,SpeechToTextTool
+from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel, HfApiModel, tool, SpeechToTextTool
+from transformers import BitsAndBytesConfig
 import yaml
+from tkinter import filedialog
+import os
+import time
+import google_auth_oauthlib.flow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-
 import pickle
 from dotenv import load_dotenv
 from typing import Literal
@@ -109,8 +115,10 @@ from numpy import (
     float32,
     uint8
 )
+from tkcalendar import DateEntry 
+import torch
 
-# GUI imports
+
 import tkinter as tk
 from tkinter import StringVar, DISABLED, NORMAL,END,scrolledtext
 from customtkinter import (
@@ -118,6 +126,7 @@ from customtkinter import (
     CTkButton,
     CTkFrame,
     CTkComboBox,
+    CTkCheckBox,
     CTkSlider,
     CTkEntry,
     CTkFont,
@@ -202,10 +211,46 @@ model_loading_thread = None
 global original_preview
 global upscaled_preview
 preview_instance = None  
-global Smol_agent
 file_list_update_callback = None
 media_info_update_callback = None
 stop_download_flag = False
+Global_offline_model = None  
+
+def check_hardware():
+    torch_dtype  = None
+    if torch.cuda.is_available():
+        device = "cuda"
+
+        if torch.cuda.get_device_capability(0)[0] >= 7:
+            torch_dtype = torch.float16
+            return device, torch_dtype
+        else:
+            torch_dtype = torch.bfloat16
+            return device, torch_dtype
+    else:
+        device = "cpu"
+        torch_dtype = torch.float32
+        return device, torch_dtype
+
+
+
+def load_model_background():
+    device, dtype = check_hardware()
+
+    print(f"🧠 Loading model on {device} using dtype: {dtype}")
+
+
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    
+    global Global_offline_model
+    model_path = "./local_model/"
+    Global_offline_model = TransformersModel(model_path, device_map=device, torch_dtype=dtype, trust_remote_code=True, max_new_tokens=2048)
+    print("✅ Model loaded successfully in the background!")
+
 
 model_loading_lock = threading.Lock()
 AI_models_list         = ( SRVGGNetCompact_models_list + AI_LIST_SEPARATOR + RRDB_models_list + AI_LIST_SEPARATOR + IRCNN_models_list )
@@ -309,7 +354,7 @@ supported_video_extensions = [
 
 
 
-
+#didrik
 class Agent_GUI():
     """Agent that retrieves transcripts, searches the web, and generates optimized metadata for videos."""
 
@@ -326,7 +371,27 @@ class Agent_GUI():
         )
         self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-   
+        self.loading_label = CTkLabel(
+            master=self.container,
+            text="",
+            text_color="#00FF00",
+            font=("Arial", 14)
+        )
+        self.loading_label.grid(row=2, column=0, pady=5, sticky="nsew")
+
+        wait_time = 0
+        while Global_offline_model is None:
+            self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
+            self.loading_label.update_idletasks()
+            time.sleep(1)
+            wait_time += 1
+            if wait_time > 60:
+                self.loading_label.configure(text="❌ Timeout waiting for model to load.")
+                return
+
+        self.loading_label.configure(text="✅ Model loaded successfully.")
+        self.model = Global_offline_model
+
         self.create_widgets()
         global file_list_update_callback
         file_list_update_callback = self.sync_uploaded_files
@@ -438,11 +503,9 @@ class Agent_GUI():
 
     def load_llama_instruct(self, uploaded_file=None):
         load_dotenv()
-        #https://huggingface.co/docs/smolagents/guided_tour?build-a-tool=Decorate+a+function+with+%40tool&Pick+a+LLM=Local+Transformers+Model#default-toolbox
-        #model_path = "./local_qwen2.5_coder_7b"
-        #model = TransformersModel(model_path)
 
-        model = HfApiModel("Qwen/Qwen2.5-Coder-32B-Instruct")
+        self.model = Global_offline_model
+
         prompts = find_by_relative_path(f"Assets{os_separator}prompts.yaml")
         with open(prompts, 'r') as stream:
             prompt_templates = yaml.safe_load(stream)
@@ -577,9 +640,6 @@ class Agent_GUI():
         )
 
 
-
-
-
         context_vars = {
                 "video_path": Video_path,
                 "file_type": file,
@@ -587,11 +647,8 @@ class Agent_GUI():
             }       
 
 
-
-
-
         manager_agent  = CodeAgent(
-            model=model,
+            model=self.model,
             tools=[
                 FinalAnswerTool(), 
                 SpeechToTextTool(),
@@ -668,203 +725,325 @@ class Agent_GUI():
 
 
 
-
+#didrik
 class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tiktok) if available for api's. (options too use smolgent with a generate button for automatic generation of (title,description,keywords,hashtags.))
     def __init__(self, parent_container):
-        self.parent_container = parent_container
+            self.parent_container = parent_container
+            self.credentials = None  
 
-        self.container = CTkFrame(
-            master=self.parent_container,
-            fg_color="#282828",
-            border_width=2,
-            border_color="#404040",
-            corner_radius=10
-        )
-        self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
-   
-        self.create_widgets()
-
-    def youtube_login(self):
-
-
-        SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
-        try:
-            print("🔐 Launching browser for YouTube login...")
-
-            # Use a stable port to avoid firewall issues
-            flow = InstalledAppFlow.from_client_secrets_file(
-                os.path.join(os.path.dirname(__file__), "client_secret.json"),
-                SCOPES
+            self.container = CTkFrame(
+                master=self.parent_container,
+                fg_color="black",
+                border_width=2,
+                border_color="#404040",
+                corner_radius=10,
+                height=1000
             )
+            self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+            self.container.update_idletasks()
 
-            # Localhost + open_browser=True ensures automatic login flow
-            credentials = flow.run_local_server(
-                host="localhost",
-                port=8765,
-                open_browser=True
-            )
 
-            with open("youtube_token.pkl", "wb") as token:
-                pickle.dump(credentials, token)
+            self.create_widgets()
 
-            print("✅ Logged in! You can now upload.")
-
-        except FileNotFoundError:
-            print("❌ ERROR: 'client_secret.json' not found. Please place it in the app folder.")
-        except Exception as e:
-            print(f"❌ Login failed: {e}")
-
-    
-
-    def upload_to_youtube(self,video_path, title, description, tags=None, hashtags=None, schedule_datetime=None):
-        try:
-            credentials = self.load_youtube_credentials()
-            youtube = build("youtube", "v3", credentials=credentials)
-        except Exception as e: 
-            print(f"⚠️ Please login first. Error: {str(e)}")
-            return
-        keywords = []
-        if tags: 
-            keywords.extend(tags)
-        if hashtags: keywords.extend([tag.lstrip('#') for tag in hashtags])
-
-        snippet = {
-            "title": title,
-            "description": description,
-            "tags": keywords,
-        }
-
-        status = {
-            "privacyStatus": "private"
-        }
-
-        if schedule_datetime:
-            status["PublishAt"] = schedule_datetime.isoformat() + "Z"
-            status["privacyStatus"] = "private"
-
-        
-        request = youtube.videos().insert(
-            part="snippet,status",
-            body={
-                "snippet": snippet,
-                "status": status
-                },
-                media_body=MediaFileUpload(video_path)
-        )
-
-        try:
-            response = request.execute()
-            print("✅ Upload complete! Video ID:", response["id"])
-        except Exception as e:
-               print(f"❌ Upload failed: {str(e)}")
-
-    def browse_video_file(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Video Files", "*.mp4 *.mov *.avi *.mkv")])
-        if file_path:
-            self.video_path_entry.delete(0, 'end')
-            self.video_path_entry.insert(0, file_path)
-
-    def handle_upload(self):
-        if self.file_menu.get() != "Youtube":
-            print("⚠️ Only YouTube upload is supported right now.")
-            return
-
-        title = self.title_entry.get()
-        description = self.description_entry.get("1.0", "end").strip()
-        tags = [t.strip() for t in self.tags_entry.get().split(",") if t.strip()]
-        hashtags = [h.strip() for h in self.hashtags_entry.get().split(",") if h.strip()]
-        video_path = self.video_path_entry.get()
-
-        if not video_path:
-            print("⚠️ No video selected.")
-            return
-
-        self.upload_to_youtube(
-            video_path=video_path,
-            title=title,
-            description=description,
-            tags=tags,
-            hashtags=hashtags,
-            schedule_datetime=None  
-        )
-
-            
     def create_widgets(self):
+            row=1
+            self.container.columnconfigure(0, weight=1)
+            self.container.columnconfigure(1, weight=1)
+            self.container.rowconfigure(1, weight=1)
 
         
-        self.top_bar = CTkFrame(
-            master=self.container,
-            fg_color="#282828"
-        )
-        self.top_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+            self.add_account_button = CTkButton(
+                self.container,
+                text="Add New YouTube Account",
+                command=lambda: Thread(target=self.authenticate).start(),
+                font=("Arial", 14),
+                fg_color="#1c2636",
+                text_color="white",
+                height=36
+            )
+            self.add_account_button.place(relx=0.01, rely=0.01, anchor="nw")
+            row += 1
+            self.file_menu = CTkOptionMenu(
+                master=self.container,
+                values=['Youtube','Instagram','Tiktok'],
+                width=200,
+                height=30,
+                font=bold11,
+                dropdown_font=bold11,
+                fg_color="#282828",
+                button_color="#404040",
+                text_color="#FFFFFF",
+            )
+            self.file_menu.grid(row=0, column=1, padx=10, pady=10, sticky="ne")
 
-        self.LoginYoutube = CTkButton(master=self.top_bar, text="Log in to YouTube",  command=lambda: Thread(target=self.youtube_login).start()).pack(side="right", padx=10, pady=5)
-   
-        self.file_menu = CTkOptionMenu(
-            master=self.top_bar,
-            values=['Youtube','Instagram','Tiktok'],
-            width=200,
-            height=30,
-            font=bold11,
-            dropdown_font=bold11,
-            fg_color="#282828",
-            button_color="#404040",
-            text_color="#FFFFFF",
-        )
-        self.file_menu.pack(side="left", padx=10, pady=5)
+
+            self.channel_dropdown = CTkOptionMenu(
+                self.container,
+                values=self.get_saved_channels(),
+                command=self.select_channel,
+                width=200
+            )
+            self.channel_dropdown.set("Select Channel")
+            self.channel_dropdown.place(relx=0.99, rely=0.2, anchor="ne")
+
+            row = 1
+
+            self.video_path_entry = CTkEntry(self.container, placeholder_text="Video File Path", width=500)
+            self.video_path_entry.grid(row=row, column=0, padx=10, pady=(60, 10), sticky="ew")
+
+            browse_btn = CTkButton(
+                self.container,
+                text="Browse",
+                command=self.browse_video,
+                fg_color="#1c2636",
+                text_color="white"
+            )
+            browse_btn.grid(row=row, column=1, padx=10, pady=(60, 10), sticky="w")
+            row += 1
+
+            self.title_entry = CTkEntry(self.container, placeholder_text="Video Title")
+            self.title_entry.grid(row=row, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+            row += 1
+
+          
 
     
-        self.Upload = CTkButton(
-            master=self.top_bar,
-            text="Upload",
-            width=140,
-            height=30,
-            font=bold11,
-            border_width=1,
-            fg_color="#282828",
-            text_color="#E0E0E0",
-            border_color="#0096FF",
-            command=lambda: Thread(target=self.handle_upload).start()
-        )
-        self.Upload.pack(side="left", padx=10, pady=5)
+            self.schedule_checkbox = CTkCheckBox(
+                self.container,
+                text="Schedule for later",
+                command=self.toggle_schedule_fields,
+                fg_color="#1c2636",
+                text_color="white"
+            )
+            self.schedule_checkbox.grid(row=row, column=0, sticky="w", padx=10, pady=10)
 
-    
-        self.info_button_Social_media_uploading = create_info_button(
-            open_socialMedia_tool_info,
-            text="INFO",
-            width=15,
-            master=self.top_bar
-        )
-        self.info_button_Social_media_uploading.pack(side="left", padx=10, pady=5)
+            self.date_entry = CTkEntry(self.container, placeholder_text="YYYY-MM-DD", width=150)
+            self.time_entry = CTkEntry(self.container, placeholder_text="HH:MM (24h)", width=150)
+
+            # Hide by default
+            self.date_entry.grid_forget()
+            self.time_entry.grid_forget()
+            row += 1
 
 
-        self.title_entry = CTkEntry(master=self.container, placeholder_text="Video Title")
-        self.title_entry.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+            self.description_entry = CTkTextbox(self.container, height=100)
+            self.description_entry.insert("1.0", "Video Description")
+            self.description_entry.grid(row=row, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+            row += 1
 
-        self.description_entry = CTkTextbox(master=self.container, height=100)
-        self.description_entry.insert("1.0", "Video Description")
-        self.description_entry.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
+            self.category_entry = CTkEntry(self.container, placeholder_text="Category ID (e.g., 22)")
+            self.category_entry.grid(row=row, column=0, padx=10, pady=10, sticky="w")
 
-        self.tags_entry = CTkEntry(master=self.container, placeholder_text="Tags (comma-separated)")
-        self.tags_entry.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
+            self.privacy_dropdown = CTkOptionMenu(self.container, values=["public", "private", "unlisted"])
+            self.privacy_dropdown.set("unlisted")
+            self.privacy_dropdown.grid(row=row, column=1, padx=10, pady=10, sticky="w")
+            row += 1
 
-        self.hashtags_entry = CTkEntry(master=self.container, placeholder_text="Hashtags (comma-separated)")
-        self.hashtags_entry.grid(row=4, column=0, padx=10, pady=5, sticky="ew")
+            self.upload_button = CTkButton(
+                self.container,
+                text="Upload to YouTube",
+                command=self.Upload_to_platform,
+                font=("Arial", 16, "bold"),
+                fg_color="#0d1b2a",
+                hover_color="#1c2636",
+                text_color="white",
+                height=40
+            )
+            self.upload_button.grid(row=row, column=0, columnspan=2, pady=10)
+            row += 1
 
-        self.video_path_entry = CTkEntry(master=self.container, placeholder_text="Path to video file")
-        self.video_path_entry.grid(row=5, column=0, padx=10, pady=5, sticky="ew")
+            self.test_connection = CTkButton(
+                self.container,
+                text="Test YouTube Connection",
+                command=self.test_connection,
+                font=("Arial", 16, "bold"),
+                fg_color="#0d1b2a",
+                hover_color="#1c2636",
+                text_color="white",
+                height=40
+            )
+            self.test_connection.grid(row=row, column=0, columnspan=2, pady=10)
+            row += 1
 
-        self.browse_button = CTkButton(
-            master=self.container,
-            text="Browse...",
-            command=self.browse_video_file
-        )
-        self.browse_button.grid(row=5, column=1, padx=5, pady=5)
+            self.channel_label = CTkLabel(
+                self.container,
+                text="Channel: Not connected",
+                font=("Arial", 14),
+                text_color="white"
+            )
+            self.channel_label.grid(row=row, column=0, columnspan=2, pady=5)
+
+        
+            saved_channels = self.get_saved_channels()
+            if saved_channels:
+                self.channel_dropdown.set(saved_channels[0])
+                self.select_channel(saved_channels[0])
+                
+    def toggle_schedule_fields(self):
+            if self.schedule_checkbox.get():
+                self.date_entry.grid(row=self.upload_button.grid_info()['row'] - 1, column=0, padx=10, sticky="w")
+                self.time_entry.grid(row=self.upload_button.grid_info()['row'] - 1, column=1, padx=10, sticky="w")
+            else:
+                self.date_entry.grid_forget()
+                self.time_entry.grid_forget()
+
+
+    def browse_video(self):
+            filepath = filedialog.askopenfilename(filetypes=[("MP4 files", "*.mp4")])
+            if filepath:
+                self.video_path_entry.delete(0, "end")
+                self.video_path_entry.insert(0, filepath)
+
+
+    def get_saved_channels(self):
+            from File_path import app_data_path
+            token_dir = app_data_path / "youtube_tokens"
+            print(f"[DEBUG] Looking for tokens in: {token_dir}")
+
+            if not token_dir.exists():
+                print("[DEBUG] Token dir does not exist")
+                return []
+
+            tokens = []
+            for file in token_dir.glob("*.pickle.enc"):
+                # Remove both .pickle.enc
+                name = file.name.replace(".pickle.enc", "")
+                tokens.append(name)
+
+            print(f"[DEBUG] Cleaned token names: {tokens}")
+            return tokens
+
+
+    def test_connection(self):
+            if not self.credentials:
+                self.authenticate()
+
+            youtube = build("youtube", "v3", credentials=self.credentials)
+
+            channel_response = youtube.channels().list(part="snippet", mine=True).execute()
+            channel_title = channel_response["items"][0]["snippet"]["title"]
+            print(f"📺 Authenticated YouTube Channel: {channel_title}")
+            self.channel_label.configure(text=f"Channel: {channel_title}")
+
+    def Upload_to_platform(self):
+            platform = self.file_menu.get()  # 
+
+            if platform == "Youtube":
+                self.upload_to_youtube_actual()
+            elif platform == "Tiktok":
+                return
+            elif platform == "Instagram":
+                return
+            else:
+                print("⚠️ No valid platform selected.")
+                return
+          
 
 
 
 
+
+    def upload_to_youtube_actual(self):
+            video_path = self.video_path_entry.get()
+            title = self.title_entry.get()
+            description = self.description_entry.get("1.0", "end").strip()
+            category_id = self.category_entry.get()
+            privacy_status = self.privacy_dropdown.get()
+            status_config = {
+                "privacyStatus": privacy_status
+            }
+
+
+            if self.schedule_checkbox.get():
+                try:
+                    date_str = self.date_entry.get()
+                    time_str = self.time_entry.get()
+                    publish_datetime = f"{date_str}T{time_str}:00Z"
+
+        
+                    dt = datetime.datetime.strptime(publish_datetime, "%Y-%m-%dT%H:%M:%SZ")
+                    publish_at = dt.isoformat() + "Z"
+
+                    status_config["privacyStatus"] = "private"
+                    status_config["publishAt"] = publish_at
+                    print(f"📅 Scheduled for: {publish_at}")
+                except Exception as e:
+                    print("❌ Invalid date/time format:", e)
+                    return
+
+            if not self.credentials:
+                self.authenticate()
+
+            youtube = build("youtube", "v3", credentials=self.credentials)
+
+            request_body = {
+                "snippet": {
+                    "title": title,
+                    "description": description,
+                    "categoryId": category_id,
+                },
+                "status": {
+                    "privacyStatus": status_config
+                }
+            }
+
+            media_file = MediaFileUpload(video_path)
+
+            response = youtube.videos().insert(
+                part="snippet,status",
+                body=request_body,
+                media_body=media_file
+            ).execute()
+
+            channel_response = youtube.channels().list(part="snippet", mine=True).execute()
+            channel_title = channel_response["items"][0]["snippet"]["title"]
+
+            print("✅ Upload successful!")
+            print(f"📺 Uploaded to: {channel_title}")
+            print(f"🔗 Video URL: https://youtu.be/{response['id']}")
+            self.channel_label.configure(text=f"Uploaded to: {channel_title}")
+
+
+    def select_channel(self, channel_name):
+            from encryption import load_encrypted_token
+
+            credentials = load_encrypted_token(channel_name)
+            if credentials:
+                self.credentials = credentials
+                self.channel_label.configure(text=f"Loaded: {channel_name}")
+                print(f"✅ Loaded token for {channel_name}")
+            else:
+                self.channel_label.configure(text=f"❌ Failed to load: {channel_name}")
+                print(f"⚠️ Failed to load token for {channel_name}")
+
+    def authenticate(self):
+            import google_auth_oauthlib.flow
+            from googleapiclient.discovery import build
+            from encryption import save_encrypted_token
+        
+
+            scopes = [
+                "https://www.googleapis.com/auth/youtube.upload",
+                "https://www.googleapis.com/auth/youtube.force-ssl"
+            ]
+            client_secrets_file = "./Json_secrets/client_secret_849553263621-grvsfihl7lkocrt0qgs37iipuv5lbpkl.apps.googleusercontent.com.json"
+
+            # OAuth login flow
+            flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file(
+                client_secrets_file, scopes)
+            self.credentials = flow.run_local_server(port=0)
+
+            youtube = build("youtube", "v3", credentials=self.credentials)
+            channel_response = youtube.channels().list(part="snippet", mine=True).execute()
+            channel_name = channel_response["items"][0]["snippet"]["title"]
+
+            # Save encrypted token
+            save_encrypted_token(channel_name, self.credentials)
+
+            # Refresh dropdown with new value
+            self.channel_dropdown.configure(values=self.get_saved_channels())
+            self.channel_dropdown.set(channel_name)
+            self.channel_label.configure(text=f"Authenticated: {channel_name}")
 
 
 ####Youtube Download#####
@@ -1599,12 +1778,305 @@ class ToolMenu:
         self.container.columnconfigure(0, weight=1)
         self.container.rowconfigure(1, weight=1)
 
+ 
+#didrik
+class LR_Agent_Automation:
+
+    def __init__(self, parent_container):
+        self.parent_container = parent_container
+        self.model = Global_offline_model
+      
+        
+        self.should_stop = False
+        self.container = CTkFrame(
+            master=self.parent_container,
+            fg_color="#282828",
+            border_width=2,
+            border_color="#404040",
+            corner_radius=10
+        )
+        self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+        self.loading_label = CTkLabel(
+            master=self.container,
+            text="",
+            text_color="#00FF00",
+            font=("Arial", 14)
+        )
+        self.loading_label.grid(row=2, column=0, pady=5, sticky="nsew")
+        wait_time = 0
+        while Global_offline_model is None:
+            self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
+            self.loading_label.update_idletasks()
+            time.sleep(1)
+            wait_time += 1
+            if wait_time > 60:
+                self.loading_label.configure(text="❌ Timeout waiting for model to load.")
+                return
+
+        self.loading_label.configure(text="✅ Model loaded successfully.")
+        self.model = Global_offline_model
 
 
 
+        self.create_widgets()
+
+
+        self.chat_display  = scrolledtext.ScrolledText(
+        self.container,
+          wrap=tk.WORD,
+          width=55,
+          height=25,
+          font=("Helvetica",12),
+          bg="black",  
+          fg="white",
+          state="disabled",
+        )
+        self.chat_display.config(
+            insertbackground="yellow",
+            selectbackground="#444444",
+            selectforeground="white",
+            borderwidth=2,
+            relief="sunken"
+        )
+        self.chat_display.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        self.chat_display.yview(END)
+        self.container.columnconfigure(0, weight=1)
+        self.container.rowconfigure(1, weight=1)
+
+
+    def create_widgets(self):
+        self.settingsframe = CTkFrame(
+            self.container,
+            width=750,
+            height=750,
+            fg_color="black",
+            bg_color="black"
+        )
+        self.settingsframe.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+
+        self.media_type_var = tk.StringVar(value="videos only")
+        self.media_type_menu = CTkComboBox(self.container,textvariable =self.media_type_var, state="readonly")
+        self.media_type_menu["values"] = ("videos only", "images and videos")
+        self.media_type_menu.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+
+
+        self.title_entry = CTkEntry(
+            self.settingsframe,
+            placeholder_text="Title of video",
+            width=500
+        )
+        self.title_entry.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
+
+
+        self.topic_entry = CTkEntry(
+            self.settingsframe,
+            placeholder_text="Topic of video",
+            width=500
+        )
+        self.topic_entry.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
+
+        
+        from tkinter import StringVar
+        def only_digits_input(P):
+            return P.isdigit() or P == ""  
+
+        vcmd = self.settingsframe.register(only_digits_input)
+
+       
+        self.video_amount_var = StringVar()
+        self.video_amount = CTkEntry(
+            self.settingsframe,
+            textvariable=self.video_amount_var,
+            placeholder_text="Amount of videos to be made",
+            validate="key",
+            validatecommand=(vcmd, "%P"),
+            width=500
+        )
+        self.video_amount.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
+
+
+        self.description_entry = CTkTextbox(
+            self.settingsframe,
+            width=500,
+            height=100
+        )
+        self.description_entry.insert("1.0", "Description of video")
+        self.description_entry.grid(row=1, column=0, padx=20, pady=(10, 20), sticky="w")
+
+
+        self.run_agent_node = CTkButton(
+            self.container,
+            command=lambda: Thread(target=self.run_agent).start(),
+            fg_color="black",
+            text="Run AGENT Node"
+        )
+        self.run_agent_node.grid(row=0,column=0, padx=20, pady=(20,10),sticky="w")
 
 
 
+    def run_single_video_task(self):
+            @tool
+            def Upload_video_to_socialMedia_platform(title: str, description: str, time: int):
+                """
+                
+                """
+                return   
+            
+            @tool 
+            def add_text_to_video():
+                """
+                
+                """
+                return
+
+            @tool
+            def add_audio_to_video():
+                """
+                
+                """
+                return
+
+            @tool
+            def add_filter_to_video():
+                """
+                
+                """
+                return 
+
+
+
+            @tool
+            def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
+                    """
+                    A tool for fetching metadata from top trending YouTube videos in a specific category or topic.
+
+                    Args:
+                        Search_Query (str): A keyword or topic to search for trending YouTube videos (e.g., "Motivational", "Funny", "Tech Reviews").
+
+                    Returns:
+                        dict: A dictionary containing video metadata including title, description, view count, like count, comment count,
+                        thumbnails, and channel title for each top trending video.
+                    """
+                    
+                    Api_key = os.getenv("YOUTUBE_API_KEY")
+
+                    youtube = build("youtube", "v3", developerKey=Api_key)
+
+                    request = youtube.search().list(
+                        part="snippet",
+                        q=Search_Query,
+                        type="video",
+                        maxResults=30
+                    )
+                    response = request.execute()
+
+                    return response 
+            
+            @tool
+            def next_video_goals(Next_video_conecpt: str) -> str:
+                """
+                
+                """
+                return
+
+            try:
+                prompts = find_by_relative_path(f"Assets{os_separator}prompts_video_creator.yaml")
+                with open(prompts, 'r') as stream:
+                    prompt_templates = yaml.safe_load(stream)
+
+                user_task = """Your goal is to create a video based on the specified topic and parameters.
+
+                1. Read all the additional arguments that are provided to you. These arguments give you insight into the video to be created — including title, topic, description, number of clips to generate, and the media preference (e.g., videos only, or a mix of images and videos). If any of the values are empty or None, use your creativity to decide them.
+
+                2. Search the internet and social media platforms to gain insights from similar trending videos to inform your video concept.
+
+                3. Based on the gathered information and user preferences, start creating the video content accordingly.
+
+                4. When you are finnished with the video. use the tool (next_video_goals)
+                """
+
+          
+                self.context_var =  { 
+                            "Video Title": self.title_entry.get(),
+                            "topic": self.topic_entry.get(),
+                            "description": self.description_entry.get("1.0", "end-1c"),
+                            "video_amount": self.video_amount_var.get(),
+                            "media_type": self.media_type_var.get()
+                            }
+                
+                manager_agent  = CodeAgent(
+                    model=self.model,
+                    tools=[
+                        FinalAnswerTool(), 
+                        SpeechToTextTool(),
+                        VisitWebpageTool(),
+                        GoogleSearchTool(),
+                        Fetch_top_trending_youtube_videos,
+                        Upload_video_to_socialMedia_platform,
+                    ], 
+                    max_steps=10,
+                    verbosity_level=1,
+                    prompt_templates=prompt_templates,
+                    add_base_tools=True
+                )
+
+                self.manager_agent = manager_agent
+                self.user_task = user_task
+                self.context_var = self.context_var
+
+
+                response = self.manager_agent.run(
+                            task=self.user_task,
+                            additional_args=self.context_var
+                )
+
+                self.chat_display.config(state=tk.NORMAL)
+                if isinstance(response, dict):
+                    formatted = (
+                        json.dumps(response, indent=4),
+                    )
+                else:
+                    formatted = str(response)
+
+                self.chat_display.insert(tk.END, formatted + "\n")
+                self.chat_display.config(state=tk.DISABLED)
+                self.chat_display.see(tk.END)
+            except Exception as e:
+                    print("❌ Error in run_single_video_task:", e)
+
+
+
+    def run_agent_loop(self):
+            try:
+                amount = int(self.video_amount_var.get())
+            except ValueError:
+                print("invalid video amount entered")
+                return
+            
+            for i in range(amount):
+                if self.should_stop:
+                    break
+                self.run_single_video_task()
+
+
+    def run_agent(self):   
+     
+
+
+                
+ 
+
+
+        self.RunForever = Thread(target=self.run_agent_loop(),daemon=True)
+        self.RunForever.start()
+
+ 
+
+           
+
+
+        
 
 ####TOOL(1) FOR TOOLCLASS#####
 class MediaInfoAnalyst:
@@ -1912,6 +2384,8 @@ class ToolWindowClass:
 
 
     def create_LR_Agent_Automation(self):
+        self.LR_Agent_automation = LR_Agent_Automation(self.content_frame)
+        self.LR_Agent_automation.container.pack(fill="both",expand=True,padx=10,pady=10)
         return
 
     def create_mediainfo_Analysist(self):
@@ -1929,7 +2403,6 @@ class ToolWindowClass:
 
 
 ####VIDEO PREVIEW CLASS######
-#didrik
 class VideoPreview:
     def __init__(self, parent_container, original_label, upscaled_label, video_path):
         print("Initializing VideoPreview...")
@@ -1986,7 +2459,7 @@ class VideoPreview:
 
 
 
-#didrik
+
 #SOLO FRAME MODE
     def show_soloFame(self, original_frame, upscaled_frame):
 
@@ -2211,6 +2684,8 @@ def load_model_inference():
                 _ = preview_ai_instance.AI_orchestration(dummy_input)
                 last_model_config = current_config
                 print("Dummy inference complete")
+                gc.collect()
+                torch.cuda.empty_cache()
                 
     except Exception as e:
         print(f"Error loading model with dummy input: {str(e)}")
@@ -2330,7 +2805,7 @@ def create_placeholder_image(width, height):
 
 
 
-#didrik
+
 def place_loadFile_section(window):
     global container, original_preview, upscaled_preview,original_label_title, upscaled_label_title
 
@@ -4696,7 +5171,7 @@ def open_files_action():
             fg_color             = background_color, 
             bg_color             = background_color
         )
-        file_widget.place(relx = 0.0, rely = 0.0, relwidth = 0.555, relheight = 0.42)#didrik
+        file_widget.place(relx = 0.0, rely = 0.0, relwidth = 0.555, relheight = 0.42)
 
         info_message.set("Ready")
     else: 
@@ -5325,14 +5800,10 @@ def on_app_close() -> None:
         preference_file.write(user_preference_json)
 
     stop_upscale_process()
+    gc.collect()
+    torch.cuda.empty_cache()
     
     
-
-    
-
-
-
-
 
 
     
@@ -5363,7 +5834,7 @@ class VideoEnhancer():
         place_message_label()
         place_upscale_button()
         selected_VRAM_limiter.set(str(round(get_gpu_vram() / 1000)) if get_gpu_vram() else "4")
-
+        Thread(target=load_model_background, daemon=True).start()
     
             
         
