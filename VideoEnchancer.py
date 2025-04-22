@@ -1,5 +1,6 @@
 import sys
 import os
+import Vocal_Isolation
 from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
@@ -9,8 +10,6 @@ import yaml
 from tkinter import filedialog
 import os
 import time
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from dotenv import load_dotenv
@@ -112,7 +111,7 @@ from numpy import (
 
 import torch
 import tkinter as tk
-from tkinter import StringVar, DISABLED, NORMAL,END,scrolledtext
+from tkinter import StringVar, DISABLED,END,scrolledtext
 from customtkinter import (
     CTk,
     CTkButton,
@@ -239,7 +238,7 @@ def load_model_background():
 
     
     global Global_offline_model
-    model_path = "./local_model/"
+    model_path = find_by_relative_path("./local_model/")
     Global_offline_model = TransformersModel(model_path, device_map=device, torch_dtype=dtype, trust_remote_code=True, max_new_tokens=2048)
     print("✅ Model loaded successfully in the background!")
 
@@ -2937,7 +2936,7 @@ class AI:
                 case 'CPU':
                     providers = ['CPUExecutionProvider']
         
-        # Set up session options
+    
         session_options = onnxruntime.SessionOptions()
         session_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         session_options.execution_mode = onnxruntime.ExecutionMode.ORT_PARALLEL
@@ -5831,7 +5830,7 @@ class VideoEnhancer():
             
         
 if __name__ == "__main__":
-    # from Decryption import validate_jwt
+    from Decryption import validate_jwt
     # if not validate_jwt():
     #   sys.exit(1)
     

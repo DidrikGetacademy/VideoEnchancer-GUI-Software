@@ -1,0 +1,5 @@
+=== Checking datas entries ===
+✔ C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Assets → Assets
+✔ C:\Users\didri\Desktop\Programmering\VideoEnchancer program\AI-onnx → AI-onnx
+✔ C:\Users\didri\Desktop\Programmering\VideoEnchancer program\.env → .
+✔ C:\Users\didri\Desktop\Programmering\VideoEnchancer program\vocal_isolation\app.py → vocal_isolation
