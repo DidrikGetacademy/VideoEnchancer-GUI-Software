@@ -102,15 +102,31 @@ def get_app_data_path():
         return Path.home() / ".config" / "LearnReflect" #linux
 
 
+# def resource_path(relative_path):
+#     if getattr(sys, 'frozen',False):
+#         base_path = sys._MEIPASS
+#     else: 
+#         base_path = os.path.abspath(os.path.dirname(__file__))
+#     logging.info(f"Base Path for bundled files {base_path}")
+#     logging.info(f"Bundled files and folders: {os.listdir(base_path)}")
+#     full_path = os.path.join(base_path,relative_path)
+#     return full_path
 def resource_path(relative_path):
-    if getattr(sys, 'frozen',False):
-        base_path = sys._MEIPASS
-    else: 
-        base_path = os.path.abspath(os.path.dirname(__file__))
-    logging.info(f"Base Path for bundled files {base_path}")
-    logging.info(f"Bundled files and folders: {os.listdir(base_path)}")
-    full_path = os.path.join(base_path,relative_path)
-    return full_path
+    try:
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.abspath(os.path.dirname(__file__))
+
+        logging.info(f"Base Path for bundled files: {base_path}")
+        logging.info(f"Bundled files and folders: {os.listdir(base_path)}")
+
+        return os.path.join(base_path, relative_path)
+
+    except Exception as e:
+        logging.error(f"Error resolving resource path for {relative_path}: {e}")
+        return relative_path  # fallback
+
 
 app_data_path = get_app_data_path()
 secret_key_path = app_data_path / 'secret.key'

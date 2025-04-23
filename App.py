@@ -2,6 +2,13 @@ import customtkinter as ctk
 from RegisterAccount_GUI import RegistrationFrame
 from LoginAccount_GUI import LoginFrame
 from PIL import Image, ImageTk 
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 from File_path import resource_path
 class MainApp(ctk.CTk):
     def __init__(self):

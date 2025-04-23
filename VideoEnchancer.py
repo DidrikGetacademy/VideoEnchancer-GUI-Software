@@ -4123,13 +4123,13 @@ def create_text_box(textvariable: StringVar,master=None) -> CTkEntry:
 
 
 
-def create_text_box_output_path(textvariable: StringVar) -> CTkEntry:
+def create_text_box_output_path(textvariable: StringVar, width=None) -> CTkEntry:
     return CTkEntry(
         master        = window, 
         textvariable  = textvariable,
         border_width  = 1,
         corner_radius = 5,
-        width         = 225,
+        width         = width if width != None else 225,
         height        = 25,
         font          = bold11,
         justify       = "center",
@@ -4835,6 +4835,7 @@ def upscale_orchestrator(
             AI_instance_list.append(AI(selected_AI_model, selected_gpu, input_resize_factor,  tiles_resolution))
 
     try:
+
         how_many_files = len(selected_file_list)
         for file_number in range(how_many_files):
             file_path   = selected_file_list[file_number]
@@ -5700,11 +5701,11 @@ def place_input_output_resolution_textboxs():
 
 
 def place_output_path_textbox():
-    output_path_textbox = create_text_box_output_path(selected_output_path) 
+    output_path_textbox = create_text_box_output_path(selected_output_path, width=150) 
     select_output_path_button = create_active_button(command = open_output_path_action, text = "SELECT",  width   = 85, height  = 25)
     
-    output_path_textbox.place(relx = column1_5_x - 0.56, rely  = row0_y - 0.08, anchor = "center")
-    select_output_path_button.place(relx = column2_x - 0.612, rely  = row0_y - 0.08, anchor = "center")
+    output_path_textbox.place(relx = column1_5_x - 0.57, rely  = row0_y - 0.08, anchor = "center",)
+    select_output_path_button.place(relx = column2_x - 0.645, rely  = row0_y - 0.08, anchor = "center")
 
 
 
@@ -5809,7 +5810,7 @@ def place_stop_button():
         height  = 30,
         border_color = "#EC1D1D"
     )
-    stop_button.place(relx=column0_x - 0.17 , rely=row1_y + 0.345, anchor="center")
+    stop_button.place(relx=column0_x - 0.16 , rely=row1_y + 0.315, anchor="center")
 
 
 
@@ -5824,10 +5825,10 @@ def place_message_label():
         anchor       = "center",
         corner_radius = 12
     )
-    message_label.place(relx=column0_x - 0.12, rely=row1_y + 0.31, anchor="center")
+    message_label.place(relx=column0_x - 0.08, rely=row1_y + 0.31, anchor="center")
 
 
-
+    global input_file_button
     input_file_button = CTkButton(
         master = window,
         command  = open_files_action,
@@ -5964,10 +5965,10 @@ class VideoEnhancer():
         
 if __name__ == "__main__":
     from Decryption import validate_jwt
-    # if not validate_jwt():
-    #    sys.exit(1)
+    #if not validate_jwt():
+     #   sys.exit(1)
     
-
+    selected_audio_mode = "Disabled"
     multiprocessing_freeze_support()
     set_appearance_mode("Dark")
     set_default_color_theme("dark-blue")
@@ -5991,7 +5992,7 @@ if __name__ == "__main__":
     video_format_var = StringVar()
     audio_format_var = StringVar()
 
- 
+    
     global selected_file_list
     global selected_AI_model
     global selected_gpu
@@ -6050,7 +6051,7 @@ if __name__ == "__main__":
     upscale_icon   = CTkImage(pillow_image_open(find_by_relative_path(f"Assets{os_separator}upscale_iconLR.png")),   size=(15, 15))
     clear_icon     = CTkImage(pillow_image_open(find_by_relative_path(f"Assets{os_separator}clear_icon.png")),     size=(15, 15))
     info_icon      = CTkImage(pillow_image_open(find_by_relative_path(f"Assets{os_separator}info_icon.png")),      size=(17, 17))
-    
+    place_stop_button()
     
     
     app = VideoEnhancer(window)

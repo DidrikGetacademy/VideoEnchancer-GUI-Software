@@ -163,13 +163,20 @@ class UserAccountFrame(ctk.CTkFrame):
             from tkinter import messagebox
             messagebox.showinfo("Update", "Your software is up to date.")
 
+    import logging
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
 
     def run_enchancer(self):
         from File_path import resource_path
         import os
         import subprocess
-        VideoEnchancer_Folder = resource_path('VideoEnchancer.exe')
-        video_enhancer_exe = os.path.join(VideoEnchancer_Folder, 'VideoEnchancer.exe')
+        #VideoEnchancer_Folder = resource_path('VideoEnchancer.exe')
+        #video_enhancer_exe = os.path.join(VideoEnchancer_Folder, 'VideoEnchancer.exe')
+        video_enhancer_exe = resource_path('VideoEnchancer.exe')
         logging.info(f"Resolved path to VideoEnhancer.exe: {video_enhancer_exe}")
 
         if not os.path.exists(video_enhancer_exe):
