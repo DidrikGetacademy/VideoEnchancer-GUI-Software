@@ -225,22 +225,87 @@ def check_hardware():
 
 
 
+# def load_model_background():
+#     device, dtype = check_hardware()
+
+#     print(f"🧠 Loading model on {device} using dtype: {dtype}")
+
+
+#     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+#     gc.collect()
+#     if torch.cuda.is_available():
+#         torch.cuda.empty_cache()
+
+    
+#     global Global_offline_model
+#     model_path = find_by_relative_path("./local_model/")
+#     Global_offline_model = TransformersModel(model_path, device_map=device, torch_dtype=dtype, trust_remote_code=True, max_new_tokens=2048,    local_files_only=True)
+#     print("✅ Model loaded successfully in the background!")
 def load_model_background():
     device, dtype = check_hardware()
-
     print(f"🧠 Loading model on {device} using dtype: {dtype}")
-
 
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    
     global Global_offline_model
-    model_path = find_by_relative_path("./local_model/")
-    Global_offline_model = TransformersModel(model_path, device_map=device, torch_dtype=dtype, trust_remote_code=True, max_new_tokens=2048)
-    print("✅ Model loaded successfully in the background!")
+
+    
+    try:
+        model_path = os_path_abspath(find_by_relative_path("./local_model/"))
+        print(f"🔍 Attempt 1 - model path: {model_path}")
+        Global_offline_model = TransformersModel(
+            model_path,
+            device_map=device,
+            torch_dtype=dtype,
+            trust_remote_code=True,
+            max_new_tokens=2048,
+            local_files_only=True
+        )
+        print("✅ Model loaded successfully from find_by_relative_path!")
+        return
+
+    except Exception as e1:
+        print(f"⚠️ Attempt 1 failed: {e1}")
+
+
+    try:
+        raw_path = find_by_relative_path("local_model")
+        model_path = os.path.normpath(os.path.abspath(raw_path))
+        print(f"🔍 Attempt 2 - normalized path: {model_path}")
+        Global_offline_model = TransformersModel(
+            model_path,
+            device_map=device,
+            torch_dtype=dtype,
+            trust_remote_code=True,
+            max_new_tokens=2048,
+            local_files_only=True
+        )
+        print("✅ Model loaded successfully from normalized path!")
+        return
+
+    except Exception as e2:
+        print(f"⚠️ Attempt 2 failed: {e2}")
+
+ 
+    try:
+        model_path = os.path.join(os.path.dirname(sys.executable), "local_model")
+        print(f"🔍 Attempt 3 - .exe dir path: {model_path}")
+        Global_offline_model = TransformersModel(
+            model_path,
+            device_map=device,
+            torch_dtype=dtype,
+            trust_remote_code=True,
+            max_new_tokens=2048,
+            local_files_only=True
+        )
+        print("✅ Model loaded successfully from executable location!")
+        return
+
+    except Exception as e3:
+        print(f"❌ All model loading attempts failed: {e3}")
 
 import onnxruntime as ort
 model_loading_lock = threading.Lock()
@@ -1045,7 +1110,7 @@ def place_youtube_download_menu(parent_container):
     frame_width = 800
     frame_height = 600
     global youtube_link_entry, youtube_output_path_entry ,video_format_var, audio_format_var
-    bg_image = Image.open("./Assets/youtubebackground(1).png").resize((frame_width, frame_height))
+    bg_image = Image.open(find_by_relative_path("Assets" + os_separator + "youtubebackground(1).png")).resize((frame_width, frame_height))
     bg_image_tk = CTkImage(bg_image, size=(frame_width, frame_height))
 
     youtube_frame = CTkFrame(
@@ -2069,6 +2134,31 @@ class LR_Agent_Automation:
 
         
 
+
+class ColorRestorer:
+    def __init__(self, parent_container):
+        self.parent_container = parent_container
+        self.selected_file_list = selected_file_list
+        self.truncated_to_full = {}
+
+
+        self.container = CTkFrame(
+            master=self.parent_container,
+            fg_color="#282828",
+            border_width=2,
+            border_color="#404040",
+            corner_radius=10
+        )
+        self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+
+
+
+
+
+
+
+
 ####TOOL(1) FOR TOOLCLASS#####
 class MediaInfoAnalyst:
     def __init__(self, parent_container):
@@ -2319,7 +2409,7 @@ class ToolWindowClass:
         self.menu_frame.pack(side="top", pady=(20, 10))
 
   
-        self.tool_list = ['Tool Menu','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','LR-Agent Automation']
+        self.tool_list = ['Tool Menu','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','LR-Agent Automation','ColorRestorer']
         self.tool_menu_var = StringVar(value=self.tool_list[0])
         self.tool_menu = CTkOptionMenu(
             master=self.menu_frame,
@@ -2358,6 +2448,8 @@ class ToolWindowClass:
             self.Create_Social_Media_uploading()
         elif selected_tool == "LR-Agent Automation":
             self.create_LR_Agent_Automation()
+        elif selected_tool == "ColorRestorer":
+            self.create_ColorRestorer()
 
         
 
@@ -2387,6 +2479,10 @@ class ToolWindowClass:
     def Create_Social_Media_uploading(self):
         self.socialMediaUploading = SocialMediaUploading(self.content_frame)
         self.socialMediaUploading.container.pack(fill="both", expand=True, padx=10, pady=10)
+    
+    def create_ColorRestorer(self):
+        self.colorRestorer = ColorRestorer(self.content_frame)
+        self.colorRestorer.container.pack(fill="both", expand=True, padx=10, pady=10)
 
 
 
@@ -2663,10 +2759,17 @@ def load_model_inference():
                     resize_factor, 
                     max_resolution
                 )
-                preview_ai_instance.inferenceSession.set_providers(
+                available_providers = ort.get_available_providers()
+                if "DmlExecutionProvider" in available_providers:
+                    preview_ai_instance.inferenceSession.set_providers(
                     ['DmlExecutionProvider'], 
                     [{'device_id': 0}]
                 )
+                else: 
+                    preview_ai_instance.inferenceSession.set_providers(
+                    preview_ai_instance.inferenceSession.set_providers(["CPUExecutionProvider"])
+
+                    )
                 dummy_height = max(64, int(512 * resize_factor))  
                 dummy_width = max(64, int(512 * resize_factor))
                 dummy_input = np.random.randint(0, 255, (dummy_height, dummy_width, 3), dtype=np.uint8)
@@ -2965,7 +3068,13 @@ class AI:
 
     def _load_audio_inferenceSession(self) -> onnxruntime_inferenceSession:
         import onnxruntime
-        providers = ['CPUExecutionProvider'] 
+        available_providers = onnxruntime.get_available_providers()
+        if 'DmlExecutionProvider' in available_providers:
+            providers = ['DmlExecutionProvider'] 
+            [{"device_id": 0}]
+        else:  
+            providers = ["CPUExecutionProvider"]
+
 
         session_options = onnxruntime.SessionOptions()
         session_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -3024,7 +3133,6 @@ class AI:
         import torch
         import soundfile as sf
         from librosa import istft
-        import onnxruntime
         import numpy as np
         video_dir = os.path.dirname(video_path)
         audio_output_path = os.path.join(video_dir, "extracted_audio.wav")
@@ -3892,8 +4000,8 @@ def create_info_button(
         width: int = 150,
         master=None
         ) -> CTkButton:
-    
-    bg_image = Image.open("./Assets/1.jpg")
+     
+    bg_image = Image.open(find_by_relative_path("Assets" + os_separator + "1.jpg"))
     bg_image = bg_image.resize((width, 22))  
     bg_image_ctk = CTkImage(bg_image)
 
@@ -5808,7 +5916,7 @@ class VideoEnhancer():
         Master.geometry("1920x1080")
         Master.resizable(False, False)
         Master.iconbitmap(find_by_relative_path("Assets" + os_separator + "logo.ico"))
-        self.bg_image = CTkImage(Image.open("Assets" + os_separator + "prøv.png"),size=(1920, 1080))
+        self.bg_image = CTkImage(Image.open(find_by_relative_path("Assets" + os_separator + "prov.png")), size=(1920, 1080))
         self.background_label = CTkLabel(Master, image=self.bg_image, fg_color="black")
         self.background_label.place(relx=-0.22,rely=-0.25, relwidth=1, relheight=0.64) 
         self.background_label.lower() 
@@ -5832,7 +5940,7 @@ class VideoEnhancer():
 if __name__ == "__main__":
     from Decryption import validate_jwt
     # if not validate_jwt():
-    #   sys.exit(1)
+    #    sys.exit(1)
     
 
     multiprocessing_freeze_support()

@@ -30,7 +30,7 @@ for src, dest in raw_datas:
 binaries  = collect_dynamic_libs('torch')
 binaries += collect_dynamic_libs('numba')
 
-hiddenimports = ['natsort','moviepy.editor','moviepy.audio.io.AudioFileClip','moviepy.video.io.VideoFileClip']
+hiddenimports = ['natsort','moviepy.editor','moviepy.audio.io.AudioFileClip','moviepy.video.io.VideoFileClip','psutil']
 tmp_ret = collect_all('numba')
 hiddenimports += tmp_ret[2]
 
