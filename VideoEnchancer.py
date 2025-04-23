@@ -1,6 +1,7 @@
 import sys
 import os
 import Vocal_Isolation
+import onnxruntime as ort
 from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
@@ -223,6 +224,9 @@ def check_hardware():
         torch_dtype = torch.float32
         return device, torch_dtype
 
+CPU_ONLY = 'CUDAExecutionProvider' not in ort.get_available_providers()
+if CPU_ONLY:
+    FRAMES_FOR_CPU = 5
 
 
 # def load_model_background():
@@ -320,9 +324,11 @@ DOCUMENT_PATH        = os_path_join(os_path_expanduser('~'), 'Documents')
 USER_PREFERENCE_PATH = find_by_relative_path(f"{DOCUMENT_PATH}{os_separator}{app_name}_UserPreference.json")
 FFMPEG_EXE_PATH      = find_by_relative_path(f"Assets{os_separator}ffmpeg.exe")
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "video_codec;h264_cuvid"
-
+#os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "video_codec;h264"
 EXIFTOOL_EXE_PATH    = find_by_relative_path(f"Assets{os_separator}exiftool.exe")
 FRAMES_FOR_CPU       = 30
+if 'CUDAExecutionProvider' not in ort.get_available_providers():
+    FRAMES_FOR_CPU = 5
 
 
 if os_path_exists(FFMPEG_EXE_PATH): 
@@ -3120,7 +3126,7 @@ class AI:
         vocals_array, samplerate = main(self.audio_model_path,audio_file_path,audio_session)
         if vocals_array is None or samplerate is None:
             raise ValueError("Failed to isolate vocals. Received None values from main() function.")
-        sf.write("output_vocals.wav", vocals_array.T, samplerate)  
+       # sf.write("output_vocals.wav", vocals_array.T, samplerate)  
         
     
         isolated_output_path = audio_file_path.replace("extracted_audio", "isolated_audio")
@@ -3191,6 +3197,7 @@ class AI:
                 return Denoised_audio
             except Exception as e:
                 print(f"Audio inference audio denoise failed: {str(e)}")
+                return
         else: 
             print("Normal audio returning None")
             return None
@@ -4468,6 +4475,20 @@ def video_encoding(
     except Exception as e:
         print(f"Error during video encoding: {e}")
         pass
+
+    if Audio_Inference_output:
+        try: 
+            if os_path_exists(Audio_Inference_output):
+                os_remove(Audio_Inference_output)
+        except Exception as e:
+            print(f"error during removal of audio {str(e)}")
+
+    extracted_audio = os_path_join(os.path.dirname(video_path), "extracted_audio.wav") 
+    if os_path_exists(extracted_audio):
+        try:
+            os_remove(extracted_audio)
+        except Exception as e:
+            print(f"warning could not delete extracted audio {extracted_audio}, might have been moved: {str(e)}")
     
 def check_video_upscaling_resume(
         target_directory: str, 
@@ -4624,7 +4645,9 @@ def update_process_status_videos(
         average_processing_time: float,
         ) -> None:
 
-    if frame_index != 0 and (frame_index + 1) % 8 == 0:  
+
+    batch = 4 if not CPU_ONLY else 1
+    if frame_index != 0 and (frame_index + 1) % batch == 0:  
         remaining_frames = how_many_frames - frame_index
         remaining_time   = calculate_time_to_complete_video(average_processing_time, remaining_frames)
         if remaining_time != "":
@@ -5065,23 +5088,25 @@ def upscale_video_frames_multithreading(
     upscaled_frame_list_chunks = [upscaled_frame_paths[i:i + chunk_size] for i in range(0, len(upscaled_frame_paths), chunk_size)]
 
     write_process_status(processing_queue, f"{file_number}. Upscaling video ({multiframes_number} threads)")
-
-    pool = ThreadPool(multiframes_number)
-    pool.starmap(
-        upscale_single_video_frame_async,
-        zip(
-            repeat(processing_queue),
-            repeat(file_number),
-            repeat(multiframes_number),
-            repeat(total_video_frames),
-            AI_instance_list,
-            frame_list_chunks,
-            upscaled_frame_list_chunks,
-            repeat(selected_interpolation_factor)
+    try: 
+        pool = ThreadPool(multiframes_number)
+        pool.starmap(
+            upscale_single_video_frame_async,
+            zip(
+                repeat(processing_queue),
+                repeat(file_number),
+                repeat(multiframes_number),
+                repeat(total_video_frames),
+                AI_instance_list,
+                frame_list_chunks,
+                upscaled_frame_list_chunks,
+                repeat(selected_interpolation_factor)
+            )
         )
-    )
-    pool.close()
-    pool.join()
+        pool.close()
+        pool.join()
+    except Exception as e:
+        print(f"error during upscaling {str(e)}")
 
 def check_forgotten_video_frames(
         processing_queue: multiprocessing_Queue,
