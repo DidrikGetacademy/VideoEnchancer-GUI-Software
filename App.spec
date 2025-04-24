@@ -1,10 +1,12 @@
+
 a = Analysis(
     ['App.py'],
     pathex=[r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program'],
     binaries=[],
     datas=[
-        (r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program\dist\VideoEnchancer.exe', 'VideoEnchancer.exe'),
+        (r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program\dist\VideoEnchancer.exe', '.'),
         (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Assets", "Assets"),
+        (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\.env", "."), 
 
     ],
     hiddenimports=[
@@ -46,7 +48,8 @@ exe = EXE(
     strip=False,
     upx=True,
     console=True,  
-    manifest=r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\BuildingFiles\Program.manifest",
+    manifest=r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\BuildingFiles\ProgramApp.manifest",
+    icon=r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Assets\logo.ico",
 )
 
 # Collect everything
@@ -59,7 +62,6 @@ coll = COLLECT(
     upx=True,
     name='LearnReflect_App',  # Output directory name
     console=True,
-    icon=r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Assets\logo.ico",
     uac_admin=False,
     disable_windowed_traceback=False,
     argv_emulation=False,

@@ -32,7 +32,7 @@ from multiprocessing import (
     Queue          as multiprocessing_Queue,
     freeze_support as multiprocessing_freeze_support
 )
-import logging
+
 from json import (
     load  as json_load, 
     dumps as json_dumps
@@ -663,8 +663,12 @@ class Agent_GUI():
                     dict: A dictionary containing video metadata including title, description, view count, like count, comment count,
                     thumbnails, and channel title for each top trending video.
                 """
-                
-                Api_key = os.getenv("YOUTUBE_API_KEY")
+                try:   
+                    Api_key = os.getenv("YOUTUBE_API_KEY")
+                    logging(f"Api_key loaded successfully.")
+                except Exception as e:
+                   logging(f"Error loading api key {str(e)}")
+                   return
 
                 youtube = build("youtube", "v3", developerKey=Api_key)
 

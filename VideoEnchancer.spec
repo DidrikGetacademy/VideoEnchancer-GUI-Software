@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
-from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs, collect_data_files
 
 # Logging setup (optional)
 log_file = "datas_check_log.txt"
@@ -9,10 +9,10 @@ with open(log_file, "w") as log:
 
 # Define your datas
 raw_datas = [
+    (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\AI-onnx", "AI-onnx"), 
+    (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\.env", "."), #Env 
     (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Assets", "Assets"),
-    (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\AI-onnx", "AI-onnx"),
-    (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\.env", "."),
-    (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\vocal_isolation\app.py", "vocal_isolation")
+    (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\vocal_isolation\app.py", "vocal_isolation") 
 ]
 
 # Validate existence
@@ -71,5 +71,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    manifest=r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\BuildingFiles\Program.manifest",
+    manifest=r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\BuildingFiles\ProgramVideoEnancer.manifest",
 )

@@ -4,8 +4,12 @@ from activation_window import ActivationWindow
 from User_data_storage import get_user_data, set_user_data, Update_user_data
 from PIL import Image, ImageTk
 from File_path import resource_path
-
-
+import shutil
+import os 
+import tempfile
+import subprocess
+import psutil
+import time 
 class UserAccountFrame(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master, corner_radius=25, fg_color="#2C3E50")
@@ -170,33 +174,65 @@ class UserAccountFrame(ctk.CTkFrame):
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
+    # def run_enchancer(self):
+    #     from File_path import resource_path
+    #     import os
+    #     import subprocess
+    #     #VideoEnchancer_Folder = resource_path('VideoEnchancer.exe')
+    #     #video_enhancer_exe = os.path.join(VideoEnchancer_Folder, 'VideoEnchancer.exe')
+    #     video_enhancer_exe = resource_path('VideoEnchancer.exe')
+    #     logging.info(f"Resolved path to VideoEnhancer.exe: {video_enhancer_exe}")
+
+    #     if not os.path.exists(video_enhancer_exe):
+    #         logging.info(f"Error: The executable {video_enhancer_exe} does not exist.")
+    #         return
+
+    #     if not os.access(video_enhancer_exe, os.X_OK):
+    #         logging.error(f"No execute permission for {video_enhancer_exe}. Check file permissions.")
+    #         return
+
+    #     try:
+    #         result = subprocess.run([video_enhancer_exe], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    #         stdout = result.stdout.decode().strip()
+    #         stderr = result.stderr.decode().strip()
+    #         self.master.destroy()
+    #         logging.info(f"Successfully launched {video_enhancer_exe}, stderr: {stderr},stdout: {stdout}")
+    #     except subprocess.CalledProcessError as e:
+    #         logging.error(f"Error message: {e.stderr.decode().strip() if e.stderr else 'No error message'}")
+    #         logging.error(f"Failed to launch VideoEnchancer.exe: {str(e)}")
+    #         logging.error(f"Failed to launch VideoEnchancer.exe: from this path: {video_enhancer_exe} {str(e)}")
+    #     except Exception as e:
+    #         logging.error(f"Failed to launch VideoEnchancer.exe: from this path: {video_enhancer_exe} {str(e)}")
+
+ 
+ 
     def run_enchancer(self):
-        from File_path import resource_path
-        import os
-        import subprocess
-        #VideoEnchancer_Folder = resource_path('VideoEnchancer.exe')
-        #video_enhancer_exe = os.path.join(VideoEnchancer_Folder, 'VideoEnchancer.exe')
-        video_enhancer_exe = resource_path('VideoEnchancer.exe')
-        logging.info(f"Resolved path to VideoEnhancer.exe: {video_enhancer_exe}")
-
-        if not os.path.exists(video_enhancer_exe):
-            logging.info(f"Error: The executable {video_enhancer_exe} does not exist.")
-            return
-
-        if not os.access(video_enhancer_exe, os.X_OK):
-            logging.error(f"No execute permission for {video_enhancer_exe}. Check file permissions.")
-            return
+        def is_process_running(name):
+            for proc in psutil.process_iter(['name']):
+                if proc.info['name'] == name:
+                    return True
+            return False
 
         try:
-            self.master.destroy()
-            result = subprocess.run([video_enhancer_exe], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-            stdout = result.stdout.decode().strip()
-            stderr = result.stderr.decode().strip()
-            logging.info(f"Successfully launched {video_enhancer_exe}, stderr: {stderr},stdout: {stdout}")
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Error message: {e.stderr.decode().strip() if e.stderr else 'No error message'}")
+            src = resource_path("VideoEnchancer.exe")
+            temp_dir = tempfile.gettempdir()
+            temp_path = os.path.join(temp_dir, "VideoEnchancer.exe")
+            if not os.path.exists(temp_path):
+                logging.error(f"Copied file does not exist at {temp_path}")
+
+            logging.info(f"Copying VideoEnchancer.exe to temp dir: {temp_path}")
+            shutil.copyfile(src, temp_path)
+       
+            subprocess.Popen([temp_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1)
+            if  is_process_running("VideoEnchancer.exe"):
+                 self.master.destroy()
+                 logging.info("Launched VideoEnchancer.exe successfully")
+            else:
+                logging.error(f"error video enhancer did not start: {str(e)}")
+
         except Exception as e:
-            logging.error(f"Failed to launch VideoEnchancer.exe: {str(e)}")
+            logging.error(f"Failed to launch VideoEnchancer.exe: {e}")
 
     def hide_widgets(self):
         for widget in self.winfo_children():

@@ -117,7 +117,7 @@ def resource_path(relative_path):
             base_path = sys._MEIPASS
         else:
             base_path = os.path.abspath(os.path.dirname(__file__))
-
+        logging.info(f"All files at base path: {os.listdir(base_path)}")
         logging.info(f"Base Path for bundled files: {base_path}")
         logging.info(f"Bundled files and folders: {os.listdir(base_path)}")
 
