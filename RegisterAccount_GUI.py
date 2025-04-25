@@ -150,7 +150,7 @@ class RegistrationFrame(ctk.CTkFrame):
         Password = self.password_entry.get()
         Name = self.name_entry.get()
         status_message = register_user(Email, Password, Name)
-        print("REGISTRATION STATUS:", status_message)
+        logging.info("REGISTRATION STATUS:", status_message)
 
         if "success" in status_message.lower():
             self.status_label.configure(text="Registration successful. Please log in.")

@@ -49,15 +49,15 @@ def save_encrypted_token(channel_name, credentials):
     encrypted = fernet.encrypt(serialized)
 
     path = get_token_path(channel_name)
-    print(f"[DEBUG] Saving token to: {path}")
+    logging.info(f"[DEBUG] Saving token to: {path}")
     with open(path, "wb") as file:
         file.write(encrypted)
 
 def load_encrypted_token(channel_name):
     token_path = get_token_path(channel_name)
-    print(f"[DEBUG] Loading token from: {token_path}")
+    logging.info(f"[DEBUG] Loading token from: {token_path}")
     if not token_path.exists():
-        print(f"[ERROR] Token file not found: {token_path}")
+        logging.info(f"[ERROR] Token file not found: {token_path}")
 
         return None
 

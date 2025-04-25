@@ -214,20 +214,35 @@ class UserAccountFrame(ctk.CTkFrame):
             return False
 
         try:
-            src = resource_path("VideoEnchancer.exe")
             temp_dir = tempfile.gettempdir()
-            temp_path = os.path.join(temp_dir, "VideoEnchancer.exe")
-            if not os.path.exists(temp_path):
-                logging.error(f"Copied file does not exist at {temp_path}")
+            dest_model = os.path.join(tempfile.gettempdir(), "local_model")
+            dest_encancer = os.path.join(temp_dir, "VideoEnchancer.exe")
+            logging.info(f"temp directory: {temp_dir}, local_model: {dest_model}, videoencancer.exe: {dest_encancer}")
 
-            logging.info(f"Copying VideoEnchancer.exe to temp dir: {temp_path}")
-            shutil.copyfile(src, temp_path)
+
+            src_model = resource_path("local_model")
+            if not os.path.exists(dest_model):
+                shutil.copytree(src_model,dest_model)
+            logging.info(f"Copied local_model to temp dir: {dest_model}")
+
+            src = resource_path("VideoEnchancer.exe")
+            if not os.path.exists(dest_encancer):
+                logging.error(f"Copied file does not exist at {dest_encancer}")
+
+            logging.info(f"Copying VideoEnchancer.exe to temp dir: {dest_encancer}")
+            shutil.copyfile(src, dest_encancer)
        
-            subprocess.Popen([temp_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            time.sleep(1)
+            subprocess.Popen([dest_encancer],
+                              stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL,
+                              creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                              )
+                            
+            time.sleep(3)
             if  is_process_running("VideoEnchancer.exe"):
-                 self.master.destroy()
+                 import sys
                  logging.info("Launched VideoEnchancer.exe successfully")
+                 sys.exit(0)
             else:
                 logging.error(f"error video enhancer did not start: {str(e)}")
 

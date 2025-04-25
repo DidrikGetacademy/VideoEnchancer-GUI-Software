@@ -6,7 +6,7 @@ from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool,  GoogleSearchTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool
+from smolagents import CodeAgent, FinalAnswerTool,  GoogleSearchTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool,tools, PythonInterpreterTool
 import yaml
 from tkinter import filedialog
 import os
@@ -229,37 +229,20 @@ if CPU_ONLY:
     FRAMES_FOR_CPU = 5
 
 
-# def load_model_background():
-#     device, dtype = check_hardware()
-
-#     print(f"🧠 Loading model on {device} using dtype: {dtype}")
-
-
-#     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-#     gc.collect()
-#     if torch.cuda.is_available():
-#         torch.cuda.empty_cache()
-
-    
-#     global Global_offline_model
-#     model_path = find_by_relative_path("./local_model/")
-#     Global_offline_model = TransformersModel(model_path, device_map=device, torch_dtype=dtype, trust_remote_code=True, max_new_tokens=2048,    local_files_only=True)
-#     print("✅ Model loaded successfully in the background!")
 def load_model_background():
-    device, dtype = check_hardware()
-    print(f"🧠 Loading model on {device} using dtype: {dtype}")
-
-    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+    device, dtype = check_hardware()
+    logging.info(f"🧠 Loading model on {device} using dtype: {dtype}")
+
 
     global Global_offline_model
 
-    
+
     try:
-        model_path = os_path_abspath(find_by_relative_path("./local_model/"))
-        print(f"🔍 Attempt 1 - model path: {model_path}")
+        model_path = find_by_relative_path("./local_model/")
+        logging.info(f"🔍 .exe dir path: {model_path}")
         Global_offline_model = TransformersModel(
             model_path,
             device_map=device,
@@ -267,37 +250,25 @@ def load_model_background():
             trust_remote_code=True,
             max_new_tokens=2048,
             local_files_only=True
+
         )
-        print("✅ Model loaded successfully from find_by_relative_path!")
+        logging.info("✅ Model loaded successfully from executable location!")
+        logging.info("✅ Model loaded successfully from executable location!")
         return
+    except Exception as e3:
+        logging.info(f"❌ All model loading attempts failed: {e3}")
+    logging.info(f"💻 Final device_map: {dtype}")
+    logging.info(f"📐 Selected torch_dtype: {dtype if dtype else dtype}")
+    logging.info(f"📦 Model loading from: {Global_offline_model}")
+    print(f"💻 Final device_map: {device}")
+    print(f"📐 Selected torch_dtype: {dtype if dtype else dtype}")
+    print(f"📦 Model loading from: {Global_offline_model}")
 
-    except Exception as e1:
-        print(f"⚠️ Attempt 1 failed: {e1}")
-
-
-    try:
-        raw_path = find_by_relative_path("local_model")
-        model_path = os.path.normpath(os.path.abspath(raw_path))
-        print(f"🔍 Attempt 2 - normalized path: {model_path}")
-        Global_offline_model = TransformersModel(
-            model_path,
-            device_map=device,
-            torch_dtype=dtype,
-            trust_remote_code=True,
-            max_new_tokens=2048,
-            local_files_only=True
-        )
-        print("✅ Model loaded successfully from normalized path!")
-        return
-
-    except Exception as e2:
-        print(f"⚠️ Attempt 2 failed: {e2}")
-
- 
     try:
         model_path = os.path.join(os.path.dirname(sys.executable), "local_model")
-        print(f"🔍 Attempt 3 - .exe dir path: {model_path}")
-        Global_offline_model = TransformersModel(
+        logging.info(f"🔍 .exe dir path: {model_path}")
+        print(f"🔍 - .exe dir path: {model_path}")
+        Global_offline_model = TransformersModel( ###error --> endret noe i transformers libary/smolagents libary for å kjøre modell loakt uten problemer. husker ikke hva konkret jeg endret. har uninstallert og installert transformers på nytt etter pakking av exe............................................
             model_path,
             device_map=device,
             torch_dtype=dtype,
@@ -305,11 +276,15 @@ def load_model_background():
             max_new_tokens=2048,
             local_files_only=True
         )
+        logging.info("✅ Model loaded successfully from executable location!")
+        print("✅ Model loaded successfully from executable location!")
         print("✅ Model loaded successfully from executable location!")
         return
-
+    
     except Exception as e3:
-        print(f"❌ All model loading attempts failed: {e3}")
+        logging.info(f"❌ All model loading attempts failed: {e3}")
+
+
 
 import onnxruntime as ort
 model_loading_lock = threading.Lock()
@@ -324,7 +299,6 @@ DOCUMENT_PATH        = os_path_join(os_path_expanduser('~'), 'Documents')
 USER_PREFERENCE_PATH = find_by_relative_path(f"{DOCUMENT_PATH}{os_separator}{app_name}_UserPreference.json")
 FFMPEG_EXE_PATH      = find_by_relative_path(f"Assets{os_separator}ffmpeg.exe")
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "video_codec;h264_cuvid"
-#os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "video_codec;h264"
 EXIFTOOL_EXE_PATH    = find_by_relative_path(f"Assets{os_separator}exiftool.exe")
 FRAMES_FOR_CPU       = 30
 if 'CUDAExecutionProvider' not in ort.get_available_providers():
@@ -332,11 +306,11 @@ if 'CUDAExecutionProvider' not in ort.get_available_providers():
 
 
 if os_path_exists(FFMPEG_EXE_PATH): 
-    print(f"[{app_name}] External ffmpeg.exe file found")
+    logging.info(f"[{app_name}] External ffmpeg.exe file found")
     os_environ["IMAGEIO_FFMPEG_EXE"] = FFMPEG_EXE_PATH
 
 if os_path_exists(USER_PREFERENCE_PATH):
-    print(f"[{app_name}] Preference file exist")
+    logging.info(f"[{app_name}] Preference file exist")
     with open(USER_PREFERENCE_PATH, "r") as json_file:
         json_data = json_load(json_file)
         default_AI_model          = json_data["default_AI_model"]
@@ -350,7 +324,7 @@ if os_path_exists(USER_PREFERENCE_PATH):
         default_resize_factor     = json_data["default_resize_factor"]
         default_VRAM_limiter      = json_data["default_VRAM_limiter"]
 else:
-    print(f"[{app_name}] Preference file does not exist, using default coded value")
+    logging.info(f"[{app_name}] Preference file does not exist, using default coded value")
     default_AI_model          = AI_models_list[0]
     default_AI_multithreading = max(1, int(os_cpu_count() // 2))
     default_gpu               = get_gpu_vram()
@@ -566,14 +540,12 @@ class Agent_GUI():
     def load_llama_instruct(self, uploaded_file=None):
         load_dotenv()
 
-        self.model = Global_offline_model
+
+        uploaded_file = self.file_menu_var.get()
 
         prompts = find_by_relative_path(f"Assets{os_separator}prompts.yaml")
         with open(prompts, 'r') as stream:
             prompt_templates = yaml.safe_load(stream)
-
-        uploaded_file = self.file_menu_var.get()
-
 
         if uploaded_file: 
                 file_extension = os.path.splitext(uploaded_file)[1].lower()
@@ -603,11 +575,11 @@ class Agent_GUI():
                 Returns:
                     str:  the path to the extracted audio file.
             """
-            audio_path = "temp_audio.wav"
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "video_codec;h264"
             audio_path = "temp_audio.wav"
             command = [
                 "ffmpeg",
-                "-y",  #
+                "-y",  
                 "-i", video_path,
                 "-ac", "1", 
                 "-ar", "16000",  
@@ -646,7 +618,7 @@ class Agent_GUI():
             self.chat_display.config(state=tk.DISABLED)
             self.chat_display.see(tk.END)
 
-            print(f"[{stage.upper()}] {log_entry['timestamp']}: {message}")
+            logging.info(f"[{stage.upper()}] {log_entry['timestamp']}: {message}")
             return "Log recorded successfully."
 
 
@@ -688,7 +660,7 @@ class Agent_GUI():
         uploaded_file_name = self.file_menu_var.get()
         Video_path = next((f for f in self.uploaded_files if os_path_basename(f) == uploaded_file_name), None)
         if not Video_path:
-            print("Error: File not found!")
+            logging.info("Error: File not found!")
             self.chat_display.config(state=tk.NORMAL)
             self.chat_display.insert(tk.END, "Not a valid file path" + "\n")
             self.chat_display.config(state=tk.DISABLED)  
@@ -713,6 +685,7 @@ class Agent_GUI():
             }       
 
 
+       #didrik
         manager_agent  = CodeAgent(
             model=self.model,
             tools=[
@@ -720,6 +693,7 @@ class Agent_GUI():
                 SpeechToTextTool(),
                 VisitWebpageTool(),
                 GoogleSearchTool(),
+                PythonInterpreterTool(),
                 ExtractAudioFromVideo,
                 Fetch_top_trending_youtube_videos,
                 Log_Agent_Progress
@@ -727,10 +701,10 @@ class Agent_GUI():
             max_steps=10,
             verbosity_level=1,
             prompt_templates=prompt_templates,
-            add_base_tools=True
+
         )
 
-        Response = manager_agent .run(
+        Response = manager_agent.run(
             task=user_task,
             additional_args=context_vars
         )
@@ -738,9 +712,9 @@ class Agent_GUI():
         try:
             if os.path.exists("temp_audio.wav"):
                 os.remove("temp_audio.wav")
-                print("🗑️ temp_audio.wav deleted successfully.")
+                logging.info("🗑️ temp_audio.wav deleted successfully.")
         except Exception as e:
-            print(f"⚠️ Error deleting temp audio: {e}")
+            logging.info(f"⚠️ Error deleting temp audio: {e}")
 
         self.chat_display.config(state=tk.NORMAL)
         self.chat_display.insert(tk.END, "2. 🌍 The AI agent is searching for similar videos and trending content...\n")
@@ -964,10 +938,10 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
     def get_saved_channels(self):
             from File_path import app_data_path
             token_dir = app_data_path / "youtube_tokens"
-            print(f"[DEBUG] Looking for tokens in: {token_dir}")
+            logging.info(f"[DEBUG] Looking for tokens in: {token_dir}")
 
             if not token_dir.exists():
-                print("[DEBUG] Token dir does not exist")
+                logging.info("[DEBUG] Token dir does not exist")
                 return []
 
             tokens = []
@@ -976,7 +950,7 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
                 name = file.name.replace(".pickle.enc", "")
                 tokens.append(name)
 
-            print(f"[DEBUG] Cleaned token names: {tokens}")
+            logging.info(f"[DEBUG] Cleaned token names: {tokens}")
             return tokens
 
 
@@ -988,7 +962,7 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
 
             channel_response = youtube.channels().list(part="snippet", mine=True).execute()
             channel_title = channel_response["items"][0]["snippet"]["title"]
-            print(f"📺 Authenticated YouTube Channel: {channel_title}")
+            logging.info(f"📺 Authenticated YouTube Channel: {channel_title}")
             self.channel_label.configure(text=f"Channel: {channel_title}")
 
     def Upload_to_platform(self):
@@ -1001,7 +975,7 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
             elif platform == "Instagram":
                 return
             else:
-                print("⚠️ No valid platform selected.")
+                logging.info("⚠️ No valid platform selected.")
                 return
           
 
@@ -1032,9 +1006,9 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
 
                     status_config["privacyStatus"] = "private"
                     status_config["publishAt"] = publish_at
-                    print(f"📅 Scheduled for: {publish_at}")
+                    logging.info(f"📅 Scheduled for: {publish_at}")
                 except Exception as e:
-                    print("❌ Invalid date/time format:", e)
+                    logging.info("❌ Invalid date/time format:", e)
                     return
 
             if not self.credentials:
@@ -1064,9 +1038,9 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
             channel_response = youtube.channels().list(part="snippet", mine=True).execute()
             channel_title = channel_response["items"][0]["snippet"]["title"]
 
-            print("✅ Upload successful!")
-            print(f"📺 Uploaded to: {channel_title}")
-            print(f"🔗 Video URL: https://youtu.be/{response['id']}")
+            logging.info("✅ Upload successful!")
+            logging.info(f"📺 Uploaded to: {channel_title}")
+            logging.info(f"🔗 Video URL: https://youtu.be/{response['id']}")
             self.channel_label.configure(text=f"Uploaded to: {channel_title}")
 
 
@@ -1077,10 +1051,10 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
             if credentials:
                 self.credentials = credentials
                 self.channel_label.configure(text=f"Loaded: {channel_name}")
-                print(f"✅ Loaded token for {channel_name}")
+                logging.info(f"✅ Loaded token for {channel_name}")
             else:
                 self.channel_label.configure(text=f"❌ Failed to load: {channel_name}")
-                print(f"⚠️ Failed to load token for {channel_name}")
+                logging.info(f"⚠️ Failed to load token for {channel_name}")
 
     def authenticate(self):
             import google_auth_oauthlib.flow
@@ -1466,9 +1440,9 @@ def delete_cookie_file_and_reset_button():
             corruptedcookiefile_path = str(COOKIE_PATH_FILE)
             os.remove(corruptedcookiefile_path)
             cookie_file_path = None
-            print(f"Cookie file {COOKIE_PATH_FILE} deleted successfully.")
+            logging.info(f"Cookie file {COOKIE_PATH_FILE} deleted successfully.")
         except Exception as e:
-            print(f"Error deleting cookie file: {e}")
+            logging.info(f"Error deleting cookie file: {e}")
     upload_button.place(relx=0.12, rely=0.94, anchor="e")
 
 
@@ -1478,13 +1452,13 @@ def load_cookie_file_path():
     try:
         if COOKIE_PATH_FILE.exists():
             cookie_file_path = str(COOKIE_PATH_FILE)
-            print(f"Cookie file path exsist at: {cookie_file_path}")
+            logging.info(f"Cookie file path exsist at: {cookie_file_path}")
         else:
             cookie_file_path = None
-            print(f"cookie file path is None cause it does not exists.")
+            logging.info(f"cookie file path is None cause it does not exists.")
     except Exception as e:        
         cookie_file_path = None
-        print(f"Error exception cookie file path is None ")
+        logging.info(f"Error exception cookie file path is None ")
 
 
 def update_cookie_timestamps(file_path):
@@ -1514,7 +1488,7 @@ def update_cookie_timestamps(file_path):
     with open(updated_path, "w", encoding="utf-8") as f:
         f.write("\n".join(updated_lines))
 
-    print(f"Updated cookie file saved at: {updated_path}")
+    logging.info(f"Updated cookie file saved at: {updated_path}")
     return updated_path
 
 
@@ -1543,9 +1517,9 @@ def upload_cookie_file():
            
 
         except Exception as e:
-            print(f"Error saving cookie file: {e}")
+            logging.info(f"Error saving cookie file: {e}")
     else: 
-        print("No file selected")
+        logging.info("No file selected")
 
 
 
@@ -1588,10 +1562,10 @@ def get_available_formats(youtube_url):
         ydl_opts_backup["cookiefile"] = cookie_file_path
         ydl_opts_fallback["cookiefile"] = cookie_file_path
     if not cookie_file_path:
-        print("Cookie file path is None/Empty")
+        logging.info("Cookie file path is None/Empty")
         return
 
-    print(f"cookie_file_path when getting available format: {cookie_file_path}")
+    logging.info(f"cookie_file_path when getting available format: {cookie_file_path}")
 
     def try_fetching_format(ydl_opts_variable):
                 with yt_dlp.YoutubeDL(ydl_opts_variable) as ydl:
@@ -1615,22 +1589,22 @@ def get_available_formats(youtube_url):
             return video_formats, audio_formats
     
     except yt_dlp.utils.DownloadError as e:
-        print(f"Error fetching formats: {e}")
+        logging.info(f"Error fetching formats: {e}")
         if "cookie" in str(e).lower() or "sign in" in str(e).lower() or "403" in str(e):
-                print("⚠️ Cookie file seems broken or expired. Resetting...")
+                logging.info("⚠️ Cookie file seems broken or expired. Resetting...")
                 delete_cookie_file_and_reset_button()
         backup = True
         try:
-            print("⚙️ Switching to backup method...")
+            logging.info("⚙️ Switching to backup method...")
             video_formats, audio_formats = try_fetching_format(ydl_opts_backup)
 
         except yt_dlp.utils.DownloadError as e:
             if "cookie" in str(e).lower() or "sign in" in str(e).lower() or "403" in str(e):
-                print("⚠️ Cookie file seems broken or expired. Resetting...")
+                logging.info("⚠️ Cookie file seems broken or expired. Resetting...")
                 delete_cookie_file_and_reset_button()
                 return [], []
-            print(f"❌ Backup method failed: {e}")
-            print("🛠️ Trying final fallback method (force_generic_extractor)...")
+            logging.info(f"❌ Backup method failed: {e}")
+            logging.info("🛠️ Trying final fallback method (force_generic_extractor)...")
 
         try:
             video_formats, audio_formats = try_fetching_format(ydl_opts_fallback)
@@ -1642,10 +1616,10 @@ def get_available_formats(youtube_url):
             return video_formats, audio_formats
 
         except Exception as e:
-            print(f"❌ Final fallback failed: {e}")
+            logging.info(f"❌ Final fallback failed: {e}")
 
             if "cookie" in str(e).lower() or "sign in" in str(e).lower() or "403" in str(e):
-                print("⚠️ Cookie file seems broken or expired. Resetting...")
+                logging.info("⚠️ Cookie file seems broken or expired. Resetting...")
                 delete_cookie_file_and_reset_button()
                 return [], []
             return ["error"], ["error"]
@@ -1675,7 +1649,7 @@ def download_youtube_link(youtube_url,output_path, progress_callback=None):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
              ydl.download([youtube_url])
-        return "Download Complete!"
+        return "Download Complete!"  and stop_youtube_download_btn.pack_forget()
     except yt_dlp.utils.DownloadError as e:
         return f"Error: {str(e)}"
     
@@ -1850,7 +1824,7 @@ class LR_Agent_Automation:
 
     def __init__(self, parent_container):
         self.parent_container = parent_container
-        self.model = Global_offline_model
+       #self.LR_Agent_Automation_model = Global_offline_model
       
         
         self.should_stop = False
@@ -2049,7 +2023,7 @@ class LR_Agent_Automation:
             try:
                 prompts = find_by_relative_path(f"Assets{os_separator}prompts_video_creator.yaml")
                 with open(prompts, 'r') as stream:
-                    prompt_templates = yaml.safe_load(stream)
+                     prompt = yaml.safe_load(stream)
 
                 user_task = """Your goal is to create a video based on the specified topic and parameters.
 
@@ -2071,8 +2045,8 @@ class LR_Agent_Automation:
                             "media_type": self.media_type_var.get()
                             }
                 
-                manager_agent  = CodeAgent(
-                    model=self.model,
+                AutoMation_agent  = CodeAgent(
+                    model=self.LR_Agent_Automation_model,
                     tools=[
                         FinalAnswerTool(), 
                         SpeechToTextTool(),
@@ -2083,11 +2057,11 @@ class LR_Agent_Automation:
                     ], 
                     max_steps=10,
                     verbosity_level=1,
-                    prompt_templates=prompt_templates,
+                    prompt_templates=prompt,
                     add_base_tools=True
                 )
 
-                self.manager_agent = manager_agent
+                self.manager_agent = AutoMation_agent
                 self.user_task = user_task
                 self.context_var = self.context_var
 
@@ -2109,7 +2083,7 @@ class LR_Agent_Automation:
                 self.chat_display.config(state=tk.DISABLED)
                 self.chat_display.see(tk.END)
             except Exception as e:
-                    print("❌ Error in run_single_video_task:", e)
+                    logging.info("❌ Error in run_single_video_task:", e)
 
 
 
@@ -2117,7 +2091,7 @@ class LR_Agent_Automation:
             try:
                 amount = int(self.video_amount_var.get())
             except ValueError:
-                print("invalid video amount entered")
+                logging.info("invalid video amount entered")
                 return
             
             for i in range(amount):
@@ -2128,12 +2102,6 @@ class LR_Agent_Automation:
 
     def run_agent(self):   
      
-
-
-                
- 
-
-
         self.RunForever = Thread(target=self.run_agent_loop(),daemon=True)
         self.RunForever.start()
 
@@ -2160,6 +2128,12 @@ class ColorRestorer:
             corner_radius=10
         )
         self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+
+        #upload files/images
+        #Run model
+        #Output Colorized image 
+        #Took files from a huggingface, files is in C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Old_photos__colorizing
 
 
 
@@ -2301,19 +2275,19 @@ class MediaInfoAnalyst:
         """
         Retrieves detailed metadata for the selected video file using ffmpeg.
         """
-        print("[DEBUG] Fetch button clicked")
+        logging.info("[DEBUG] Fetch button clicked")
 
         selected_file = self.file_menu_var.get()
         file_path = self.truncated_to_full.get(selected_file)
-        print(f"[DEBUG] Selected file: {selected_file}")
-        print(f"[DEBUG] Full path: {file_path}")
+        logging.info(f"[DEBUG] Selected file: {selected_file}")
+        logging.info(f"[DEBUG] Full path: {file_path}")
 
         self.details_text.configure(state="normal")
         self.details_text.delete("1.0", END)
 
         if file_path:
             details = get_ffmpeg_details(file_path)
-            print(f"[DEBUG] Raw details returned:\n{details}")
+            logging.info(f"[DEBUG] Raw details returned:\n{details}")
 
             if not details:
                 self.details_text.insert(END, "No data received from ffmpeg.")
@@ -2502,7 +2476,7 @@ class ToolWindowClass:
 ####VIDEO PREVIEW CLASS######
 class VideoPreview:
     def __init__(self, parent_container, original_label, upscaled_label, video_path):
-        print("Initializing VideoPreview...")
+        logging.info("Initializing VideoPreview...")
         self.parent_container = parent_container
         self.original_label = original_label
         self.upscaled_label = upscaled_label
@@ -2537,7 +2511,7 @@ class VideoPreview:
         
         
         self.update_frame_preview(0)
-        print("VideoPreview initialized successfully.")
+        logging.info("VideoPreview initialized successfully.")
         if self.total_frames <= 1: 
             self.timeline_slider.pack_forget()
             self.timeline_slider.configure(state='disabled')
@@ -2601,7 +2575,7 @@ class VideoPreview:
     
 
     def switch_view_mode(self, mode):
-        print(f"Switched to {mode} view mode.")
+        logging.info(f"Switched to {mode} view mode.")
         self.upscaled_label.pack_forget()
 
         if mode == "side_by_side":
@@ -2643,7 +2617,7 @@ class VideoPreview:
         self.upscaled_label.update_idletasks()
 
         self.timeline_slider.configure(state='normal')
-        print("Side by side frame updated successfully!")
+        logging.info("Side by side frame updated successfully!")
 
     def update_gui(self, original_frame, upscaled_frame):
 
@@ -2658,7 +2632,7 @@ class VideoPreview:
       
 
     def update_frame_preview(self, frame_number):
-        print(f"Updating frame preview for frame {frame_number}...")
+        logging.info(f"Updating frame preview for frame {frame_number}...")
         self.timeline_slider.configure(state='disabled')   
 
         self.loading_icon = LoadingIcon(self.parent_container)
@@ -2668,40 +2642,40 @@ class VideoPreview:
 
     def process_and_update_frame(self, frame_number):
         try:
-            print(f"Processing frame {frame_number}...")
+            logging.info(f"Processing frame {frame_number}...")
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_number))
             
    
             if frame_number in frame_cache:
                 self.loading_icon.stop()
-                print(f"Frame {frame_number} loaded from cache.")
+                logging.info(f"Frame {frame_number} loaded from cache.")
                 original_frame, upscaled_frame = frame_cache[frame_number]
             else:
                 success, frame = self.cap.read()
                 if success:
-                    print(f"Frame {frame_number} read successfully from video.")
+                    logging.info(f"Frame {frame_number} read successfully from video.")
                     
                
                     original_frame = cv2.resize(frame, self.target_size, interpolation=cv2.INTER_AREA)
                     upscaled_frame = self.process_frame(original_frame)  
                     frame_cache[frame_number] = (original_frame, upscaled_frame)
-                    print(f"Frame {frame_number} processed and added to cache.")
+                    logging.info(f"Frame {frame_number} processed and added to cache.")
                 else:
-                    print(f"Failed to read frame {frame_number} from video.")
+                    logging.info(f"Failed to read frame {frame_number} from video.")
                     return 
             
             
             self.parent_container.after(0, lambda: self.update_gui(original_frame, upscaled_frame))
             self.parent_container.after(0, self.loading_icon.stop)
-            print(f"Stopped loading animation for frame {frame_number}.")
+            logging.info(f"Stopped loading animation for frame {frame_number}.")
 
         except Exception as e:
-            print(f"Error processing frame {frame_number}: {str(e)}")
+            logging.info(f"Error processing frame {frame_number}: {str(e)}")
             self.loading_icon.stop()
 
     def process_frame(self, frame):
         global preview_ai_instance, last_model_config
-        print("Processing frame with AI model...")
+        logging.info("Processing frame with AI model...")
         
         if not selected_AI_model or selected_AI_model == AI_LIST_SEPARATOR[0]:
             show_error_message("Select an AI model first!")
@@ -2723,7 +2697,7 @@ class VideoPreview:
         return CTkImage(pil_image, size=(preview_width, preview_height))  
 
     def close(self):
-        print("Releasing video capture and destroying slider...")
+        logging.info("Releasing video capture and destroying slider...")
         self.cap.release()
         self.timeline_slider.destroy()
 
@@ -2736,14 +2710,14 @@ class VideoPreview:
 ####VIDEO PREVIEW EXTERNAL FUNCTIONS######
 def load_model_inference():
     global preview_ai_instance, last_model_config
-    print(f" preview_ai_instance: {preview_ai_instance},last model config: {last_model_config} ")
+    logging.info(f" preview_ai_instance: {preview_ai_instance},last model config: {last_model_config} ")
     if not selected_AI_model or selected_AI_model == AI_LIST_SEPARATOR[0]:
-        print("Select an AI model first!")
+        logging.info("Select an AI model first!")
         return
     try:
         resolution_percentage = float(selected_input_resize_factor.get())
         if not 1 <= resolution_percentage <= 100:
-            print("Resolution must be between 1% and 100%")
+            logging.info("Resolution must be between 1% and 100%")
             return
 
         resize_factor = float(resolution_percentage / 100.0)  
@@ -2784,16 +2758,19 @@ def load_model_inference():
                 dummy_width = max(64, int(512 * resize_factor))
                 dummy_input = np.random.randint(0, 255, (dummy_height, dummy_width, 3), dtype=np.uint8)
 
-                print(f"Dummy input shape: {dummy_input.shape}")
+                logging.info(f"Dummy input shape: {dummy_input.shape}")
+                logging.info(f"Dummy input shape: {dummy_input.shape}")
                 _ = preview_ai_instance.AI_orchestration(dummy_input)
                 last_model_config = current_config
-                print("Dummy inference complete")
+                logging.info("Dummy inference complete")
+                logging.info("Dummy inference complete")
                 gc.collect()
                 torch.cuda.empty_cache()
                 
     except Exception as e:
-        print(f"Error loading model with dummy input: {str(e)}")
-        print("Dummy inference ERROR")
+        logging.info(f"Error loading model with dummy input: {str(e)}")
+        logging.info(f"Error loading model with dummy input: {str(e)}")
+        logging.info("Dummy inference ERROR")
 
 
 
@@ -2803,14 +2780,14 @@ def load_model_inference():
 
 def load_model_if_needed(model_name):
     global preview_ai_instance, current_loaded_model
-    print(f"Loading model if needed: {model_name}...")
+    logging.info(f"Loading model if needed: {model_name}...")
     with model_loading_lock:
         if current_loaded_model == model_name:
-            print(f"Model {model_name} already loaded.")
+            logging.info(f"Model {model_name} already loaded.")
             return 
         
         try:
-            print(f"Loading {model_name} model...")
+            logging.info(f"Loading {model_name} model...")
             info_message.set(f"Loading {model_name} model...")
 
      
@@ -2830,9 +2807,11 @@ def load_model_if_needed(model_name):
 
             current_loaded_model = model_name
             info_message.set(f"Model: {model_name} Ready!")
-            print(f"{model_name} loaded successfully.")
+            logging.info(f"Model: {model_name} Ready!")
+            logging.info(f"{model_name} loaded successfully.")
         except Exception as e:
-            print(f"Error loading model {model_name}: {str(e)}")
+            logging.info(f"Error loading model {model_name}: {str(e)}")
+            logging.info(f"Error loading model {model_name}: {str(e)}")
             info_message.set(f"Model load failed: {str(e)}")
             current_loaded_model = None
             preview_ai_instance = None
@@ -2875,13 +2854,13 @@ class LoadingIcon:
 
     def start(self):
         self.animating = True
-        print("Started loading animation")
+        logging.info("Started loading animation")
         self.animate()
 
     def stop(self):
         self.animating = False
         self.label.destroy()
-        print("Stopped loading animation")
+        logging.info("Stopped loading animation")
     
     def animate(self):
         if self.animating:
@@ -2965,7 +2944,7 @@ def place_loadFile_section(window):
 
 def select_AI_from_menu(selected_option: str) -> None:
     global selected_AI_model, current_loaded_model, model_loading_thread
-    print(f"AI model selected: {selected_option}")
+    logging.info(f"AI model selected: {selected_option}")
     
     if selected_option == current_loaded_model or selected_option in AI_LIST_SEPARATOR:
         return
@@ -3062,17 +3041,17 @@ class AI:
                 sess_options=session_options
             )
         except Exception as e:
-            print(f"Session creation failed: {str(e)}")
+            logging.info(f"Session creation failed: {str(e)}")
 
             inference_session = onnxruntime_inferenceSession(
                 path_or_bytes=self.AI_model_path,
                 providers=['CPUExecutionProvider']
             )
         
-        print(f"Using providers: {inference_session.get_providers()}")
+        logging.info(f"Using providers: {inference_session.get_providers()}")
         if 'CUDAExecutionProvider' in inference_session.get_providers():
             options = inference_session.get_provider_options()['CUDAExecutionProvider']
-            print(f"CUDA device ID: {options.get('device_id', 'default')}")
+            logging.info(f"CUDA device ID: {options.get('device_id', 'default')}")
 
         return inference_session
 
@@ -3097,7 +3076,7 @@ class AI:
                 sess_options=session_options
             )
         except Exception as e:
-            print(f"[AudioSession Error] {e}")
+            logging.info(f"[AudioSession Error] {e}")
             return ort.InferenceSession(
                 path_or_bytes=self.audio_model_path,
                 providers=['CPUExecutionProvider']
@@ -3117,7 +3096,7 @@ class AI:
             audio_output_path   # Output path
         ]       
         subprocess_run(command, check=True)
-        print(f"Returning audio_output_path for extracted audio at: {audio_output_path}")
+        logging.info(f"Returning audio_output_path for extracted audio at: {audio_output_path}")
         return audio_output_path
      
 
@@ -3135,7 +3114,7 @@ class AI:
     
         isolated_output_path = audio_file_path.replace("extracted_audio", "isolated_audio")
         sf.write(isolated_output_path, vocals_array.T, samplerate)
-        print(f"isolated audio saved at {isolated_output_path}")
+        logging.info(f"isolated audio saved at {isolated_output_path}")
         return isolated_output_path
     
 
@@ -3192,7 +3171,7 @@ class AI:
 
                 return Enchanced_audiofile
             except Exception as e:
-                print(f"Audio inference vocal isolation failed: {str(e)}")
+                logging.info(f"Audio inference vocal isolation failed: {str(e)}")
                 return None
             
         elif selected_audio_mode == "Audio Denoise":
@@ -3200,10 +3179,10 @@ class AI:
                 Denoised_audio = self.run_audio_denoise(video_path)
                 return Denoised_audio
             except Exception as e:
-                print(f"Audio inference audio denoise failed: {str(e)}")
+                logging.info(f"Audio inference audio denoise failed: {str(e)}")
                 return
         else: 
-            print("Normal audio returning None")
+            logging.info("Normal audio returning None")
             return None
    
     
@@ -3285,7 +3264,7 @@ class AI:
 
         frames_simultaneously = max_supported_pixels // image_pixels 
 
-        print(f" Frames supported simultaneously by GPU: {frames_simultaneously}")
+        logging.info(f" Frames supported simultaneously by GPU: {frames_simultaneously}")
 
         return frames_simultaneously
 
@@ -3421,7 +3400,6 @@ class AI:
     def onnxruntime_inference(self, image: numpy_ndarray) -> numpy_ndarray:
 
         # IO BINDING
-        
         # io_binding = self.inferenceSession.io_binding()
         # io_binding.bind_cpu_input(self.inferenceSession.get_inputs()[0].name, image)
         # io_binding.bind_output(self.inferenceSession.get_outputs()[0].name, element_type = float32)
@@ -4477,7 +4455,7 @@ def video_encoding(
         if os_path_exists(no_audio_path):
             os_remove(no_audio_path)
     except Exception as e:
-        print(f"Error during video encoding: {e}")
+        logging.info(f"Error during video encoding: {e}")
         pass
 
     if Audio_Inference_output:
@@ -4485,14 +4463,14 @@ def video_encoding(
             if os_path_exists(Audio_Inference_output):
                 os_remove(Audio_Inference_output)
         except Exception as e:
-            print(f"error during removal of audio {str(e)}")
+            logging.info(f"error during removal of audio {str(e)}")
 
     extracted_audio = os_path_join(os.path.dirname(video_path), "extracted_audio.wav") 
     if os_path_exists(extracted_audio):
         try:
             os_remove(extracted_audio)
         except Exception as e:
-            print(f"warning could not delete extracted audio {extracted_audio}, might have been moved: {str(e)}")
+            logging.info(f"warning could not delete extracted audio {extracted_audio}, might have been moved: {str(e)}")
     
 def check_video_upscaling_resume(
         target_directory: str, 
@@ -4730,7 +4708,7 @@ def write_process_status(
         step: str
         ) -> None:
     
-    print(f"{step}")
+    logging.info(f"{step}")
     while not processing_queue.empty(): processing_queue.get()
     processing_queue.put(f"{step}")
 
@@ -4767,22 +4745,22 @@ def upscale_button_command() -> None:
     if user_input_checks():
         info_message.set("Loading")
 
-        print("=" * 50)
-        print("> Starting upscale:")
-        print(f"  Files to upscale: {len(selected_file_list)}")
-        print(f"  Output path: {(selected_output_path.get())}")
-        print(f"  Selected AI model: {selected_AI_model}")
-        print(f"  Selected GPU: {selected_gpu}")
-        print(f"  AI multithreading: {selected_AI_multithreading}")
-        print(f"  Interpolation factor: {selected_interpolation_factor}")
-        print(f"  Selected image output extension: {selected_image_extension}")
-        print(f"  Selected video output extension: {selected_video_extension}")
-        print(f"  Tiles resolution for selected GPU VRAM: {tiles_resolution}x{tiles_resolution}px")
-        print(f"  input_resize_factor: {int(input_resize_factor * 100)}%")
-        print(f"  Cpu number: {cpu_number}")
-        print(f" Save frames: {selected_keep_frames}")
-        print(f" selected_audio_mode : {selected_audio_mode}")
-        print("=" * 50)
+        logging.info("=" * 50)
+        logging.info("> Starting upscale:")
+        logging.info(f"  Files to upscale: {len(selected_file_list)}")
+        logging.info(f"  Output path: {(selected_output_path.get())}")
+        logging.info(f"  Selected AI model: {selected_AI_model}")
+        logging.info(f"  Selected GPU: {selected_gpu}")
+        logging.info(f"  AI multithreading: {selected_AI_multithreading}")
+        logging.info(f"  Interpolation factor: {selected_interpolation_factor}")
+        logging.info(f"  Selected image output extension: {selected_image_extension}")
+        logging.info(f"  Selected video output extension: {selected_video_extension}")
+        logging.info(f"  Tiles resolution for selected GPU VRAM: {tiles_resolution}x{tiles_resolution}px")
+        logging.info(f"  input_resize_factor: {int(input_resize_factor * 100)}%")
+        logging.info(f"  Cpu number: {cpu_number}")
+        logging.info(f" Save frames: {selected_keep_frames}")
+        logging.info(f" selected_audio_mode : {selected_audio_mode}")
+        logging.info("=" * 50)
 
         place_stop_button()
 
@@ -4954,7 +4932,7 @@ def upscale_video(
     
     Audio_Inference_output = AI_instance.process_Audio_Inference(video_path,selected_audio_mode) 
     if Audio_Inference_output == None:
-        print(f"Error: no enchanced audio recieved, audio inference output is {Audio_Inference_output}")
+        logging.info(f"Error: no enchanced audio recieved, audio inference output is {Audio_Inference_output}")
     
     # 2. Resume upscaling OR Extract video frames
     video_upscale_continue = check_video_upscaling_resume(target_directory, selected_AI_model)
@@ -5111,7 +5089,7 @@ def upscale_video_frames_multithreading(
         pool.close()
         pool.join()
     except Exception as e:
-        print(f"error during upscaling {str(e)}")
+        logging.info(f"error during upscaling {str(e)}")
 
 def check_forgotten_video_frames(
         processing_queue: multiprocessing_Queue,
@@ -5122,7 +5100,7 @@ def check_forgotten_video_frames(
         selected_interpolation_factor: float,
         ):
     
-    # Check if all the upscaled frames exist
+
     frame_path_todo_list          = []
     upscaled_frame_path_todo_list = []
 
@@ -5276,7 +5254,7 @@ def open_files_action():
     supported_files_list    = check_supported_selected_files(uploaded_files_list)
     supported_files_counter = len(supported_files_list)
     
-    print("> Uploaded files: " + str(uploaded_files_counter) + " => Supported files: " + str(supported_files_counter))
+    logging.info("> Uploaded files: " + str(uploaded_files_counter) + " => Supported files: " + str(supported_files_counter))
 
     if supported_files_counter > 0:
         if supported_files_list:
@@ -5324,15 +5302,15 @@ def open_output_path_action():
 def select_audio_mode_from_menu(selected_mode):
     global selected_audio_mode
     selected_audio_mode = selected_mode
-    print(f"Print global selected audio mode: {selected_audio_mode}, print selected_mode: {selected_mode}")
+    logging.info(f"Print global selected audio mode: {selected_audio_mode}, print selected_mode: {selected_mode}")
     if selected_audio_mode == "Vocal Isolation":
-        print(f"Selected Audio Mode:  {selected_audio_mode}")
+        logging.info(f"Selected Audio Mode:  {selected_audio_mode}")
     
     if selected_audio_mode == "Audio Denoise":
-        print(f"Selected audio mode is: {selected_audio_mode}")
+        logging.info(f"Selected audio mode is: {selected_audio_mode}")
         
     if selected_audio_mode == "Disabled":
-        print(f"Selected audio mode is: {selected_audio_mode}")
+        logging.info(f"Selected audio mode is: {selected_audio_mode}")
     
     return selected_audio_mode
     
@@ -5969,8 +5947,12 @@ class VideoEnhancer():
         
 if __name__ == "__main__":
     from Decryption import validate_jwt
-    #if not validate_jwt():
-     #   sys.exit(1)
+    # if not validate_jwt():
+    #     logging.info(f"Validating with jwt error")
+    #     sys.exit(1)
+    # else: 
+    #     logging.info(f"Validating with jwt success!")
+
     
     selected_audio_mode = "Disabled"
     multiprocessing_freeze_support()
@@ -6055,7 +6037,7 @@ if __name__ == "__main__":
     upscale_icon   = CTkImage(pillow_image_open(find_by_relative_path(f"Assets{os_separator}upscale_iconLR.png")),   size=(15, 15))
     clear_icon     = CTkImage(pillow_image_open(find_by_relative_path(f"Assets{os_separator}clear_icon.png")),     size=(15, 15))
     info_icon      = CTkImage(pillow_image_open(find_by_relative_path(f"Assets{os_separator}info_icon.png")),      size=(17, 17))
-    place_stop_button()
+
     
     
     app = VideoEnhancer(window)

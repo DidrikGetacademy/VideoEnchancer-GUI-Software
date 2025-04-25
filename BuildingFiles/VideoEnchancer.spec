@@ -24,7 +24,7 @@ for src, dest in raw_datas:
     if exists:
         datas.append((src, dest))
     else:
-        print(f"[WARNING] Missing data source: {src}")
+        logging.info(f"[WARNING] Missing data source: {src}")
 
 # Add dependencies
 binaries  = collect_dynamic_libs('torch')
@@ -35,7 +35,7 @@ tmp_ret = collect_all('numba')
 hiddenimports += tmp_ret[2]
 
 a = Analysis(
-    ['VideoEnchancer.py'],
+    [r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program\VideoEnchancer.py'],
     pathex=[r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program"],
     binaries=binaries,
     datas=datas,
@@ -60,12 +60,12 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     icon=r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Assets\LearnReflect.ico",
     uac_admin=False,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

@@ -1,10 +1,11 @@
 
 a = Analysis(
-    ['App.py'],
+    [r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program\App.py'],
     pathex=[r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program'],
     binaries=[],
     datas=[
-        (r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program\dist\VideoEnchancer.exe', '.'),
+        (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\local_model",'local_model'),
+        (r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program\BuildingFiles\dist\VideoEnchancer.exe', '.'),
         (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Assets", "Assets"),
         (r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\.env", "."), 
 
@@ -46,8 +47,8 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    console=True,  
+    upx=False,
+    console=False,  
     manifest=r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\BuildingFiles\ProgramApp.manifest",
     icon=r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Assets\logo.ico",
 )
@@ -61,7 +62,7 @@ coll = COLLECT(
     strip=False,
     upx=True,
     name='LearnReflect_App',  # Output directory name
-    console=True,
+    console=False,
     uac_admin=False,
     disable_windowed_traceback=False,
     argv_emulation=False,

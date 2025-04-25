@@ -49,7 +49,7 @@ def validate_key_with_Server(key_code):
 def validate_subscription_status(user_id):
     try:
         user_data = get_user_data()
-        print(f"userdata:",user_data)
+        logging.info(f"userdata:",user_data)
         
         headers = {
             "Content-Type": "application/json",
@@ -77,7 +77,7 @@ def validate_subscription_status(user_id):
             exp_date = datetime.strptime(expiration_date, "%Y-%m-%d")
             if exp_date < datetime.now():
                 logging.error("Subscription expired!")
-                print(f"Error subscription expired.")
+                logging.info(f"Error subscription expired.")
          
                 return False
 

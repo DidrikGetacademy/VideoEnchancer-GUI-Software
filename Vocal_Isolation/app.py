@@ -328,9 +328,9 @@ class Conv_TDF_net_trimm(nn.Module):
                         map_location=COMPUTATION_DEVICE,
                     )
                 )
-                print(f"Loading model ({target_name})")
+                logging.info(f"Loading model ({target_name})")
             except FileNotFoundError:
-                print(f"Random init ({target_name})")
+                logging.info(f"Random init ({target_name})")
 
     def forward(self, x):
         """

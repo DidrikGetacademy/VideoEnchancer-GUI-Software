@@ -21,14 +21,14 @@ logger = logging.getLogger(__name__)
 def debug_bundled_environment():
     if getattr(sys, 'frozen', False):
         base_path = sys._MEIPASS
-        print(f"Extracted base path: {base_path}")
-        print("Contents of base path:")
+        logging.info(f"Extracted base path: {base_path}")
+        logging.info("Contents of base path:")
         for root, dirs, files in os.walk(base_path):
-            print(f"\nRoot: {root}")
-            print(f"Directories: {dirs}")
-            print(f"Files: {files}")
+            logging.info(f"\nRoot: {root}")
+            logging.info(f"Directories: {dirs}")
+            logging.info(f"Files: {files}")
     else:
-        print("Not running in bundled mode.")
+        logging.info("Not running in bundled mode.")
         
 #debug_bundled_environment()
 
