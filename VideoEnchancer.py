@@ -1,12 +1,18 @@
 import sys
 import os
+import torch 
+torch.backends.cuda.enable_flash_sdp(True)
+torch.backends.cuda.enable_mem_efficient_sdp(True)
+torch.backends.cuda.enable_math_sdp(True)
+os.environ["PYTORCH_ENABLE_FLASH_SDPA"] = "1"
+os.environ["PYTORCH_USE_CUDA_DSA"] = "1"
 import Vocal_Isolation
 import onnxruntime as ort
 from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool,  GoogleSearchTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool,tools, PythonInterpreterTool
+from smolagents import CodeAgent, FinalAnswerTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool,DuckDuckGoSearchTool,VLLMModel
 import yaml
 from tkinter import filedialog
 import os
@@ -209,80 +215,29 @@ stop_download_flag = False
 Global_offline_model = None  
 
 def check_hardware():
-    torch_dtype  = None
+    import torch
+
     if torch.cuda.is_available():
         device = "cuda"
 
-        if torch.cuda.get_device_capability(0)[0] >= 7:
-            torch_dtype = torch.float16
-            return device, torch_dtype
-        else:
+        if torch.cuda.is_bf16_supported():
             torch_dtype = torch.bfloat16
-            return device, torch_dtype
+        else:
+            torch_dtype = torch.float16
+
+        return device, torch_dtype
+
     else:
         device = "cpu"
         torch_dtype = torch.float32
         return device, torch_dtype
+
 
 CPU_ONLY = 'CUDAExecutionProvider' not in ort.get_available_providers()
 if CPU_ONLY:
     FRAMES_FOR_CPU = 5
 
 
-def load_model_background():
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    device, dtype = check_hardware()
-    logging.info(f"🧠 Loading model on {device} using dtype: {dtype}")
-
-
-    global Global_offline_model
-
-
-    try:
-        model_path = find_by_relative_path("./local_model/")
-        logging.info(f"🔍 .exe dir path: {model_path}")
-        Global_offline_model = TransformersModel(
-            model_path,
-            device_map=device,
-            torch_dtype=dtype,
-            trust_remote_code=True,
-            max_new_tokens=2048,
-            local_files_only=True
-
-        )
-        logging.info("✅ Model loaded successfully from executable location!")
-        logging.info("✅ Model loaded successfully from executable location!")
-        return
-    except Exception as e3:
-        logging.info(f"❌ All model loading attempts failed: {e3}")
-    logging.info(f"💻 Final device_map: {dtype}")
-    logging.info(f"📐 Selected torch_dtype: {dtype if dtype else dtype}")
-    logging.info(f"📦 Model loading from: {Global_offline_model}")
-    print(f"💻 Final device_map: {device}")
-    print(f"📐 Selected torch_dtype: {dtype if dtype else dtype}")
-    print(f"📦 Model loading from: {Global_offline_model}")
-
-    try:
-        model_path = os.path.join(os.path.dirname(sys.executable), "local_model")
-        logging.info(f"🔍 .exe dir path: {model_path}")
-        print(f"🔍 - .exe dir path: {model_path}")
-        Global_offline_model = TransformersModel( ###error --> endret noe i transformers libary/smolagents libary for å kjøre modell loakt uten problemer. husker ikke hva konkret jeg endret. har uninstallert og installert transformers på nytt etter pakking av exe............................................
-            model_path,
-            device_map=device,
-            torch_dtype=dtype,
-            trust_remote_code=True,
-            max_new_tokens=2048,
-            local_files_only=True
-        )
-        logging.info("✅ Model loaded successfully from executable location!")
-        print("✅ Model loaded successfully from executable location!")
-        print("✅ Model loaded successfully from executable location!")
-        return
-    
-    except Exception as e3:
-        logging.info(f"❌ All model loading attempts failed: {e3}")
 
 
 
@@ -397,7 +352,8 @@ class Agent_GUI():
     def __init__(self, parent_container):
         self.parent_container = parent_container
         self.uploaded_files = selected_file_list
-
+        
+      
         self.container = CTkFrame(
             master=self.parent_container,
             fg_color="#282828",
@@ -416,6 +372,8 @@ class Agent_GUI():
         self.loading_label.grid(row=2, column=0, pady=5, sticky="nsew")
 
         wait_time = 0
+        
+        global Global_offline_model
         while Global_offline_model is None:
             self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
             self.loading_label.update_idletasks()
@@ -473,7 +431,6 @@ class Agent_GUI():
             text_color="#E0E0E0",
             border_color="#0096FF",
             command=lambda: self.start_metadata_thread(),
-            state="DISABLED"
         )
         self.metadata_btn.pack(side="left", padx=10, pady=5)
         
@@ -543,9 +500,7 @@ class Agent_GUI():
 
         uploaded_file = self.file_menu_var.get()
 
-        prompts = find_by_relative_path(f"Assets{os_separator}prompts.yaml")
-        with open(prompts, 'r') as stream:
-            prompt_templates = yaml.safe_load(stream)
+
 
         if uploaded_file: 
                 file_extension = os.path.splitext(uploaded_file)[1].lower()
@@ -565,6 +520,25 @@ class Agent_GUI():
         self.chat_display.configure(state="disabled")
         self.chat_display.update()
 
+        @tool
+        def TranscribeAudio(audio_path: str) -> str:
+            """
+            A simple tool that transcribes an audio file to text using Whisper open-source model.
+            
+            Args:
+                audio_path (str): Path to the audio file (e.g., .wav)
+
+            Returns:
+                str: Transcribed text
+            """
+            import whisper
+
+     
+            model = whisper.load_model("base")  
+
+            result = model.transcribe(audio_path)
+   
+            return result["text"]
 
         @tool
         def ExtractAudioFromVideo(video_path: str) -> str:
@@ -605,7 +579,7 @@ class Agent_GUI():
             """
             valid_stages = {"info", "action", "reflection"}
             if stage not in valid_stages:
-                stage = "info"  # fallback or error handling
+                stage = "info" 
 
             log_entry = {
                 "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
@@ -614,11 +588,13 @@ class Agent_GUI():
             }
 
             self.chat_display.config(state=tk.NORMAL)
+
             self.chat_display.insert(tk.END, f"{log_entry['timestamp']} [{stage.upper()}] {message}\n")
             self.chat_display.config(state=tk.DISABLED)
             self.chat_display.see(tk.END)
 
             logging.info(f"[{stage.upper()}] {log_entry['timestamp']}: {message}")
+            print(f"[{stage.upper()}] {log_entry['timestamp']}: {message}")
             return "Log recorded successfully."
 
 
@@ -636,10 +612,13 @@ class Agent_GUI():
                     thumbnails, and channel title for each top trending video.
                 """
                 try:   
+                    load_dotenv()
                     Api_key = os.getenv("YOUTUBE_API_KEY")
-                    logging(f"Api_key loaded successfully.")
+                    logging.info(f"Api_key loaded successfully.")
+                    print(f"Api_key loaded successfully.")
                 except Exception as e:
-                   logging(f"Error loading api key {str(e)}")
+                   logging.error(f"Error loading api key {str(e)}") 
+                   print(f"Error loading api key {str(e)}")
                    return
 
                 youtube = build("youtube", "v3", developerKey=Api_key)
@@ -665,49 +644,58 @@ class Agent_GUI():
             self.chat_display.insert(tk.END, "Not a valid file path" + "\n")
             self.chat_display.config(state=tk.DISABLED)  
             return
-                
+        
+
         user_task = (
+            "ALWAYS REMEMBER TO LOG YOUR THOUGTS, PLANNING AND ACTION USING THE Log_Agent_Progress  A tool for logging agent thoughts, actions, and reflections during task execution. "
             "1. Use the ExtractAudioFromVideo tool to extract audio from the video. "
             "2. Store the returned path to the audio file (e.g., temp_audio.wav). "
-            "3. Use the SpeechToTextTool (called 'transcriber') to transcribe the audio by passing the audio path as input to the tool like: SpeechToTextTool(audio=audio_path). "
+            "3. Use the TranscribeAudio tool to transcribe the audio by passing the audio path as input: TranscribeAudio(audio_path)."
             "4. After you have the transcript, analyze it and create a unique and engaging title, description, keywords, hashtags and emojies "
             "5. Search for trending and similar content using Fetch_top_trending_youtube_videos for inspiration. "
-            "6. ALWAYS REMEMBER Log your thoughts and each step using the Log_Agent_Progress tool. "
-            "7. Finally, present your output using this format:\n"
+            "6. Finally, present your output using this format:\n"
             "title: ...\ndescription: ...\nkeywords: ...\nhashtags: ..."
         )
 
-
         context_vars = {
-                "video_path": Video_path,
-                "file_type": file,
-
-            }       
-
-
+               "video_path": Video_path,
+               "file_type": file
+           }       
+        
+        prompts = find_by_relative_path(f"local_model{os_separator}deepseek_coder_7b_instruct{os_separator}")
+        with open(prompts, 'r') as stream:
+            prompt_templates = yaml.safe_load(stream)
+            print(f"loaded prompt template: {prompt_templates} \n from path: {prompts} ")
+        
        #didrik
-        manager_agent  = CodeAgent(
-            model=self.model,
-            tools=[
-                FinalAnswerTool(), 
-                SpeechToTextTool(),
-                VisitWebpageTool(),
-                GoogleSearchTool(),
-                PythonInterpreterTool(),
-                ExtractAudioFromVideo,
-                Fetch_top_trending_youtube_videos,
-                Log_Agent_Progress
-            ], 
-            max_steps=10,
-            verbosity_level=1,
-            prompt_templates=prompt_templates,
-
+        agent  = CodeAgent(
+                model=self.model,
+                tools=[
+                     FinalAnswerTool(),
+                     VisitWebpageTool(),
+                     DuckDuckGoSearchTool(),
+                     ExtractAudioFromVideo,
+                     Fetch_top_trending_youtube_videos,
+                     Log_Agent_Progress,
+                     TranscribeAudio,
+                ], 
+             max_steps=12,
+             verbosity_level=3,
+             prompt_templates=prompt_templates,
+          
+     
         )
-
-        Response = manager_agent.run(
+        Response = agent.run(
             task=user_task,
             additional_args=context_vars
         )
+        if isinstance(Response, dict):
+            self._append_chat(self._format_metadata(Response))
+            self.clean_temp_audio()
+
+        else:
+            self._append_chat(str(Response))
+
 
         try:
             if os.path.exists("temp_audio.wav"):
@@ -716,32 +704,32 @@ class Agent_GUI():
         except Exception as e:
             logging.info(f"⚠️ Error deleting temp audio: {e}")
 
-        self.chat_display.config(state=tk.NORMAL)
-        self.chat_display.insert(tk.END, "2. 🌍 The AI agent is searching for similar videos and trending content...\n")
-        self.chat_display.update()
-        self.chat_display.configure(state="disabled")
+
 
 
         
-        self.chat_display.insert(tk.END, "✅ Done!\n\n")
-        self.chat_display.config(state=tk.NORMAL)
-        if isinstance(Response, dict):
-            formatted_response = (
-                f"🎬 Title:\n{Response.get('title', 'N/A')}\n\n"
-                f"📝 Description:\n{Response.get('description', 'N/A')}\n\n"
-                f"🔑 Keywords:\n{Response.get('keywords', 'N/A')}\n\n"
-                f"🏷️ Hashtags:\n{Response.get('hashtags', 'N/A')}\n"
-            )
-            self.chat_display.insert(tk.END, formatted_response + "\n")
-            self.chat_display.configure(state="disabled")
-        else:
-            self.chat_display.insert(tk.END, str(Response) + "\n")
-            self.chat_display.configure(state="disabled")
-        self.metadata_btn.configure(state="normal")
+
+         
+    def clean_temp_audio(self):
+        try:
+            if os.path.exists("temp_audio.wav"):
+                os.remove("temp_audio.wav")
+                logging.info("🗑️ temp_audio.wav deleted successfully.")
+        except Exception as e:
+            logging.info(f"⚠️ Error deleting temp audio: {e}")
 
 
 
- 
+    
+    def _format_metadata(self, md: dict) -> str:
+        return (
+            f"🎬 Title:\n  {md.get('title', 'N/A')}\n\n"
+            f"📝 Description:\n  {md.get('description', 'N/A')}\n\n"
+            f"🔑 Keywords:\n  {', '.join(md.get('keywords', []))}\n\n"
+            f"🏷️ Hashtags:\n  {' '.join(md.get('hashtags', []))}\n"
+        )
+    
+
     def update_file_list(self):
         """Update dropdown with current files"""
         file_names = [os_path_basename(f) for f in self.uploaded_files]
@@ -749,7 +737,11 @@ class Agent_GUI():
         if file_names:
             self.file_menu_var.set(file_names[0])
 
-
+    def _append_chat(self, text: str):
+        self.chat_display.config(state=tk.NORMAL)
+        self.chat_display.insert(tk.END, text + "\n")
+        self.chat_display.see(tk.END)
+        self.chat_display.config(state=tk.DISABLED)
 
     def clear_file_list(self):
         """Reset dropdown to empty state"""
@@ -758,6 +750,34 @@ class Agent_GUI():
         self.file_menu_var.set("No files uploaded")
 
 
+    
+#didrik
+def load_model_background():
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    device, dtype = check_hardware()
+    logging.info(f"🧠 Loading model on {device} using dtype: {dtype}")
+    print(f"🧠 Loading model on {device} using dtype: {dtype}")
+
+
+
+    global Global_offline_model
+    try:
+     
+        model_id_deepseek = find_by_relative_path("./local_model/deepseek_coder_7b_instruct")
+        logging.info(f"🔍 .exe dir path: {model_id_deepseek}")
+        Global_offline_model = VLLMModel(
+            model_id=model_id_deepseek, 
+        )
+        logging.info("✅ Model loaded successfully from executable location!")
+        print("✅ Model loaded successfully from executable location!")
+        return
+    except Exception as e3:
+        logging.info(f"❌ All model loading attempts failed: {e3}")
+        print(f"❌ All model loading attempts failed: {e3}")
+
+  
 
 
 
@@ -766,7 +786,8 @@ class Agent_GUI():
 
 
 #didrik
-class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tiktok) if available for api's. (options too use smolgent with a generate button for automatic generation of (title,description,keywords,hashtags.))
+ #Upload videos too (instagram,facebook,youtube,tiktok) if available for api's. (options too use smolgent with a generate button for automatic generation of (title,description,keywords,hashtags.))
+class SocialMediaUploading:
     def __init__(self, parent_container):
             self.parent_container = parent_container
             self.credentials = None  
@@ -1058,7 +1079,6 @@ class SocialMediaUploading: #Upload videos too (instagram,facebook,youtube,tikto
 
     def authenticate(self):
             import google_auth_oauthlib.flow
-            from googleapiclient.discovery import build
             from encryption import save_encrypted_token
         
 
@@ -1819,291 +1839,291 @@ class ToolMenu:
         self.container.rowconfigure(1, weight=1)
 
  
-#didrik
-class LR_Agent_Automation:
+# #didrik
+# class LR_Agent_Automation:
 
-    def __init__(self, parent_container):
-        self.parent_container = parent_container
-       #self.LR_Agent_Automation_model = Global_offline_model
+#     def __init__(self, parent_container):
+#         self.parent_container = parent_container
+#        #self.LR_Agent_Automation_model = Global_offline_model
       
         
-        self.should_stop = False
-        self.container = CTkFrame(
-            master=self.parent_container,
-            fg_color="#282828",
-            border_width=2,
-            border_color="#404040",
-            corner_radius=10
-        )
-        self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+#         self.should_stop = False
+#         self.container = CTkFrame(
+#             master=self.parent_container,
+#             fg_color="#282828",
+#             border_width=2,
+#             border_color="#404040",
+#             corner_radius=10
+#         )
+#         self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        self.loading_label = CTkLabel(
-            master=self.container,
-            text="",
-            text_color="#00FF00",
-            font=("Arial", 14)
-        )
-        self.loading_label.grid(row=2, column=0, pady=5, sticky="nsew")
-        wait_time = 0
-        while Global_offline_model is None:
-            self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
-            self.loading_label.update_idletasks()
-            time.sleep(1)
-            wait_time += 1
-            if wait_time > 60:
-                self.loading_label.configure(text="❌ Timeout waiting for model to load.")
-                return
+#         self.loading_label = CTkLabel(
+#             master=self.container,
+#             text="",
+#             text_color="#00FF00",
+#             font=("Arial", 14)
+#         )
+#         self.loading_label.grid(row=2, column=0, pady=5, sticky="nsew")
+#         wait_time = 0
+#         while Global_offline_model is None:
+#             self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
+#             self.loading_label.update_idletasks()
+#             time.sleep(1)
+#             wait_time += 1
+#             if wait_time > 60:
+#                 self.loading_label.configure(text="❌ Timeout waiting for model to load.")
+#                 return
 
-        self.loading_label.configure(text="✅ Model loaded successfully.")
-        self.model = Global_offline_model
-
-
-
-        self.create_widgets()
+#         self.loading_label.configure(text="✅ Model loaded successfully.")
+#         self.model = Global_offline_model
 
 
-        self.chat_display  = scrolledtext.ScrolledText(
-        self.container,
-          wrap=tk.WORD,
-          width=55,
-          height=25,
-          font=("Helvetica",12),
-          bg="black",  
-          fg="white",
-          state="disabled",
-        )
-        self.chat_display.config(
-            insertbackground="yellow",
-            selectbackground="#444444",
-            selectforeground="white",
-            borderwidth=2,
-            relief="sunken"
-        )
-        self.chat_display.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        self.chat_display.yview(END)
-        self.container.columnconfigure(0, weight=1)
-        self.container.rowconfigure(1, weight=1)
+
+#         self.create_widgets()
 
 
-    def create_widgets(self):
-        self.settingsframe = CTkFrame(
-            self.container,
-            width=750,
-            height=750,
-            fg_color="black",
-            bg_color="black"
-        )
-        self.settingsframe.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+#         self.chat_display  = scrolledtext.ScrolledText(
+#         self.container,
+#           wrap=tk.WORD,
+#           width=55,
+#           height=25,
+#           font=("Helvetica",12),
+#           bg="black",  
+#           fg="white",
+#           state="disabled",
+#         )
+#         self.chat_display.config(
+#             insertbackground="yellow",
+#             selectbackground="#444444",
+#             selectforeground="white",
+#             borderwidth=2,
+#             relief="sunken"
+#         )
+#         self.chat_display.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+#         self.chat_display.yview(END)
+#         self.container.columnconfigure(0, weight=1)
+#         self.container.rowconfigure(1, weight=1)
 
-        self.media_type_var = tk.StringVar(value="videos only")
-        self.media_type_menu = CTkComboBox(self.container,textvariable =self.media_type_var, state="readonly")
-        self.media_type_menu["values"] = ("videos only", "images and videos")
-        self.media_type_menu.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+
+#     def create_widgets(self):
+#         self.settingsframe = CTkFrame(
+#             self.container,
+#             width=750,
+#             height=750,
+#             fg_color="black",
+#             bg_color="black"
+#         )
+#         self.settingsframe.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+
+#         self.media_type_var = tk.StringVar(value="videos only")
+#         self.media_type_menu = CTkComboBox(self.container,textvariable =self.media_type_var, state="readonly")
+#         self.media_type_menu["values"] = ("videos only", "images and videos")
+#         self.media_type_menu.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
 
-        self.title_entry = CTkEntry(
-            self.settingsframe,
-            placeholder_text="Title of video",
-            width=500
-        )
-        self.title_entry.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
+#         self.title_entry = CTkEntry(
+#             self.settingsframe,
+#             placeholder_text="Title of video",
+#             width=500
+#         )
+#         self.title_entry.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
 
 
-        self.topic_entry = CTkEntry(
-            self.settingsframe,
-            placeholder_text="Topic of video",
-            width=500
-        )
-        self.topic_entry.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
+#         self.topic_entry = CTkEntry(
+#             self.settingsframe,
+#             placeholder_text="Topic of video",
+#             width=500
+#         )
+#         self.topic_entry.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
 
         
-        from tkinter import StringVar
-        def only_digits_input(P):
-            return P.isdigit() or P == ""  
+#         from tkinter import StringVar
+#         def only_digits_input(P):
+#             return P.isdigit() or P == ""  
 
-        vcmd = self.settingsframe.register(only_digits_input)
+#         vcmd = self.settingsframe.register(only_digits_input)
 
        
-        self.video_amount_var = StringVar()
-        self.video_amount = CTkEntry(
-            self.settingsframe,
-            textvariable=self.video_amount_var,
-            placeholder_text="Amount of videos to be made",
-            validate="key",
-            validatecommand=(vcmd, "%P"),
-            width=500
-        )
-        self.video_amount.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
+#         self.video_amount_var = StringVar()
+#         self.video_amount = CTkEntry(
+#             self.settingsframe,
+#             textvariable=self.video_amount_var,
+#             placeholder_text="Amount of videos to be made",
+#             validate="key",
+#             validatecommand=(vcmd, "%P"),
+#             width=500
+#         )
+#         self.video_amount.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
 
 
-        self.description_entry = CTkTextbox(
-            self.settingsframe,
-            width=500,
-            height=100
-        )
-        self.description_entry.insert("1.0", "Description of video")
-        self.description_entry.grid(row=1, column=0, padx=20, pady=(10, 20), sticky="w")
+#         self.description_entry = CTkTextbox(
+#             self.settingsframe,
+#             width=500,
+#             height=100
+#         )
+#         self.description_entry.insert("1.0", "Description of video")
+#         self.description_entry.grid(row=1, column=0, padx=20, pady=(10, 20), sticky="w")
 
 
-        self.run_agent_node = CTkButton(
-            self.container,
-            command=lambda: Thread(target=self.run_agent).start(),
-            fg_color="black",
-            text="Run AGENT Node"
-        )
-        self.run_agent_node.grid(row=0,column=0, padx=20, pady=(20,10),sticky="w")
+#         self.run_agent_node = CTkButton(
+#             self.container,
+#             command=lambda: Thread(target=self.run_agent).start(),
+#             fg_color="black",
+#             text="Run AGENT Node"
+#         )
+#         self.run_agent_node.grid(row=0,column=0, padx=20, pady=(20,10),sticky="w")
 
 
 
-    def run_single_video_task(self):
-            @tool
-            def Upload_video_to_socialMedia_platform(title: str, description: str, time: int):
-                """
+#     def run_single_video_task(self):
+#             @tool
+#             def Upload_video_to_socialMedia_platform(title: str, description: str, time: int):
+#                 """
                 
-                """
-                return   
+#                 """
+#                 return   
             
-            @tool 
-            def add_text_to_video():
-                """
+#             @tool 
+#             def add_text_to_video():
+#                 """
                 
-                """
-                return
+#                 """
+#                 return
 
-            @tool
-            def add_audio_to_video():
-                """
+#             @tool
+#             def add_audio_to_video():
+#                 """
                 
-                """
-                return
+#                 """
+#                 return
 
-            @tool
-            def add_filter_to_video():
-                """
+#             @tool
+#             def add_filter_to_video():
+#                 """
                 
-                """
-                return 
+#                 """
+#                 return 
 
 
 
-            @tool
-            def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
-                    """
-                    A tool for fetching metadata from top trending YouTube videos in a specific category or topic.
+#             @tool
+#             def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
+#                     """
+#                     A tool for fetching metadata from top trending YouTube videos in a specific category or topic.
 
-                    Args:
-                        Search_Query (str): A keyword or topic to search for trending YouTube videos (e.g., "Motivational", "Funny", "Tech Reviews").
+#                     Args:
+#                         Search_Query (str): A keyword or topic to search for trending YouTube videos (e.g., "Motivational", "Funny", "Tech Reviews").
 
-                    Returns:
-                        dict: A dictionary containing video metadata including title, description, view count, like count, comment count,
-                        thumbnails, and channel title for each top trending video.
-                    """
+#                     Returns:
+#                         dict: A dictionary containing video metadata including title, description, view count, like count, comment count,
+#                         thumbnails, and channel title for each top trending video.
+#                     """
                     
-                    Api_key = os.getenv("YOUTUBE_API_KEY")
+#                     Api_key = os.getenv("YOUTUBE_API_KEY")
 
-                    youtube = build("youtube", "v3", developerKey=Api_key)
+#                     youtube = build("youtube", "v3", developerKey=Api_key)
 
-                    request = youtube.search().list(
-                        part="snippet",
-                        q=Search_Query,
-                        type="video",
-                        maxResults=30
-                    )
-                    response = request.execute()
+#                     request = youtube.search().list(
+#                         part="snippet",
+#                         q=Search_Query,
+#                         type="video",
+#                         maxResults=30
+#                     )
+#                     response = request.execute()
 
-                    return response 
+#                     return response 
             
-            @tool
-            def next_video_goals(Next_video_conecpt: str) -> str:
-                """
+#             @tool
+#             def next_video_goals(Next_video_conecpt: str) -> str:
+#                 """
                 
-                """
-                return
+#                 """
+#                 return
 
-            try:
-                prompts = find_by_relative_path(f"Assets{os_separator}prompts_video_creator.yaml")
-                with open(prompts, 'r') as stream:
-                     prompt = yaml.safe_load(stream)
+#             try:
+#                 prompts = find_by_relative_path(f"Assets{os_separator}prompts_video_creator.yaml")
+#                 with open(prompts, 'r') as stream:
+#                      prompt = yaml.safe_load(stream)
 
-                user_task = """Your goal is to create a video based on the specified topic and parameters.
+#                 user_task = """Your goal is to create a video based on the specified topic and parameters.
 
-                1. Read all the additional arguments that are provided to you. These arguments give you insight into the video to be created — including title, topic, description, number of clips to generate, and the media preference (e.g., videos only, or a mix of images and videos). If any of the values are empty or None, use your creativity to decide them.
+#                 1. Read all the additional arguments that are provided to you. These arguments give you insight into the video to be created — including title, topic, description, number of clips to generate, and the media preference (e.g., videos only, or a mix of images and videos). If any of the values are empty or None, use your creativity to decide them.
 
-                2. Search the internet and social media platforms to gain insights from similar trending videos to inform your video concept.
+#                 2. Search the internet and social media platforms to gain insights from similar trending videos to inform your video concept.
 
-                3. Based on the gathered information and user preferences, start creating the video content accordingly.
+#                 3. Based on the gathered information and user preferences, start creating the video content accordingly.
 
-                4. When you are finnished with the video. use the tool (next_video_goals)
-                """
+#                 4. When you are finnished with the video. use the tool (next_video_goals)
+#                 """
 
           
-                self.context_var =  { 
-                            "Video Title": self.title_entry.get(),
-                            "topic": self.topic_entry.get(),
-                            "description": self.description_entry.get("1.0", "end-1c"),
-                            "video_amount": self.video_amount_var.get(),
-                            "media_type": self.media_type_var.get()
-                            }
+#                 self.context_var =  { 
+#                             "Video Title": self.title_entry.get(),
+#                             "topic": self.topic_entry.get(),
+#                             "description": self.description_entry.get("1.0", "end-1c"),
+#                             "video_amount": self.video_amount_var.get(),
+#                             "media_type": self.media_type_var.get()
+#                             }
                 
-                AutoMation_agent  = CodeAgent(
-                    model=self.LR_Agent_Automation_model,
-                    tools=[
-                        FinalAnswerTool(), 
-                        SpeechToTextTool(),
-                        VisitWebpageTool(),
-                        GoogleSearchTool(),
-                        Fetch_top_trending_youtube_videos,
-                        Upload_video_to_socialMedia_platform,
-                    ], 
-                    max_steps=10,
-                    verbosity_level=1,
-                    prompt_templates=prompt,
-                    add_base_tools=True
-                )
+#                 AutoMation_agent  = CodeAgent(
+#                     model=self.LR_Agent_Automation_model,
+#                     tools=[
+#                         FinalAnswerTool(), 
+#                         SpeechToTextTool(),
+#                         VisitWebpageTool(),
+#                         GoogleSearchTool(),
+#                         Fetch_top_trending_youtube_videos,
+#                         Upload_video_to_socialMedia_platform,
+#                     ], 
+#                     max_steps=10,
+#                     verbosity_level=1,
+#                     prompt_templates=prompt,
+#                     add_base_tools=True
+#                 )
 
-                self.manager_agent = AutoMation_agent
-                self.user_task = user_task
-                self.context_var = self.context_var
-
-
-                response = self.manager_agent.run(
-                            task=self.user_task,
-                            additional_args=self.context_var
-                )
-
-                self.chat_display.config(state=tk.NORMAL)
-                if isinstance(response, dict):
-                    formatted = (
-                        json.dumps(response, indent=4),
-                    )
-                else:
-                    formatted = str(response)
-
-                self.chat_display.insert(tk.END, formatted + "\n")
-                self.chat_display.config(state=tk.DISABLED)
-                self.chat_display.see(tk.END)
-            except Exception as e:
-                    logging.info("❌ Error in run_single_video_task:", e)
+#                 self.manager_agent = AutoMation_agent
+#                 self.user_task = user_task
+#                 self.context_var = self.context_var
 
 
+#                 response = self.manager_agent.run(
+#                             task=self.user_task,
+#                             additional_args=self.context_var
+#                 )
 
-    def run_agent_loop(self):
-            try:
-                amount = int(self.video_amount_var.get())
-            except ValueError:
-                logging.info("invalid video amount entered")
-                return
+#                 self.chat_display.config(state=tk.NORMAL)
+#                 if isinstance(response, dict):
+#                     formatted = (
+#                         json.dumps(response, indent=4),
+#                     )
+#                 else:
+#                     formatted = str(response)
+
+#                 self.chat_display.insert(tk.END, formatted + "\n")
+#                 self.chat_display.config(state=tk.DISABLED)
+#                 self.chat_display.see(tk.END)
+#             except Exception as e:
+#                     logging.info("❌ Error in run_single_video_task:", e)
+
+
+
+#     def run_agent_loop(self):
+#             try:
+#                 amount = int(self.video_amount_var.get())
+#             except ValueError:
+#                 logging.info("invalid video amount entered")
+#                 return
             
-            for i in range(amount):
-                if self.should_stop:
-                    break
-                self.run_single_video_task()
+#             for i in range(amount):
+#                 if self.should_stop:
+#                     break
+#                 self.run_single_video_task()
 
 
-    def run_agent(self):   
+#     def run_agent(self):   
      
-        self.RunForever = Thread(target=self.run_agent_loop(),daemon=True)
-        self.RunForever.start()
+#         self.RunForever = Thread(target=self.run_agent_loop(),daemon=True)
+#         self.RunForever.start()
 
  
 
