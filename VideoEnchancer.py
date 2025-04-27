@@ -1,18 +1,13 @@
 import sys
 import os
 import torch 
-torch.backends.cuda.enable_flash_sdp(True)
-torch.backends.cuda.enable_mem_efficient_sdp(True)
-torch.backends.cuda.enable_math_sdp(True)
-os.environ["PYTORCH_ENABLE_FLASH_SDPA"] = "1"
-os.environ["PYTORCH_USE_CUDA_DSA"] = "1"
 import Vocal_Isolation
 import onnxruntime as ort
 from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool,DuckDuckGoSearchTool,VLLMModel, PythonInterpreterTool
+from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel, HfApiModel, tool,SpeechToTextTool
 import yaml
 from tkinter import filedialog
 import os
@@ -140,7 +135,21 @@ from customtkinter import (
 )
 
 
+def check_hardware():
+    torch_dtype  = None
+    if torch.cuda.is_available():
+        device = "cuda"
 
+        if torch.cuda.get_device_capability(0)[0] >= 7:
+            torch_dtype = torch.float16
+            return device, torch_dtype
+        else:
+            torch_dtype = torch.bfloat16
+            return device, torch_dtype
+    else:
+        device = "cpu"
+        torch_dtype = torch.float32
+        return device, torch_dtype
 def get_gpu_vram():
     import psutil
     try:
@@ -316,7 +325,70 @@ supported_video_extensions = [
 
 
 
+def load_model_background():
+    device, dtype = check_hardware()
 
+    print(f"🧠 Loading model on {device} using dtype: {dtype}")
+
+
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    
+    global Global_offline_model
+    model_path = "./local_model/qwen_coder_7b_instruct/"
+    Global_offline_model = TransformersModel(model_path, device_map=device, torch_dtype=dtype, trust_remote_code=True, max_new_tokens=1024)
+    print("✅ Model loaded successfully in the background!")
+
+
+
+
+
+#didrik
+def load_model_background():
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    device, dtype = check_hardware()
+    logging.info(f"🧠 Loading model on {device} using dtype: {dtype}")
+    print(f"🧠 Loading model on {device} using dtype: {dtype}")
+
+
+
+    global Global_offline_model
+    try:
+     
+        model_id_deepseek = find_by_relative_path("./local_model/qwen_coder_7b_instruct/")
+        logging.info(f"🔍 .exe dir path: {model_id_deepseek}")
+        Global_offline_model = TransformersModel(
+            model_id=model_id_deepseek, 
+            torch_dtype=dtype,
+            device_map=device,
+            do_sample=False,
+            top_k=50,
+            top_p=0.95, 
+            num_return_sequences=1
+        )
+        logging.info("✅ Model loaded successfully from executable location!")
+        print("✅ Model loaded successfully from executable location!")
+        return
+    except Exception as e3:
+        logging.info(f"❌ All model loading attempts failed: {e3}")
+        print(f"❌ All model loading attempts failed: {e3}")
+
+  
+
+    
+
+
+
+
+
+CPU_ONLY = 'CUDAExecutionProvider' not in ort.get_available_providers()
+if CPU_ONLY:
+    FRAMES_FOR_CPU = 5
 
 
 #didrik
@@ -493,166 +565,65 @@ class Agent_GUI():
         self.chat_display.insert(tk.END, "1. 🤖 AI-agenten transcribes video now...\n")
         self.chat_display.configure(state="disabled")
         self.chat_display.update()
-
-
-        @tool
-        def ExtractAudioFromVideo(video_path: str) -> str:
-            """Extracts  mono 16kHz WAV audio from a video using ffmpeg.
-                Args:
-                    video_path (str): The full path to the video file.
-
-                Returns:
-                    str:  the path to the extracted audio file.
-            """
-            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "video_codec;h264"
-            audio_path = "temp_audio.wav"
-            command = [
-                "ffmpeg",
-                "-y",  
-                "-i", video_path,
-                "-ac", "1", 
-                "-ar", "16000",  
-                "-vn", 
-                "-f", "wav",
-                audio_path
-            ]
-            subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return audio_path
-
-
-        @tool
-        def Log_Agent_Progress(stage: str, message: str) -> str:
-            """
-            A tool for logging agent thoughts, actions, and reflections during task execution.
-            Args:
-                stage (str): One of "info", "action", "reflection".
-                message (str): A descriptive message of what the agent is doing or thinking.
-
-            Returns:
-                str: Confirmation that the message has been logged.
-            """
-            valid_stages = {"info", "action", "reflection"}
-            if stage not in valid_stages:
-                stage = "info" 
-
-            log_entry = {
-                "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
-                "stage": stage,
-                "message": message
-            }
-
-            self.chat_display.config(state=tk.NORMAL)
-
-            self.chat_display.insert(tk.END, f"{log_entry['timestamp']} [{stage.upper()}] {message}\n")
-            self.chat_display.config(state=tk.DISABLED)
-            self.chat_display.see(tk.END)
-
-            logging.info(f"[{stage.upper()}] {log_entry['timestamp']}: {message}")
-            print(f"[{stage.upper()}] {log_entry['timestamp']}: {message}")
-            return "Log recorded successfully."
-
-
-        
-        @tool
-        def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
-                """
-                A tool for fetching metadata from top trending YouTube videos in a specific category or topic.
-
-                Args:
-                    Search_Query (str): A keyword or topic to search for trending YouTube videos (e.g., "Motivational", "Funny", "Tech Reviews").
-
-                Returns:
-                    dict: A dictionary containing video metadata including title, description, view count, like count, comment count,
-                    thumbnails, and channel title for each top trending video.
-                """
-                try:   
-                    load_dotenv()
-                    Api_key = os.getenv("YOUTUBE_API_KEY")
-                    logging.info(f"Api_key loaded successfully.")
-                    print(f"Api_key loaded successfully.")
-                except Exception as e:
-                   logging.error(f"Error loading api key {str(e)}") 
-                   print(f"Error loading api key {str(e)}")
-                   return
-
-                youtube = build("youtube", "v3", developerKey=Api_key)
-
-                request = youtube.search().list(
-                    part="snippet",
-                    q=Search_Query,
-                    type="video",
-                    maxResults=10
-                )
-                response = request.execute()
-
-                return response 
-
-        @tool
-        def TranscribeAudio(audio_path: str) -> str:
-            """
-            A simple wrapper to call SpeechToTextTool properly.
-            
-            Args:
-                audio_path (str): Path to the audio file to transcribe.
-                
-            Returns:
-                str: Transcribed text.
-            """
-            tool = SpeechToTextTool()  
-            return tool.forward(audio=audio_path)
-
-            
-
         uploaded_file_name = self.file_menu_var.get()
         Video_path = next((f for f in self.uploaded_files if os_path_basename(f) == uploaded_file_name), None)
         if not Video_path:
-            logging.info("Error: File not found!")
+            print("Error: File not found!")
             self.chat_display.config(state=tk.NORMAL)
             self.chat_display.insert(tk.END, "Not a valid file path" + "\n")
             self.chat_display.config(state=tk.DISABLED)  
             return
-        
+                
 
-        user_task = ""
-        context_vars = {
-               "video_path": Video_path,
-               "file_type": file
-           }       
-        
-        prompts = find_by_relative_path(f"local_model/qwen_coder_7b_instruct/")
-        with open(prompts, 'r') as stream:
-            prompt_templates = yaml.safe_load(stream)
-            print(f"loaded prompt template: {prompt_templates} \n from path: {prompts} ")
 
-     
-        
-       #didrik
-        agent  = CodeAgent(
-                model=self.model,
-                tools=[
-                     FinalAnswerTool(),
-                     VisitWebpageTool(),
-                     PythonInterpreterTool(),
-                     SpeechToTextTool(),
-                     DuckDuckGoSearchTool(),
-                     ExtractAudioFromVideo,
-                     Fetch_top_trending_youtube_videos,
-                     Log_Agent_Progress,
-                     TranscribeAudio,
-                ], 
-             additional_authorized_imports=["whisper"],
-             max_steps=12,
-             verbosity_level=4,
-             prompt_templates=prompt_templates,
-             max_print_outputs_length = 1024,
-             
-          
-     
+
+
+        user_task = (
+            "1. Use the ExtractAudioFromVideo tool to extract audio from the video. "
+            "2. Store the returned path to the audio file (e.g., temp_audio.wav). "
+            "3. Use the SpeechToTextTool (called 'transcriber') to transcribe the audio by passing the audio path as input to the tool like: SpeechToTextTool(audio=audio_path). "
+            "4. After you have the transcript, analyze it and create a unique and engaging title, description, keywords, hashtags and emojies "
+            "5. Search for trending and similar content using Fetch_top_trending_youtube_videos for inspiration. "
+            "6. ALWAYS REMEMBER Log your thoughts and each step using the Log_Agent_Progress tool. "
+            "7. Finally, present your output using this format:\n"
+            "title: ...\ndescription: ...\nkeywords: ...\nhashtags: ..."
         )
-        Response = agent.run(
+        uploaded_file = self.file_menu_var.get()
+        context_vars = {
+                "video_path": Video_path,
+                "file_type": file,
+                "chat_display": self.chat_display,
+            }       
+
+        prompts = find_by_relative_path(f"./local_model/qwen_coder_7b_instruct/prompts.yaml")
+        with open(prompts, 'r') as stream:
+                prompt_templates = yaml.safe_load(stream)
+
+
+        from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress
+        manager_agent  = CodeAgent(
+            model=self.model,
+            tools=[
+                FinalAnswerTool(), 
+                SpeechToTextTool(),
+                VisitWebpageTool(),
+                GoogleSearchTool(),
+                ExtractAudioFromVideo,
+                Fetch_top_trending_youtube_videos,
+                Log_Agent_Progress
+            ], 
+            max_steps=10,
+            verbosity_level=3,
+            prompt_templates=prompt_templates,
+            add_base_tools=True
+        )
+
+        Response = manager_agent .run(
             task=user_task,
             additional_args=context_vars
         )
+
+
         if isinstance(Response, dict):
             self._append_chat(self._format_metadata(Response))
             self.clean_temp_audio()
@@ -716,62 +687,6 @@ class Agent_GUI():
 
 
 
-#didrik
-def load_model_background():
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    device, dtype = check_hardware()
-    logging.info(f"🧠 Loading model on {device} using dtype: {dtype}")
-    print(f"🧠 Loading model on {device} using dtype: {dtype}")
-
-
-
-    global Global_offline_model
-    try:
-     
-        model_id_deepseek = find_by_relative_path("./local_model/qwen_coder_7b_instruct/")
-        logging.info(f"🔍 .exe dir path: {model_id_deepseek}")
-        Global_offline_model = TransformersModel(
-            model_id=model_id_deepseek, 
-            torch_dtype=dtype,
-            device_map=device,
-            do_sample=False,
-            top_k=50,
-            top_p=0.95, 
-            num_return_sequences=1
-        )
-        logging.info("✅ Model loaded successfully from executable location!")
-        print("✅ Model loaded successfully from executable location!")
-        return
-    except Exception as e3:
-        logging.info(f"❌ All model loading attempts failed: {e3}")
-        print(f"❌ All model loading attempts failed: {e3}")
-
-  
-
-    
-def check_hardware():
-
-    if torch.cuda.is_available():
-        device = "cuda"
-
-        if torch.cuda.is_bf16_supported():
-            torch_dtype = torch.bfloat16
-        else:
-            torch_dtype = torch.float16
-
-        return device, torch_dtype
-
-    else:
-        device = "cpu"
-        torch_dtype = torch.float32
-        return device, torch_dtype
-
-
-CPU_ONLY = 'CUDAExecutionProvider' not in ort.get_available_providers()
-if CPU_ONLY:
-    FRAMES_FOR_CPU = 5
 
 
 
@@ -779,9 +694,7 @@ if CPU_ONLY:
 
 
 
-
-#didrik
- #Upload videos too (instagram,facebook,youtube,tiktok) if available for api's. (options too use smolgent with a generate button for automatic generation of (title,description,keywords,hashtags.))
+#Upload videos too (instagram,facebook,youtube,tiktok) if available for api's. (options too use smolgent with a generate button for automatic generation of (title,description,keywords,hashtags.))
 class SocialMediaUploading:
     def __init__(self, parent_container):
             self.parent_container = parent_container

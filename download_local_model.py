@@ -10,8 +10,8 @@ def download_Qwen_Coder_7B_Instruct():
         snapshot_download(
             repo_id=model_repo,
             local_dir=local_dir,
-            resume_download=True,  # Resume if partially downloaded
-            local_dir_use_symlinks=False  # Full copy, no symlinks
+            resume_download=True,
+            local_dir_use_symlinks=False  
         )
         print(f"✅ Qwen2.5-Coder-7B-Instruct downloaded successfully.")
     else:
@@ -34,4 +34,4 @@ def download_deepseek_coder_7b_instruct():
         print(f"✅ Model already exists at {local_dir}, skipping download.")
 
 if __name__ == "__main__":
-    download_deepseek_coder_7b_instruct()
+    download_Qwen_Coder_7B_Instruct()
