@@ -141,8 +141,24 @@ from customtkinter import (
 
 
 
+def get_gpu_vram():
+    import psutil
+    try:
+        import wmi
+        w = wmi.WMI()
+        for gpu in w.Win32_VideoController():
+            if 'VRAM' in gpu.AdapterRAM:
+                   return min(4, int((psutil.virtual_memory().total / (1024**3)) * 0.7))  
+            return 4000
+    except:
+        return 4000
 
-
+def get_cpu_number():
+        try:
+            cpu_number = max(1, int(os_cpu_count() // 1.5))
+            return cpu_number
+        except Exception as e:
+            return
 
 if sys.stdout is None: sys.stdout = open(os_devnull, "w")
 if sys.stderr is None: sys.stderr = open(os_devnull, "w")
@@ -597,23 +613,13 @@ class Agent_GUI():
             return
         
 
-        user_task = (
-            "ALWAYS REMEMBER TO LOG YOUR THOUGTS, PLANNING AND ACTION USING THE Log_Agent_Progress  A tool for logging agent thoughts, actions, and reflections during task execution. "
-            "1. Use the ExtractAudioFromVideo tool to extract audio from the video. "
-            "2. Store the returned path to the audio file (e.g., temp_audio.wav). "
-            "3. Use the TranscribeAudio tool to transcribe the audio too get information"
-            "4. After you have the transcript, analyze it and create a unique and engaging title, description, keywords, hashtags and emojies "
-            "5. Search for trending and similar content using Fetch_top_trending_youtube_videos for inspiration. "
-            "6. Finally, present your output using this format:\n"
-            "title: ...\ndescription: ...\nkeywords: ...\nhashtags: ..."
-        )
-
+        user_task = ""
         context_vars = {
                "video_path": Video_path,
                "file_type": file
            }       
         
-        prompts = find_by_relative_path(f"local_model/deepseek_coder_7b_instruct/prompts.yaml")
+        prompts = find_by_relative_path(f"local_model/qwen_coder_7b_instruct/")
         with open(prompts, 'r') as stream:
             prompt_templates = yaml.safe_load(stream)
             print(f"loaded prompt template: {prompt_templates} \n from path: {prompts} ")
@@ -724,7 +730,7 @@ def load_model_background():
     global Global_offline_model
     try:
      
-        model_id_deepseek = find_by_relative_path("./local_model/deepseek_coder_7b_instruct")
+        model_id_deepseek = find_by_relative_path("./local_model/qwen_coder_7b_instruct/")
         logging.info(f"🔍 .exe dir path: {model_id_deepseek}")
         Global_offline_model = TransformersModel(
             model_id=model_id_deepseek, 
@@ -744,17 +750,6 @@ def load_model_background():
 
   
 
-def get_gpu_vram():
-    import psutil
-    try:
-        import wmi
-        w = wmi.WMI()
-        for gpu in w.Win32_VideoController():
-            if 'VRAM' in gpu.AdapterRAM:
-                   return min(4, int((psutil.virtual_memory().total / (1024**3)) * 0.7))  
-            return 4000
-    except:
-        return 4000
     
 def check_hardware():
 
@@ -5988,12 +5983,7 @@ if __name__ == "__main__":
     window.attributes('-fullscreen', True)
     window.bind("<Escape>", exit_fullscreen) 
 
-    def get_cpu_number():
-        try:
-            cpu_number = max(1, int(os_cpu_count() // 1.5))
-            return cpu_number
-        except Exception as e:
-            return
+ 
 
 
     youtube_progress_var = StringVar()
