@@ -7,7 +7,7 @@ from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool, Tool, DuckDuckGoSearchTool, UserInputTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel, HfApiModel, tool,SpeechToTextTool
+from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel, tool, SpeechToTextTool
 import yaml
 from tkinter import filedialog
 import os
@@ -335,50 +335,33 @@ def load_model_background():
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-
+    global Global_offline_model
     
-    global Global_offline_model
-    model_path = "./local_model/qwen_coder_7b_instruct/"
-    Global_offline_model = TransformersModel(model_path, device_map=device, torch_dtype=dtype, trust_remote_code=True, max_new_tokens=1024)
-    print("✅ Model loaded successfully in the background!")
-
-
-
-
-
-#didrik
-def load_model_background():
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    device, dtype = check_hardware()
-    logging.info(f"🧠 Loading model on {device} using dtype: {dtype}")
-    print(f"🧠 Loading model on {device} using dtype: {dtype}")
-
-
-
-    global Global_offline_model
     try:
-     
-        model_id_deepseek = find_by_relative_path("./local_model/qwen_coder_7b_instruct/")
-        logging.info(f"🔍 .exe dir path: {model_id_deepseek}")
+        global Global_offline_model
+        model_path = "./local_model/qwen_coder_7b_instruct/"
         Global_offline_model = TransformersModel(
-            model_id=model_id_deepseek, 
-            torch_dtype=dtype,
+            model_path,
             device_map=device,
-            do_sample=False,
-            top_k=50,
-            top_p=0.95, 
-            num_return_sequences=1
-        )
-        logging.info("✅ Model loaded successfully from executable location!")
-        print("✅ Model loaded successfully from executable location!")
-        return
-    except Exception as e3:
-        logging.info(f"❌ All model loading attempts failed: {e3}")
-        print(f"❌ All model loading attempts failed: {e3}")
+            torch_dtype=dtype,
+            trust_remote_code=True,
+            max_new_tokens=1024,
+            eos_token_id=151643,   
+            temperature=0.2,    
+            )
+        print("✅ Model loaded successfully in the background!")
+        logging.info("✅ Model loaded successfully in the background!")
+    except Exception as e:
+         print(f"error: {str(e)}")
+         logging.error(f"error: {str(e)}")
+    
+   
 
-  
+
+
+
+
+
 
     
 
@@ -588,14 +571,15 @@ class Agent_GUI():
             "7. Finally, present your output using this format:\n"
             "title: ...\ndescription: ...\nkeywords: ...\nhashtags: ..."
         )
+       
         uploaded_file = self.file_menu_var.get()
         context_vars = {
-                "video_path": Video_path,
-                "file_type": file,
+               "video_path": Video_path,
+               "file_type": file,
                 "chat_display": self.chat_display,
             }       
 
-        prompts = find_by_relative_path(f"./local_model/qwen_coder_7b_instruct/prompts.yaml")
+        prompts = find_by_relative_path(f"./local_model/qwen_coder_7b_instruct/original_prompts.yaml")
         with open(prompts, 'r') as stream:
                 prompt_templates = yaml.safe_load(stream)
 
@@ -607,15 +591,15 @@ class Agent_GUI():
                 FinalAnswerTool(), 
                 SpeechToTextTool(),
                 VisitWebpageTool(),
-                GoogleSearchTool(),
                 ExtractAudioFromVideo,
                 Fetch_top_trending_youtube_videos,
-                Log_Agent_Progress
+                Log_Agent_Progress,
+                DuckDuckGoSearchTool(),
+                PythonInterpreterTool(),
             ], 
-            max_steps=10,
-            verbosity_level=3,
+            max_steps=5,
+            verbosity_level=4,
             prompt_templates=prompt_templates,
-            add_base_tools=True
         )
 
         Response = manager_agent .run(
@@ -5847,6 +5831,7 @@ def on_app_close() -> None:
 class VideoEnhancer():
     def __init__(self, Master):
         #Master.attributes('-fullscreen', True)
+        Thread(target=load_model_background, daemon=True).start()
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
@@ -5870,7 +5855,7 @@ class VideoEnhancer():
         place_message_label()
         place_upscale_button()
         selected_VRAM_limiter.set(str(round(get_gpu_vram() / 1000)) if get_gpu_vram() else "4")
-        Thread(target=load_model_background, daemon=True).start()
+ 
     
             
         

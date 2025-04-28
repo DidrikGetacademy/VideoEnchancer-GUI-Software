@@ -1,4 +1,5 @@
 from smolagents import tool
+from tkinter.scrolledtext import ScrolledText
 import os
 from googleapiclient.discovery import build
 import subprocess
@@ -60,7 +61,7 @@ def ExtractAudioFromVideo(video_path: str) -> str:
 
 
 @tool
-def Log_Agent_Progress(chat_display, stage: str, message: str) -> str:
+def Log_Agent_Progress(chat_display: ScrolledText, stage: str, message: str) -> str:
     """
         A tool for logging agent thoughts, actions, and reflections during task execution.
 
