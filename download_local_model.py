@@ -71,7 +71,40 @@ def download_Qwen_Coder_Instruct_3b():
 
 def download_Qwen_Coder_Instruct_5b():
     model_repo = "Qwen/Qwen2.5-1.5B-Instruct"
-    local_dir = "./local_model/Qwen2.5-Coder-3B-Instruct"
+    local_dir = "./local_model/Qwen2.5-Coder-5B-Instruct"
+
+    if not os.path.exists(local_dir):
+        print(f"📥 Downloading {model_repo} into {local_dir}...")
+        snapshot_download(
+            repo_id=model_repo,
+            local_dir=local_dir,
+            resume_download=True,
+            local_dir_use_symlinks=False
+        )
+        print(f"✅ Qwen2.5-Coder-3B-Instruct downloaded successfully.")
+    else:
+        print(f"✅ Model already exists at {local_dir}, skipping download.")
+
+def download_Qwen__Instruct_7b():
+    model_repo = "Qwen/Qwen2.5-7B-Instruct-1M"
+    local_dir = "./local_model/Qwen2.5-Coder-7B-Instruct"
+
+    if not os.path.exists(local_dir):
+        print(f"📥 Downloading {model_repo} into {local_dir}...")
+        snapshot_download(
+            repo_id=model_repo,
+            local_dir=local_dir,
+            resume_download=True,
+            local_dir_use_symlinks=False
+        )
+        print(f"✅ Qwen2.5-Coder-3B-Instruct downloaded successfully.")
+    else:
+        print(f"✅ Model already exists at {local_dir}, skipping download.")
+
+
+def download_Qwen_Coder_Instruct_7bb():
+    model_repo = "Qwen/Qwen2.5-Coder-7B-Instruct"
+    local_dir = "./local_model/Qwen/Qwen2.5-Coder-7B-Instruct"
 
     if not os.path.exists(local_dir):
         print(f"📥 Downloading {model_repo} into {local_dir}...")
@@ -107,4 +140,4 @@ def download_Deepseek_Coder_67B_Instruct():
 
 
 if __name__ == "__main__":
-   download_Qwen_Coder_Instruct_5b()
+     download_Qwen_Coder_Instruct_7bb()

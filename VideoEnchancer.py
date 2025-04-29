@@ -336,18 +336,16 @@ def load_model_background():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     global Global_offline_model
-    
     try:
         global Global_offline_model
-        model_path = "./local_model/qwen_coder_7b_instruct/"
+        model_path = find_by_relative_path("./local_model/Qwen/Qwen2.5-Coder-7B-Instruct/")
         Global_offline_model = TransformersModel(
             model_path,
             device_map=device,
             torch_dtype=dtype,
             trust_remote_code=True,
+            eos_token_id=[151645, 151643],
             max_new_tokens=1024,
-            eos_token_id=151643,   
-            temperature=0.2,    
             )
         print("✅ Model loaded successfully in the background!")
         logging.info("✅ Model loaded successfully in the background!")
@@ -381,6 +379,7 @@ class Agent_GUI():
     def __init__(self, parent_container):
         self.parent_container = parent_container
         self.uploaded_files = selected_file_list
+  
         
       
         self.container = CTkFrame(
@@ -414,7 +413,7 @@ class Agent_GUI():
 
         self.loading_label.configure(text="✅ Model loaded successfully.")
         self.model = Global_offline_model
-
+        #self.Model_VectorBase = QwenVectorbase
         self.create_widgets()
         global file_list_update_callback
         file_list_update_callback = self.sync_uploaded_files
@@ -570,6 +569,7 @@ class Agent_GUI():
             "6. ALWAYS REMEMBER Log your thoughts and each step using the Log_Agent_Progress tool. "
             "7. Finally, present your output using this format:\n"
             "title: ...\ndescription: ...\nkeywords: ...\nhashtags: ..."
+            "REMEMBER YOU DO NOT NEED TOO IMPORT ANY MODULES TOO ACHIEVE ANY TASK"
         )
        
         uploaded_file = self.file_menu_var.get()
@@ -579,7 +579,7 @@ class Agent_GUI():
                 "chat_display": self.chat_display,
             }       
 
-        prompts = find_by_relative_path(f"./local_model/qwen_coder_7b_instruct/original_prompts.yaml")
+        prompts = find_by_relative_path(f"./Assets/prompts.yaml")
         with open(prompts, 'r') as stream:
                 prompt_templates = yaml.safe_load(stream)
 
