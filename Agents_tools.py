@@ -5,6 +5,7 @@ from googleapiclient.discovery import build
 import subprocess
 import datetime
 import tkinter as tk
+from dotenv import load_dotenv
 @tool
 def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
     """
@@ -17,7 +18,7 @@ def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
         dict: A dictionary containing video metadata including title, description, view count, like count, comment count,
         thumbnails, and channel title for each top trending video.
     """
-                
+    load_dotenv()       
     Api_key = os.getenv("YOUTUBE_API_KEY")
 
     youtube = build("youtube", "v3", developerKey=Api_key)
@@ -44,7 +45,6 @@ def ExtractAudioFromVideo(video_path: str) -> str:
             str:  the path to the extracted audio file.
     """
     audio_path = "temp_audio.wav"
-    audio_path = "temp_audio.wav"
     command = [
         "ffmpeg",
         "-y",  #
@@ -64,9 +64,8 @@ def ExtractAudioFromVideo(video_path: str) -> str:
 def Log_Agent_Progress(chat_display: ScrolledText, stage: str, message: str) -> str:
     """
         A tool for logging agent thoughts, actions, and reflections during task execution.
-
         Args:
-            chat_display: The chat display widget to output messages.
+            chat_display(str):  you have access too the chat_display variable just do chat_display=chat_display when you call this function.
             stage (str): One of "info", "action", "reflection".
             message (str): A descriptive message of what the agent is doing or thinking.
 

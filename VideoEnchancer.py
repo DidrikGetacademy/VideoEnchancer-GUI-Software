@@ -3,11 +3,14 @@ import os
 import torch 
 import Vocal_Isolation
 import onnxruntime as ort
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, PythonInterpreterTool, TransformersModel, tool, SpeechToTextTool
+from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool,PythonInterpreterTool
+from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress
 import yaml
 from tkinter import filedialog
 import os
@@ -324,13 +327,15 @@ supported_video_extensions = [
 
 
 
+CPU_ONLY = 'CUDAExecutionProvider' not in ort.get_available_providers()
+if CPU_ONLY:
+    FRAMES_FOR_CPU = 5
 
+
+#didrik
 def load_model_background():
     device, dtype = check_hardware()
-
     print(f"🧠 Loading model on {device} using dtype: {dtype}")
-
-
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     gc.collect()
     if torch.cuda.is_available():
@@ -338,14 +343,14 @@ def load_model_background():
     global Global_offline_model
     try:
         global Global_offline_model
-        model_path = find_by_relative_path("./local_model/Qwen/Qwen2.5-Coder-7B-Instruct/")
+        model_path = find_by_relative_path("./local_model/Qwen2.5-Coder-3B-Instruct")
         Global_offline_model = TransformersModel(
             model_path,
             device_map=device,
             torch_dtype=dtype,
             trust_remote_code=True,
-            eos_token_id=[151645, 151643],
-            max_new_tokens=1024,
+            max_new_tokens=256, ###THIS IS the output token of the final answear, for this usertask 256 is nice perfectooooo
+            do_sample=False,
             )
         print("✅ Model loaded successfully in the background!")
         logging.info("✅ Model loaded successfully in the background!")
@@ -367,21 +372,13 @@ def load_model_background():
 
 
 
-CPU_ONLY = 'CUDAExecutionProvider' not in ort.get_available_providers()
-if CPU_ONLY:
-    FRAMES_FOR_CPU = 5
 
-
-#didrik
 class Agent_GUI():
     """Agent that retrieves transcripts, searches the web, and generates optimized metadata for videos."""
 
     def __init__(self, parent_container):
         self.parent_container = parent_container
         self.uploaded_files = selected_file_list
-  
-        
-      
         self.container = CTkFrame(
             master=self.parent_container,
             fg_color="#282828",
@@ -429,7 +426,6 @@ class Agent_GUI():
         )
         self.top_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
 
-   
         self.file_menu_var = StringVar(value="No files uploaded")
         self.file_menu = CTkOptionMenu(
             master=self.top_bar,
@@ -444,8 +440,6 @@ class Agent_GUI():
             text_color="#FFFFFF"
         )
         self.file_menu.pack(side="left", padx=10, pady=5)
-
-
 
     
         self.metadata_btn = CTkButton(
@@ -520,16 +514,9 @@ class Agent_GUI():
         thread.start()
         self.metadata_btn.configure(state="DISABLED")
       
-
-
     def load_llama_instruct(self, uploaded_file=None):
         load_dotenv()
-
-
         uploaded_file = self.file_menu_var.get()
-
-
-
         if uploaded_file: 
                 file_extension = os.path.splitext(uploaded_file)[1].lower()
                 if file_extension in ['.mp4', '.avi', '.mov', '.mkv']:
@@ -556,53 +543,37 @@ class Agent_GUI():
             self.chat_display.config(state=tk.DISABLED)  
             return
                 
-
-
-
-
-        user_task = (
-            "1. Use the ExtractAudioFromVideo tool to extract audio from the video. "
-            "2. Store the returned path to the audio file (e.g., temp_audio.wav). "
-            "3. Use the SpeechToTextTool (called 'transcriber') to transcribe the audio by passing the audio path as input to the tool like: SpeechToTextTool(audio=audio_path). "
-            "4. After you have the transcript, analyze it and create a unique and engaging title, description, keywords, hashtags and emojies "
-            "5. Search for trending and similar content using Fetch_top_trending_youtube_videos for inspiration. "
-            "6. ALWAYS REMEMBER Log your thoughts and each step using the Log_Agent_Progress tool. "
-            "7. Finally, present your output using this format:\n"
-            "title: ...\ndescription: ...\nkeywords: ...\nhashtags: ..."
-            "REMEMBER YOU DO NOT NEED TOO IMPORT ANY MODULES TOO ACHIEVE ANY TASK"
-        )
+        user_task = "Provide me with SEO optimized metadata for my video. Do not copy paste from the information you gather. provide me final answear with a uniqe creative (title, description, hashtag, keyword)"
        
         uploaded_file = self.file_menu_var.get()
         context_vars = {
                "video_path": Video_path,
                "file_type": file,
-                "chat_display": self.chat_display,
+               "chat_display": self.chat_display,
             }       
 
-        prompts = find_by_relative_path(f"./Assets/prompts.yaml")
-        with open(prompts, 'r') as stream:
+ 
+        with open(find_by_relative_path("./Assets//prompts.yaml"), 'r') as stream:
                 prompt_templates = yaml.safe_load(stream)
 
+        #didrik
+        final_answer = FinalAnswerTool()
+        web_search = DuckDuckGoSearchTool()
+        Extract_audio = ExtractAudioFromVideo
+        fetch_youtube_video_information = Fetch_top_trending_youtube_videos
+        log_every_step = Log_Agent_Progress
+        transcriber = SpeechToTextTool()
 
-        from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress
         manager_agent  = CodeAgent(
             model=self.model,
-            tools=[
-                FinalAnswerTool(), 
-                SpeechToTextTool(),
-                VisitWebpageTool(),
-                ExtractAudioFromVideo,
-                Fetch_top_trending_youtube_videos,
-                Log_Agent_Progress,
-                DuckDuckGoSearchTool(),
-                PythonInterpreterTool(),
-            ], 
-            max_steps=5,
-            verbosity_level=4,
+            tools=[final_answer, web_search, log_every_step, Extract_audio, fetch_youtube_video_information,transcriber], 
+            max_steps=13,
+            verbosity_level=2,
             prompt_templates=prompt_templates,
+            additional_authorized_imports=['datetime']
         )
 
-        Response = manager_agent .run(
+        Response = manager_agent.run(
             task=user_task,
             additional_args=context_vars
         )
@@ -622,11 +593,6 @@ class Agent_GUI():
                 logging.info("🗑️ temp_audio.wav deleted successfully.")
         except Exception as e:
             logging.info(f"⚠️ Error deleting temp audio: {e}")
-
-
-
-
-        
 
          
     def clean_temp_audio(self):
@@ -1731,7 +1697,7 @@ class ToolMenu:
         self.container.rowconfigure(1, weight=1)
 
  
-#didrik
+
 class LR_Agent_Automation:
 
     def __init__(self, parent_container):
@@ -1937,7 +1903,7 @@ class LR_Agent_Automation:
                 with open(prompts, 'r') as stream:
                      prompt = yaml.safe_load(stream)
 
-                user_task = """Your goal is to create a video based on the specified topic and parameters.
+                Custom_user_task = """Your goal is to create a video based on the specified topic and parameters.
 
                 1. Read all the additional arguments that are provided to you. These arguments give you insight into the video to be created — including title, topic, description, number of clips to generate, and the media preference (e.g., videos only, or a mix of images and videos). If any of the values are empty or None, use your creativity to decide them.
 
@@ -1974,7 +1940,7 @@ class LR_Agent_Automation:
                 )
 
                 self.manager_agent = AutoMation_agent
-                self.user_task = user_task
+                self.user_task = Custom_user_task
                 self.context_var = self.context_var
 
 

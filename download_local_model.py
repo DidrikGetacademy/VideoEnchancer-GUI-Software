@@ -97,7 +97,7 @@ def download_Qwen__Instruct_7b():
             resume_download=True,
             local_dir_use_symlinks=False
         )
-        print(f"✅ Qwen2.5-Coder-3B-Instruct downloaded successfully.")
+        print(f"✅ Qwen2.5-Coder-7B-Instruct downloaded successfully.")
     else:
         print(f"✅ Model already exists at {local_dir}, skipping download.")
 
@@ -114,7 +114,7 @@ def download_Qwen_Coder_Instruct_7bb():
             resume_download=True,
             local_dir_use_symlinks=False
         )
-        print(f"✅ Qwen2.5-Coder-3B-Instruct downloaded successfully.")
+        print(f"✅ Qwen2.5-Coder-7B-Instruct downloaded successfully.")
     else:
         print(f"✅ Model already exists at {local_dir}, skipping download.")
 
@@ -140,4 +140,4 @@ def download_Deepseek_Coder_67B_Instruct():
 
 
 if __name__ == "__main__":
-     download_Qwen_Coder_Instruct_7bb()
+     download_Qwen_Coder_Instruct_3b()
