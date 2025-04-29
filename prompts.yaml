@@ -376,15 +376,3 @@
     {{final_answer}}
 
 
-"final_answer":
-  "pre_messages": |-
-    Here is the generated video metadata based on your content and trending analysis:
-
-  "final_answer": |-
-    Title: [Your catchy, optimized video title]
-    Description: [Your detailed, SEO-rich description]
-    Keywords: [Comma-separated relevant keywords]
-    Hashtags: [Trending and relevant hashtags]
-
-  "post_messages": |-
-    This metadata has been tailored based on current video trends and content optimization techniques. Good luck with your upload!

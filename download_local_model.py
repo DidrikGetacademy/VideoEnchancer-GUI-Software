@@ -53,8 +53,24 @@ def download_Mistral_7B_Instruct_v02():
         print(f"✅ Model already exists at {local_dir}, skipping download.")
 
 
-def download_Qwen_Coder_Instruct():
-    model_repo = "Qwen2.5-Coder-3B-Instruct"
+def download_Qwen_Coder_Instruct_3b():
+    model_repo = "Qwen/Qwen2.5-VL-3B-Instruct"
+    local_dir = "./local_model/Qwen2.5-Coder-3B-Instruct"
+
+    if not os.path.exists(local_dir):
+        print(f"📥 Downloading {model_repo} into {local_dir}...")
+        snapshot_download(
+            repo_id=model_repo,
+            local_dir=local_dir,
+            resume_download=True,
+            local_dir_use_symlinks=False
+        )
+        print(f"✅ Qwen2.5-Coder-3B-Instruct downloaded successfully.")
+    else:
+        print(f"✅ Model already exists at {local_dir}, skipping download.")
+
+def download_Qwen_Coder_Instruct_5b():
+    model_repo = "Qwen/Qwen2.5-1.5B-Instruct"
     local_dir = "./local_model/Qwen2.5-Coder-3B-Instruct"
 
     if not os.path.exists(local_dir):
@@ -91,4 +107,4 @@ def download_Deepseek_Coder_67B_Instruct():
 
 
 if __name__ == "__main__":
-  download_Qwen_Coder_Instruct()
+   download_Qwen_Coder_Instruct_5b()
