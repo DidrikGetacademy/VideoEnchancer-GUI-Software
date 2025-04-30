@@ -411,6 +411,8 @@ class Agent_GUI():
         self.loading_label.configure(text="✅ Model loaded successfully.")
         self.model = Global_offline_model
         #self.Model_VectorBase = QwenVectorbase
+
+
         self.create_widgets()
         global file_list_update_callback
         file_list_update_callback = self.sync_uploaded_files
@@ -1702,7 +1704,6 @@ class LR_Agent_Automation:
 
     def __init__(self, parent_container):
         self.parent_container = parent_container
-       #self.LR_Agent_Automation_model = Global_offline_model
       
         
         self.should_stop = False
@@ -1722,33 +1723,94 @@ class LR_Agent_Automation:
             font=("Arial", 14)
         )
         self.loading_label.grid(row=2, column=0, pady=5, sticky="nsew")
-        wait_time = 0
-        while Global_offline_model is None:
-            self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
-            self.loading_label.update_idletasks()
-            time.sleep(1)
-            wait_time += 1
-            if wait_time > 60:
-                self.loading_label.configure(text="❌ Timeout waiting for model to load.")
-                return
+        # wait_time = 0
+        # while Global_offline_model is None:
+        #     self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
+        #     self.loading_label.update_idletasks()
+        #     time.sleep(1)
+        #     wait_time += 1
+        #     if wait_time > 60:
+        #         self.loading_label.configure(text="❌ Timeout waiting for model to load.")
+        #         return
 
-        self.loading_label.configure(text="✅ Model loaded successfully.")
-        self.model = Global_offline_model
+        # self.loading_label.configure(text="✅ Model loaded successfully.")
+        # self.model = Global_offline_model
+        # #self.Model_VectorBase = QwenVectorbase
 
 
+     
 
         self.create_widgets()
 
 
-        self.chat_display  = scrolledtext.ScrolledText(
-        self.container,
-          wrap=tk.WORD,
-          width=55,
-          height=25,
-          font=("Helvetica",12),
-          bg="black",  
-          fg="white",
-          state="disabled",
+
+
+    def create_widgets(self):
+        #Top section with all user inputs
+        self.top_bar = CTkFrame(
+            master=self.container,
+            fg_color="black",
+            border_color="white",
+            border_width=2
+        )
+        self.top_bar.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 0))
+        self.top_bar.columnconfigure((0, 1, 2), weight=1)
+
+        #Title input
+        self.title_entry = CTkEntry(self.top_bar, placeholder_text="Title of video", width=250)
+        self.title_entry.grid(row=0, column=0, padx=(10, 5), pady=(10, 5), sticky="w")
+
+        # Dropdown1
+        self.styledropdown1 = CTkOptionMenu(self.top_bar, variable=StringVar(), values=[
+            "Cinematic", "Emotional", "Inspirational", "Mystical",
+            "Playful", "Dark & Gritty", "Uplifting", "Chill / Relaxed",
+            "Tense / Suspenseful", "Epic", "Minimalistic", "Abstract / Surreal"
+        ], width=175)
+        self.styledropdown1.set("None")
+        self.styledropdown1.grid(row=0, column=1, padx=(5, 10), pady=(10, 5), sticky="w")
+
+        #Dropdown2
+        self.styledropdown2 = CTkOptionMenu(self.top_bar, variable=StringVar(), values=[
+            "value1", "value2", "value3", "value4"
+        ], width=175)
+        self.styledropdown2.set("None")
+        self.styledropdown2.grid(row=1, column=1, padx=(5, 10), pady=5, sticky="w")
+
+        #Topic
+        self.topic_entry = CTkEntry(self.top_bar, placeholder_text="Topic of video", width=250)
+        self.topic_entry.grid(row=1, column=0, padx=(10, 5), pady=5, sticky="w")
+
+        #Amount
+        self.video_amount = CTkEntry(self.top_bar, textvariable=StringVar(), placeholder_text="Amount of videos", width=100)
+        self.video_amount.grid(row=0, column=2, padx=5, pady=5, sticky="w")
+
+        #Description label
+        self.description_label = CTkLabel(self.top_bar, text="📝 Description of the Video", font=("Arial", 14), text_color="white")
+        self.description_label.grid(row=2, column=0, columnspan=3, padx=10, pady=(10, 0), sticky="w")
+
+        #Description box
+        self.description_entry = CTkTextbox(self.top_bar, height=110)
+        self.description_entry.grid(row=3, column=0, columnspan=3, padx=10, pady=(5, 10), sticky="ew")
+
+        #Agent run button 
+        self.run_agent_node = CTkButton(
+            master=self.top_bar,
+            command=lambda: Thread(target=self.run_agent).start(),
+            fg_color="black",
+            text="▶ Run AGENT Node"
+        )
+        self.run_agent_node.grid(row=1, column=2, padx=10, pady=0, sticky="ne")
+
+        #Chat area below other widgets
+        self.chat_display = scrolledtext.ScrolledText(
+            self.container,
+            wrap=tk.WORD,
+            width=55,
+            height=25,
+            font=("Helvetica", 12),
+            bg="black",
+            fg="white",
+            state="disabled"
         )
         self.chat_display.config(
             insertbackground="yellow",
@@ -1757,80 +1819,9 @@ class LR_Agent_Automation:
             borderwidth=2,
             relief="sunken"
         )
-        self.chat_display.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        self.chat_display.yview(END)
+        self.chat_display.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=(0, 10))
         self.container.columnconfigure(0, weight=1)
         self.container.rowconfigure(1, weight=1)
-
-
-    def create_widgets(self):
-        self.settingsframe = CTkFrame(
-            self.container,
-            width=750,
-            height=750,
-            fg_color="black",
-            bg_color="black"
-        )
-        self.settingsframe.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
-
-        self.media_type_var = tk.StringVar(value="videos only")
-        self.media_type_menu = CTkComboBox(self.container,textvariable =self.media_type_var, state="readonly")
-        self.media_type_menu["values"] = ("videos only", "images and videos")
-        self.media_type_menu.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
-
-
-        self.title_entry = CTkEntry(
-            self.settingsframe,
-            placeholder_text="Title of video",
-            width=500
-        )
-        self.title_entry.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
-
-
-        self.topic_entry = CTkEntry(
-            self.settingsframe,
-            placeholder_text="Topic of video",
-            width=500
-        )
-        self.topic_entry.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
-
-        
-        from tkinter import StringVar
-        def only_digits_input(P):
-            return P.isdigit() or P == ""  
-
-        vcmd = self.settingsframe.register(only_digits_input)
-
-       
-        self.video_amount_var = StringVar()
-        self.video_amount = CTkEntry(
-            self.settingsframe,
-            textvariable=self.video_amount_var,
-            placeholder_text="Amount of videos to be made",
-            validate="key",
-            validatecommand=(vcmd, "%P"),
-            width=500
-        )
-        self.video_amount.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
-
-
-        self.description_entry = CTkTextbox(
-            self.settingsframe,
-            width=500,
-            height=100
-        )
-        self.description_entry.insert("1.0", "Description of video")
-        self.description_entry.grid(row=1, column=0, padx=20, pady=(10, 20), sticky="w")
-
-
-        self.run_agent_node = CTkButton(
-            self.container,
-            command=lambda: Thread(target=self.run_agent).start(),
-            fg_color="black",
-            text="Run AGENT Node"
-        )
-        self.run_agent_node.grid(row=0,column=0, padx=20, pady=(20,10),sticky="w")
-
 
 
     def run_single_video_task(self):
@@ -1864,55 +1855,22 @@ class LR_Agent_Automation:
 
 
 
-            @tool
-            def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
-                    """
-                    A tool for fetching metadata from top trending YouTube videos in a specific category or topic.
-
-                    Args:
-                        Search_Query (str): A keyword or topic to search for trending YouTube videos (e.g., "Motivational", "Funny", "Tech Reviews").
-
-                    Returns:
-                        dict: A dictionary containing video metadata including title, description, view count, like count, comment count,
-                        thumbnails, and channel title for each top trending video.
-                    """
-                    
-                    Api_key = os.getenv("YOUTUBE_API_KEY")
-
-                    youtube = build("youtube", "v3", developerKey=Api_key)
-
-                    request = youtube.search().list(
-                        part="snippet",
-                        q=Search_Query,
-                        type="video",
-                        maxResults=30
-                    )
-                    response = request.execute()
-
-                    return response 
-            
-            @tool
-            def next_video_goals(Next_video_conecpt: str) -> str:
-                """
-                
-                """
-                return
 
             try:
                 prompts = find_by_relative_path(f"Assets{os_separator}prompts_video_creator.yaml")
                 with open(prompts, 'r') as stream:
                      prompt = yaml.safe_load(stream)
 
-                Custom_user_task = """Your goal is to create a video based on the specified topic and parameters.
+                Custom_user_task = f"""Your goal is to create a video based on the specified topic and parameters implemented.
+                                   1.
+                                   2.
+                                   3.
+                                   4.
+                                   5.
+                                   6.
 
-                1. Read all the additional arguments that are provided to you. These arguments give you insight into the video to be created — including title, topic, description, number of clips to generate, and the media preference (e.g., videos only, or a mix of images and videos). If any of the values are empty or None, use your creativity to decide them.
-
-                2. Search the internet and social media platforms to gain insights from similar trending videos to inform your video concept.
-
-                3. Based on the gathered information and user preferences, start creating the video content accordingly.
-
-                4. When you are finnished with the video. use the tool (next_video_goals)
-                """
+                              
+                                   """
 
           
                 self.context_var =  { 
@@ -1922,9 +1880,9 @@ class LR_Agent_Automation:
                             "video_amount": self.video_amount_var.get(),
                             "media_type": self.media_type_var.get()
                             }
-                
+                #didrik
                 AutoMation_agent  = CodeAgent(
-                    model=self.LR_Agent_Automation_model,
+                    model=self.model,
                     tools=[
                         FinalAnswerTool(), 
                         SpeechToTextTool(),
@@ -1942,7 +1900,6 @@ class LR_Agent_Automation:
                 self.manager_agent = AutoMation_agent
                 self.user_task = Custom_user_task
                 self.context_var = self.context_var
-
 
                 response = self.manager_agent.run(
                             task=self.user_task,
@@ -2272,7 +2229,7 @@ class ToolWindowClass:
         self.menu_frame.pack(side="top", pady=(20, 10))
 
   
-        self.tool_list = ['Tool Menu','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','LR-Agent Automation','ColorRestorer']
+        self.tool_list = ['LR-Agent Automation','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','Tool Menu','ColorRestorer']
         self.tool_menu_var = StringVar(value=self.tool_list[0])
         self.tool_menu = CTkOptionMenu(
             master=self.menu_frame,
@@ -5797,7 +5754,7 @@ def on_app_close() -> None:
 class VideoEnhancer():
     def __init__(self, Master):
         #Master.attributes('-fullscreen', True)
-        Thread(target=load_model_background, daemon=True).start()
+      # Thread(target=load_model_background, daemon=True).start()
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
