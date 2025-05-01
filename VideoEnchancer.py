@@ -971,16 +971,13 @@ global youtube_progress_var
 
 def place_youtube_download_menu(parent_container):
     global youtube_link_entry, youtube_output_path_entry ,video_format_var, audio_format_var
-    frame_width, frame_height = 400, 300
+    frame_width, frame_height = 250, 150
 
     youtube_progress_var.set("")
-
     parent_container.grid_rowconfigure(0, weight=1)
     parent_container.grid_columnconfigure(0, weight=1)
 
-
-
-    
+        
     def update_format_list():
         url = youtube_link_entry.get()
         if url:
@@ -1005,51 +1002,46 @@ def place_youtube_download_menu(parent_container):
         master=parent_container,
         fg_color="black",
         bg_color="black",
-        corner_radius=15
+        corner_radius=15,
+        border_width=4,
+        border_color="white"  
     )
-    input_frame.grid(row=0, column=0, sticky="w", padx=30, pady=30)
+    input_frame.grid(row=0, column=0, padx=0, pady=0)  
     input_frame.grid_rowconfigure(0, weight=1)
+    input_frame.grid_columnconfigure(0, weight=1)
 
 
 
-
-
-    left_half_frame = CTkFrame(
+    youtube_widget_container = CTkFrame(
         master=input_frame,
         fg_color="#161b22",  
-        corner_radius=10
+        border_width=2,
+        border_color="white"  
+
     )
-    left_half_frame.grid(row=0, column=0, sticky="nsew", pady=10)
-    for i in range(2): left_half_frame.grid_rowconfigure(i, weight=1)
-
-   
-    right_half_frame = CTkFrame(
-        master=input_frame,
-        fg_color="black",
-        bg_color="black",
-        corner_radius=10
-    )
-    right_half_frame.grid(row=0, column=1, sticky="nsew", pady=0)
+    youtube_widget_container.grid(row=0, column=0)
 
 
-
+  
     #youtube image
     bg_image = Image.open(find_by_relative_path("Assets" + os_separator + "youtubebackground(1).png")).resize((frame_width, frame_height))
     bg_image_tk = CTkImage(bg_image, size=(frame_width, frame_height))
     bg_label = CTkLabel(
-        master=right_half_frame,
+        master=youtube_widget_container,
         image=bg_image_tk,
         width=frame_width,
         height=frame_height,
-        bg_color='transparent'
+        bg_color='transparent',
+        fg_color="transparent",
+        text="",
     )
-    bg_label.grid(row=0,column=0, padx=10, pady=10, sticky="w")
+    bg_label.grid(row=2,column=8, padx=(2,0), sticky="w")
     bg_label.image = bg_image_tk
 
 
 
     progress_label = CTkLabel(
-        master=left_half_frame,
+        master=youtube_widget_container,
         textvariable=youtube_progress_var,
         font=bold12,
         text_color="#00FF00",
@@ -1064,12 +1056,12 @@ def place_youtube_download_menu(parent_container):
             open_YoutubeDownloader_tool_info,
             "INFO",
             width=100,
-            master=left_half_frame
+            master=youtube_widget_container
         )
     Info_button_youtubedownloader.grid(row=6, column=0,padx=5, sticky="w", pady=0)
 
     youtube_output_path_entry = CTkEntry(
-        master=left_half_frame,
+        master=youtube_widget_container,
         width=300,
         height=25,
         corner_radius=5,
@@ -1084,7 +1076,7 @@ def place_youtube_download_menu(parent_container):
 
 
     Choose_path_btn = CTkButton(
-        master=left_half_frame,
+        master=youtube_widget_container,
         text="Choose path",
         width=80,
         height=25,
@@ -1110,7 +1102,7 @@ def place_youtube_download_menu(parent_container):
 
 
     youtube_url_label = CTkLabel(
-        master=left_half_frame,
+        master=youtube_widget_container,
         text="YouTube URL:", 
         font=bold12,
         text_color="#C0C0C0",
@@ -1122,7 +1114,7 @@ def place_youtube_download_menu(parent_container):
         
 
     youtube_link_entry = CTkEntry(
-        master=left_half_frame,
+        master=youtube_widget_container,
         width=300,
         height=30,
         corner_radius=8,
@@ -1141,7 +1133,7 @@ def place_youtube_download_menu(parent_container):
 
 
     Youtubelist_label =  CTkLabel(
-        master=left_half_frame,
+        master=youtube_widget_container,
         text="YouTube List: ", 
         font=bold12,
         text_color="#C0C0C0",
@@ -1155,7 +1147,7 @@ def place_youtube_download_menu(parent_container):
     global youtube_list_menu
     youtubelist_variable = StringVar(value=youtube_download_list)
     youtube_list_menu = CTkOptionMenu(
-            master=left_half_frame,
+            master=youtube_widget_container,
             variable=youtubelist_variable,
             values=youtube_download_list,
             width=300,
@@ -1169,7 +1161,7 @@ def place_youtube_download_menu(parent_container):
 
 
     video_format_label = CTkLabel(
-        master=left_half_frame,
+        master=youtube_widget_container,
         text="Video Format:",
         font=bold12,
         text_color="#C0C0C0",
@@ -1178,7 +1170,7 @@ def place_youtube_download_menu(parent_container):
     video_format_label.grid(row=3,column=0, padx=10, pady=10, sticky="w")
 
     video_format_dropdown = CTkComboBox(
-        master=left_half_frame,
+        master=youtube_widget_container,
         variable=video_format_var,
         values=["Enter Link First..."],
         width=300,
@@ -1192,7 +1184,7 @@ def place_youtube_download_menu(parent_container):
 
 
     audioformat_label = CTkLabel(
-        master=left_half_frame,
+        master=youtube_widget_container,
         text="Audio Format:",
         font=bold12,
         text_color="#C0C0C0",
@@ -1203,7 +1195,7 @@ def place_youtube_download_menu(parent_container):
 
 
     audio_format_dropdown = CTkComboBox(
-        master=left_half_frame,
+        master=youtube_widget_container,
         variable=audio_format_var,
         values=["Enter Link First..."],
         width=300
@@ -1213,7 +1205,7 @@ def place_youtube_download_menu(parent_container):
 
     global stop_youtube_download_btn
     stop_youtube_download_btn = CTkButton(
-        master=left_half_frame,
+        master=youtube_widget_container,
         text="Stop Download",
         width=100,
         height=30,
@@ -1226,7 +1218,7 @@ def place_youtube_download_menu(parent_container):
     )
     
     clear_list_btn = CTkButton(
-    master=left_half_frame,
+    master=youtube_widget_container,
     text="Clear List",
     width=100,
     height=30,
@@ -1243,7 +1235,7 @@ def place_youtube_download_menu(parent_container):
 
 
     addlist_btn = CTkButton(
-        master=left_half_frame,
+        master=youtube_widget_container,
         text="Add List",
         width=100,
         height=30,
@@ -1260,7 +1252,7 @@ def place_youtube_download_menu(parent_container):
 
     global upload_button
     upload_button = CTkButton(
-        master=left_half_frame,
+        master=youtube_widget_container,
         text="Upload Cookies",
         width=100,
         height=30,
@@ -1280,7 +1272,7 @@ def place_youtube_download_menu(parent_container):
 
 
     fetch_button = CTkButton(
-        master=left_half_frame,
+        master=youtube_widget_container,
         text="Fetch Details",
         width=100,
         height=30,
@@ -1297,7 +1289,7 @@ def place_youtube_download_menu(parent_container):
 
     global download_btn
     download_btn = CTkButton(
-        master=left_half_frame,
+        master=youtube_widget_container,
         text="Download",
         width=100,
         height=30,
@@ -2279,7 +2271,7 @@ class ToolWindowClass:
     def __init__(self, master):
         self.master = master
 
-        self.container = CTkFrame(master, fg_color="transparent",border_width=1.5, border_color="blue")
+        self.container = CTkFrame(master, fg_color="black",border_width=1.5, border_color="blue")
         self.container.place(relx=0.37, rely=0.71, relwidth=0.37, relheight=0.58, anchor="center")
 
 
