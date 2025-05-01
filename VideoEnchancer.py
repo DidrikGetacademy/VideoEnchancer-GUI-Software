@@ -577,7 +577,18 @@ class Agent_GUI():
         PythonInterpeter = PythonInterpreterTool()
 
         ###Create 2-3 new agents that can take care of web search and youtube information. and that agent passes that information too the second agent that will find secret virality keys ( tips/idea  and also summarize the api response of both search query before it gives it too manager agent. NB: THIS WAY I CAN MAKE SURE THAT THE AGENT DON'T GET SCREWED BY INFORMATION. AND THAT BY USING 3 AGENTS INFORMATION AND REASONING WILL FLOW BETTER)
+        Web_Search_agent = CodeAgent (
+            name="Web Search Agent",
+            description="Performs web searches and returns concise, structured summaries.",
+            add_base_tools=True,
 
+        )
+        Analytic_reason_agent = CodeAgent (
+            name="Analytic Reasoner",
+            description="Performs reasoning and thought on data from api response",
+            add_base_tools=True,
+
+        )
         manager_agent  = CodeAgent(
             model=self.model,
             tools=[final_answer, web_search, log_every_step, Extract_audio, fetch_youtube_video_information,transcriber,PythonInterpeter], 
@@ -585,7 +596,11 @@ class Agent_GUI():
             verbosity_level=2,
             prompt_templates=prompt_templates,
             additional_authorized_imports=['datetime'],
-            add_base_tools=True
+            add_base_tools=True,
+            managed_agents={
+                "Web_searcher": Web_Search_agent,
+                "AnalyticsHelper": Analytic_reason_agent
+            }
         )
 
         Response = manager_agent.run(
