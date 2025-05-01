@@ -970,82 +970,374 @@ class SocialMediaUploading:
 global youtube_progress_var
 
 def place_youtube_download_menu(parent_container):
-    #load_cookie_file_path()
-    frame_width = 800
-    frame_height = 600
     global youtube_link_entry, youtube_output_path_entry ,video_format_var, audio_format_var
-    bg_image = Image.open(find_by_relative_path("Assets" + os_separator + "youtubebackground(1).png")).resize((frame_width, frame_height))
-    bg_image_tk = CTkImage(bg_image, size=(frame_width, frame_height))
+    frame_width, frame_height = 400, 300
 
-    youtube_frame = CTkFrame(
-        master=parent_container,
-        fg_color="transparent",
-        corner_radius=10,
-        bg_color='transparent'
-    )
-    youtube_frame.place(relx=0.5, rely=0.5, relwidth=1, relheight=1, anchor="center")
+    youtube_progress_var.set("")
+
+    parent_container.grid_rowconfigure(0, weight=1)
+    parent_container.grid_columnconfigure(0, weight=1)
+
 
 
     
-    Info_button_youtubedownloader = create_info_button(
-            open_YoutubeDownloader_tool_info,
-            "INFO",
-            width=100,
-            master=youtube_frame
-        )
-    Info_button_youtubedownloader.place(relx=0.12, rely=0.87, anchor="e")
+    def update_format_list():
+        url = youtube_link_entry.get()
+        if url:
+            video_formats, audio_formats = get_available_formats(url)
+
+            if video_formats or audio_formats:
+                video_format_dropdown.configure(values=video_formats if video_formats else ["No video formats available"])
+                audio_format_dropdown.configure(values=audio_formats if audio_formats else ["No audio formats available"])
+                download_btn.configure(state="normal")
+
+           
+            if video_formats:
+                video_format_var.set(video_formats[0])
+            if audio_formats:
+                audio_format_var.set(audio_formats[0])
+
+            fetch_button.configure(state="disabled")
 
 
 
+    input_frame = CTkFrame(
+        master=parent_container,
+        fg_color="black",
+        bg_color="black",
+        corner_radius=15
+    )
+    input_frame.grid(row=0, column=0, sticky="w", padx=30, pady=30)
+    input_frame.grid_rowconfigure(0, weight=1)
+
+
+
+
+
+    left_half_frame = CTkFrame(
+        master=input_frame,
+        fg_color="#161b22",  
+        corner_radius=10
+    )
+    left_half_frame.grid(row=0, column=0, sticky="nsew", pady=10)
+    for i in range(2): left_half_frame.grid_rowconfigure(i, weight=1)
+
+   
+    right_half_frame = CTkFrame(
+        master=input_frame,
+        fg_color="black",
+        bg_color="black",
+        corner_radius=10
+    )
+    right_half_frame.grid(row=0, column=1, sticky="nsew", pady=0)
+
+
+
+    #youtube image
+    bg_image = Image.open(find_by_relative_path("Assets" + os_separator + "youtubebackground(1).png")).resize((frame_width, frame_height))
+    bg_image_tk = CTkImage(bg_image, size=(frame_width, frame_height))
     bg_label = CTkLabel(
-        master=youtube_frame,
+        master=right_half_frame,
         image=bg_image_tk,
         width=frame_width,
         height=frame_height,
         bg_color='transparent'
     )
-    bg_label.place(relx=0.7, rely=0.5, anchor="center")
+    bg_label.grid(row=0,column=0, padx=10, pady=10, sticky="w")
     bg_label.image = bg_image_tk
 
 
 
-    progress_label =CTkLabel(
-        master=youtube_frame,
+    progress_label = CTkLabel(
+        master=left_half_frame,
         textvariable=youtube_progress_var,
         font=bold12,
         text_color="#00FF00",
+        text="waiting",
         width=100
     )
-    progress_label.place(relx=0.23, rely=0.6, anchor="center")
+    progress_label.grid(row=6, column=0, sticky="w", padx=10, pady=10)
 
 
-    CTkButton(
-     master=youtube_frame,
-         text="Clear List",
-         #command=clear_download_list
-     ).place(relx=0.29, rely=0.76, anchor="e")
 
-    # CTkButton(
-    #     master=youtube_frame,
-    #     text="Configure format for each link",
-    #     command=Configure_format_youtube_list
-    # )
+    Info_button_youtubedownloader = create_info_button(
+            open_YoutubeDownloader_tool_info,
+            "INFO",
+            width=100,
+            master=left_half_frame
+        )
+    Info_button_youtubedownloader.grid(row=6, column=0,padx=5, sticky="w", pady=0)
 
-    # CTkButton(
-    #     master=youtube_frame,
-    #     text="Download all",
-    #     command=download_all_from_list
-    # ).place(relx=0.4, rely=0.76, anchor="e")
+    youtube_output_path_entry = CTkEntry(
+        master=left_half_frame,
+        width=300,
+        height=25,
+        corner_radius=5,
+        font=bold11,
+        fg_color="black",
+        bg_color="black",
+        justify="center"
+    )
+    youtube_output_path_entry.grid(row=0, column=1, sticky="w", padx=10, pady=10)
+    youtube_output_path_entry.insert(0,DOCUMENT_PATH)
 
-    # def Configure_format_youtube_list():
-    #     return
+
+
+    Choose_path_btn = CTkButton(
+        master=left_half_frame,
+        text="Choose path",
+        width=80,
+        height=25,
+        fg_color="black",
+        hover_color="#2563eb",  
+        border_color="#3b82f6", 
+        font=bold11,
+        text_color="#ffffff",
+        command=lambda: select_youtube_output_path()
+    )
+    Choose_path_btn.grid(row=0,column=0, padx=10, pady=10, sticky="w")
+
+
+
+ 
+
+    def update_fetch_button_state(event=None):
+        url = youtube_link_entry.get()
+        if "youtube.com" in url or "youtu.de" in url:
+            fetch_button.configure(state="normal")  
+        else:       
+            fetch_button.configure(state="disabled")
+
+
+    youtube_url_label = CTkLabel(
+        master=left_half_frame,
+        text="YouTube URL:", 
+        font=bold12,
+        text_color="#C0C0C0",
+        bg_color="transparent",
+        fg_color="transparent",
+        justify="center"
+    )
+    youtube_url_label.grid(row=2, column=0, padx=10, pady=10, sticky="w")
+        
+
+    youtube_link_entry = CTkEntry(
+        master=left_half_frame,
+        width=300,
+        height=30,
+        corner_radius=8,
+        font=bold11,
+        fg_color="black",
+        placeholder_text="Add youtube Link",
+        bg_color="black",
+        text_color="#f0f0f0",
+        justify="center"
+    )
+    youtube_link_entry.grid(row=2,column=1, padx=10, pady=10, sticky="w")
+
+    youtube_link_entry.bind("<KeyRelease>", update_fetch_button_state)
+
+
+
+
+    Youtubelist_label =  CTkLabel(
+        master=left_half_frame,
+        text="YouTube List: ", 
+        font=bold12,
+        text_color="#C0C0C0",
+        bg_color='transparent',
+        fg_color="transparent",
+        justify="center"
+    )
+    Youtubelist_label.grid(row=1, column=0, sticky="w", padx=10, pady=10)
+
+    global youtubelist_variable
+    global youtube_list_menu
+    youtubelist_variable = StringVar(value=youtube_download_list)
+    youtube_list_menu = CTkOptionMenu(
+            master=left_half_frame,
+            variable=youtubelist_variable,
+            values=youtube_download_list,
+            width=300,
+            button_color="black",
+            bg_color="black",
+            fg_color="black",
+            text_color="#FFFFFF",
+        )
+    youtube_list_menu.grid(row=1, column=1, sticky="w", padx=10, pady=10)
+
+
+
+    video_format_label = CTkLabel(
+        master=left_half_frame,
+        text="Video Format:",
+        font=bold12,
+        text_color="#C0C0C0",
+        bg_color="transparent",
+    )
+    video_format_label.grid(row=3,column=0, padx=10, pady=10, sticky="w")
+
+    video_format_dropdown = CTkComboBox(
+        master=left_half_frame,
+        variable=video_format_var,
+        values=["Enter Link First..."],
+        width=300,
+        fg_color="black",
+        border_color="#3b82f6",
+        button_color="#1f2937",
+        text_color="#ffffff"
+    )
+    video_format_dropdown.grid(row=3,column=1, padx=10, pady=10, sticky="w")
+
+
+
+    audioformat_label = CTkLabel(
+        master=left_half_frame,
+        text="Audio Format:",
+        font=bold12,
+        text_color="#C0C0C0",
+        bg_color="transparent",
+    )
+    audioformat_label.grid(row=4,column=0, padx=10, pady=10, sticky="w")
+
+
+
+    audio_format_dropdown = CTkComboBox(
+        master=left_half_frame,
+        variable=audio_format_var,
+        values=["Enter Link First..."],
+        width=300
+    )
+    audio_format_dropdown.grid(row=4,column=1, padx=10, pady=10, sticky="w")
+
+
+    global stop_youtube_download_btn
+    stop_youtube_download_btn = CTkButton(
+        master=left_half_frame,
+        text="Stop Download",
+        width=100,
+        height=30,
+        font=bold11,
+        command=lambda: Stop_Youtube_Downloading(),
+        hover_color="#2563eb",  
+        border_color="#3b82f6",  
+        border_width=1,
+        state="DISABLED"
+    )
     
+    clear_list_btn = CTkButton(
+    master=left_half_frame,
+    text="Clear List",
+    width=100,
+    height=30,
+    #command=clear_download_list,
+    fg_color="black",
+    hover_color="#2563eb",
+    border_color="#3b82f6",
+    border_width=1,
+    text_color="#ffffff"
+     )
+    clear_list_btn.grid(row=0, column=3, padx=10, pady=10, sticky="w")
 
-    # def download_all_from_list():
-    #     output_path = youtube_output_path_entry.get()
-    #     if not output_path:
-    #         info_message.set("Choose a folder for saving!")
+
+
+
+    addlist_btn = CTkButton(
+        master=left_half_frame,
+        text="Add List",
+        width=100,
+        height=30,
+        fg_color="black",
+        hover_color="#2563eb", 
+        border_color="#3b82f6",  
+        border_width=1,
+        text_color="#ffffff",
+        command=add_link_to_download_list
+    )
+    addlist_btn.grid(row=1, column=3, sticky="w", padx=10, pady=10)
+ 
+
+
+    global upload_button
+    upload_button = CTkButton(
+        master=left_half_frame,
+        text="Upload Cookies",
+        width=100,
+        height=30,
+        font=bold11,
+        command=lambda: upload_cookie_file(),
+        fg_color="black",
+        hover_color="#2563eb", 
+        border_color="#3b82f6",  
+        border_width=1
+    )
+    upload_button.grid(row=6,column=3, padx=10, pady=10, sticky="w")
+    if cookie_file_path is None:
+      upload_button.grid(row=6,column=3, padx=10, pady=10, sticky="w")
+    
+    if cookie_file_path is not None:
+        upload_button.place_forget()
+
+
+    fetch_button = CTkButton(
+        master=left_half_frame,
+        text="Fetch Details",
+        width=100,
+        height=30,
+        font=bold11,
+        command=update_format_list,
+        hover_color="#2563eb",  
+        border_color="#3b82f6",  
+        border_width=1,
+        text_color="#ffffff",
+        fg_color="black",
+        state="disabled"  
+    )
+    fetch_button.grid(row=2,column=3, padx=10, pady=10, sticky="w")
+
+    global download_btn
+    download_btn = CTkButton(
+        master=left_half_frame,
+        text="Download",
+        width=100,
+        height=30,
+        font=bold11,
+        command=start_youtube_download,
+        fg_color="black",
+        hover_color="#2563eb",  
+        border_color="#3b82f6", 
+        border_width=1,
+        text_color="#ffffff",
+        state="disabled"
+    )
+    download_btn.grid(row=3, column=3,  padx=10, pady=10, sticky="w")
+    
+    # def Configure_format_youtube_list():
     #         return
+
+    #     configure_format_btn = CTkButton(
+    #         master=left_half_frame,
+    #         text="Configure format for each link",
+    #         #command=Configure_format_youtube_list
+    #     )
+    #     configure_format_btn.grid(row=0,column=0, padx=(10,5), pady=(10,5), sticky="w")
+
+
+    #     def download_all_from_list():
+    #         output_path = youtube_output_path_entry.get()
+    #         if not output_path:
+    #             info_message.set("Choose a folder for saving!")
+    #             return
+    #     download_all_btn = CTkButton(
+    #         master=left_half_frame,
+    #         text="Download all",
+    #         command=download_all_from_list
+    #     )
+    #     download_all_btn.grid(row=0,column=0, padx=(10,5), pady=(10,5), sticky="w")
+
+        
+
+
         
     #     def download_worker():
     #         for link in youtube_download_list:
@@ -1056,245 +1348,14 @@ def place_youtube_download_menu(parent_container):
     #     Thread(target=download_worker).start()
 
 
-    # ).place(relx=0.12, rely=0.76, anchor="e")
+
     # def clear_download_list():
     #         youtube_download_list.clear()
-    #         list_display.delete('1.0', END)
-
-    CTkLabel(
-        master=youtube_frame,
-        text="YouTube List: ", 
-        font=bold12,
-        text_color="#C0C0C0",
-        bg_color='transparent',
-        fg_color="transparent",
-        justify="center"
-    ).place(relx=0.064, rely=0.35, anchor="w")
-
-    global youtubelist_variable
-    global youtube_list_menu
-    youtubelist_variable = StringVar(value=youtube_download_list)
-    youtube_list_menu = CTkOptionMenu(
-            master=youtube_frame,
-            variable=youtubelist_variable,
-            values=youtube_download_list,
-            width=300,
-            button_color="black",
-            bg_color="black",
-            fg_color="black",
-            text_color="#FFFFFF",
-        )
-    youtube_list_menu.place(relx=0.125, rely=0.35, anchor="w")
-   
-
-
-
-
-
-    CTkLabel(
-        master=youtube_frame,
-        text="YouTube URL:", 
-        font=bold12,
-        text_color="#C0C0C0",
-        bg_color='transparent',
-        fg_color="transparent",
-        justify="center"
-    ).place(relx=0.064, rely=0.25, anchor="w")
-
-
-
-    youtube_output_path_entry = CTkEntry(
-        master=youtube_frame,
-        width=300,
-        height=25,
-        corner_radius=5,
-        font=bold11,
-        fg_color="black",
-        bg_color="black",
-        justify="center"
-    )
-    youtube_output_path_entry.place(relx=0.125, rely=0.15, anchor="w")
-    youtube_output_path_entry.insert(0,DOCUMENT_PATH)
-
-
-
-    CTkButton(
-        master=youtube_frame,
-        text="Choose path",
-        width=80,
-        height=25,
-        fg_color="black",
-        border_color="white",
-        font=bold11,
-        command=lambda: select_youtube_output_path()
-    ).place(relx=0.064  , rely=0.15, anchor="w")
-
-
-    CTkButton(
-        master=youtube_frame,
-        text="Download",
-        width=100,
-        height=30,
-        font=bold11,
-        command=start_youtube_download,
-        fg_color="black",
-        border_color="white",
-        border_width=1
-    ).place(relx=0.12, rely=0.725, anchor="e")
-    
-    global stop_youtube_download_btn
-    stop_youtube_download_btn = CTkButton(
-        master=youtube_frame,
-        text="Stop Downloading...",
-        width=100,
-        height=30,
-        font=bold11,
-        command=lambda: Stop_Youtube_Downloading(),
-        fg_color="black",
-        border_color="white",
-        border_width=1,
-        state="DISABLED"
-    )
-    
-
-
-
-    CTkButton(
-        master=youtube_frame,
-        text="Add List",
-        width=100,
-        height=30,
-        fg_color="black",
-        border_color="white",
-        border_width=1,
-        command=add_link_to_download_list
-    ).place(relx=0.12, rely=0.8, anchor="e")
-
-
-
-    global upload_button
-    upload_button = CTkButton(
-        master=youtube_frame,
-        text="Upload Cookies",
-        width=100,
-        height=30,
-        font=bold11,
-        command=lambda: upload_cookie_file(),
-        fg_color="black",
-        border_color="white",
-        border_width=1
-    )
-    if cookie_file_path is None:
-      upload_button.place(relx=0.10, rely=0.95, anchor="nw")
-    
-    if cookie_file_path is not None:
-        upload_button.place_forget()
-
-    CTkLabel(
-        master=youtube_frame,
-        text="Video Format:",
-        font=bold12,
-        text_color="#C0C0C0",
-        bg_color="transparent",
-    ).place(relx=0.064, rely=0.45, anchor="w")
-
-
-
-    video_format_dropdown = CTkComboBox(
-        master=youtube_frame,
-        variable=video_format_var,
-        values=["None"],
-        width=300
-    )
-    video_format_dropdown.place(relx=0.125, rely=0.45, anchor="w")
-
-
-
-
-
-    def update_fetch_button_state(event=None):
-        url = youtube_link_entry.get()
-        if "youtube.com" in url or "youtu.de" in url:
-            fetch_button.configure(state="normal")  
-        else:       
-            fetch_button.configure(state="disabled")
-       
-
-    
-
-    youtube_link_entry = CTkEntry(
-        master=youtube_frame,
-        width=300,
-        height=30,
-        corner_radius=5,
-        font=bold11,
-        bg_color="black",
-        fg_color="black",
-        justify="center"
-    )
-    youtube_link_entry.place(relx=0.125, rely=0.25, anchor="w")
-
-    youtube_link_entry.bind("<KeyRelease>", update_fetch_button_state)
-
-
-
-
-
-    CTkLabel(
-        master=youtube_frame,
-        text="Audio Format:",
-        font=bold12,
-        text_color="#C0C0C0",
-        bg_color="transparent",
-    ).place(relx=0.064, rely=0.55, anchor="w")
-
-
-    audio_format_var = StringVar()
-    audio_format_dropdown = CTkComboBox(
-        master=youtube_frame,
-        variable=audio_format_var,
-        values=["Enter Link First..."],
-        width=300
-    )
-    audio_format_dropdown.place(relx=0.125, rely=0.55, anchor="w")
-
-    def update_format_list():
-        url = youtube_link_entry.get()
-        if url:
-            video_formats, audio_formats = get_available_formats(url)
-
-          
-            video_format_dropdown.configure(values=video_formats if video_formats else ["No video formats available"])
-            audio_format_dropdown.configure(values=audio_formats if audio_formats else ["No audio formats available"])
-
-           
-            if video_formats:
-                video_format_var.set(video_formats[0])
-            if audio_formats:
-                audio_format_var.set(audio_formats[0])
-
-            fetch_button.configure(state="disabled")
-            
-
-
-    
-    fetch_button = CTkButton(
-        master=youtube_frame,
-        text="Fetch Details",
-        width=100,
-        height=30,
-        font=bold11,
-        command=update_format_list,
-        fg_color="black",
-        border_color="white",
-        border_width=1,
-        state="disabled"  
-    )
-    fetch_button.place(relx=0.12, rely=0.65, anchor="e")
+    #        # list_display.delete('1.0', END)
 
 
     def select_youtube_output_path():
-            path= filedialog.askdirectory()
+            path = filedialog.askdirectory()
             if path:
                 youtube_output_path_entry.delete(0,'end')
                 youtube_output_path_entry.insert(0,path)
@@ -1604,7 +1665,7 @@ def start_youtube_download():
     if not output_path:
         info_message.set("Choose a folder for saving!")
         return
-    stop_youtube_download_btn.place(relx=0.12, rely=0.96, anchor="e")
+    stop_youtube_download_btn.grid(row=4, column=1, sticky="ew", padx=10, pady=5)
     youtube_progress_var.set("0%")
     Thread(target=download_thread, args=(url, output_path)).start()
     
@@ -1723,19 +1784,19 @@ class LR_Agent_Automation:
             font=("Arial", 14)
         )
         self.loading_label.grid(row=2, column=0, pady=5, sticky="nsew")
-        # wait_time = 0
-        # while Global_offline_model is None:
-        #     self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
-        #     self.loading_label.update_idletasks()
-        #     time.sleep(1)
-        #     wait_time += 1
-        #     if wait_time > 60:
-        #         self.loading_label.configure(text="❌ Timeout waiting for model to load.")
-        #         return
+        wait_time = 0
+        while Global_offline_model is None:
+            self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
+            self.loading_label.update_idletasks()
+            time.sleep(1)
+            wait_time += 1
+            if wait_time > 60:
+                self.loading_label.configure(text="❌ Timeout waiting for model to load.")
+                return
 
-        # self.loading_label.configure(text="✅ Model loaded successfully.")
-        # self.model = Global_offline_model
-        # #self.Model_VectorBase = QwenVectorbase
+        self.loading_label.configure(text="✅ Model loaded successfully.")
+        self.model = Global_offline_model
+        #self.Model_VectorBase = QwenVectorbase
 
 
      
@@ -1755,10 +1816,15 @@ class LR_Agent_Automation:
         )
         self.top_bar.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 0))
         self.top_bar.columnconfigure((0, 1, 2), weight=1)
-
+        self.top_bar.rowconfigure(1, weight=1)
         #Title input
         self.title_entry = CTkEntry(self.top_bar, placeholder_text="Title of video", width=250)
         self.title_entry.grid(row=0, column=0, padx=(10, 5), pady=(10, 5), sticky="w")
+
+        #Topic
+        self.topic_entry = CTkEntry(self.top_bar, placeholder_text="Topic of video", width=250)
+        self.topic_entry.grid(row=1, column=0, padx=(10, 5), pady=5, sticky="w")
+
 
         # Dropdown1
         self.styledropdown1 = CTkOptionMenu(self.top_bar, variable=StringVar(), values=[
@@ -1776,10 +1842,6 @@ class LR_Agent_Automation:
         self.styledropdown2.set("None")
         self.styledropdown2.grid(row=1, column=1, padx=(5, 10), pady=5, sticky="w")
 
-        #Topic
-        self.topic_entry = CTkEntry(self.top_bar, placeholder_text="Topic of video", width=250)
-        self.topic_entry.grid(row=1, column=0, padx=(10, 5), pady=5, sticky="w")
-
         #Amount
         self.video_amount = CTkEntry(self.top_bar, textvariable=StringVar(), placeholder_text="Amount of videos", width=100)
         self.video_amount.grid(row=0, column=2, padx=5, pady=5, sticky="w")
@@ -1790,7 +1852,7 @@ class LR_Agent_Automation:
 
         #Description box
         self.description_entry = CTkTextbox(self.top_bar, height=110)
-        self.description_entry.grid(row=3, column=0, columnspan=3, padx=10, pady=(5, 10), sticky="ew")
+        self.description_entry.grid(row=3, column=0, columnspan=3, padx=10, pady=(0, 5), sticky="ew")
 
         #Agent run button 
         self.run_agent_node = CTkButton(
@@ -1799,7 +1861,7 @@ class LR_Agent_Automation:
             fg_color="black",
             text="▶ Run AGENT Node"
         )
-        self.run_agent_node.grid(row=1, column=2, padx=10, pady=0, sticky="ne")
+        self.run_agent_node.grid(row=1, column=2,     padx=(5, 10), pady=(0, 5), sticky="se")
 
         #Chat area below other widgets
         self.chat_display = scrolledtext.ScrolledText(
@@ -2229,7 +2291,7 @@ class ToolWindowClass:
         self.menu_frame.pack(side="top", pady=(20, 10))
 
   
-        self.tool_list = ['LR-Agent Automation','YouTube Downloader', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','Tool Menu','ColorRestorer']
+        self.tool_list = ['YouTube Downloader','LR-Agent Automation', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','Tool Menu','ColorRestorer']
         self.tool_menu_var = StringVar(value=self.tool_list[0])
         self.tool_menu = CTkOptionMenu(
             master=self.menu_frame,
@@ -5754,7 +5816,7 @@ def on_app_close() -> None:
 class VideoEnhancer():
     def __init__(self, Master):
         #Master.attributes('-fullscreen', True)
-      # Thread(target=load_model_background, daemon=True).start()
+       # Thread(target=load_model_background, daemon=True).start()
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
@@ -5814,8 +5876,8 @@ if __name__ == "__main__":
     selected_input_resize_factor  = StringVar()
     selected_VRAM_limiter   = StringVar()
     selected_cpu_number     = StringVar()
-    video_format_var = StringVar()
-    audio_format_var = StringVar()
+    video_format_var = StringVar(value="None")
+    audio_format_var = StringVar(value="None")
 
     
     global selected_file_list
