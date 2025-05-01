@@ -12,26 +12,37 @@ def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
         A tool for fetching metadata from top trending YouTube videos in a specific category or topic.
 
         Args:
-        Search_Query (str): A keyword or topic to search for trending YouTube videos (e.g., "Motivational", "Funny", "Tech Reviews").
+        Search_Query (str): Topic or keywords to search (e.g. “Motivational”, “Tech Reviews”).
 
         Returns:
-        dict: A dictionary containing video metadata including title, description, view count, like count, comment count,
-        thumbnails, and channel title for each top trending video.
+        dict: A YouTube API response containing for each video:
+        - snippet: title, description, channelTitle, publishTime, thumbnails
+        - statistics: viewCount, likeCount, commentCount
     """
     load_dotenv()       
     Api_key = os.getenv("YOUTUBE_API_KEY")
 
     youtube = build("youtube", "v3", developerKey=Api_key)
 
-    request = youtube.search().list(
+    search_req = youtube.search().list(
                     part="snippet",
                     q=Search_Query,
                     type="video",
-                    maxResults=10
+                    maxResults=20
                 )
-    response = request.execute()
+    search_resp = search_req.execute()
+    video_ids = [item["id"]["video_id"] for item in  search_resp.get("items",[])]
+    if not video_ids:
+        return {"items": []}
+    
+    stats_req = youtube.videos().list(
+        part="snippet.statistics",
+        id=",".join(video_ids)
+    )
+    stats_resp = stats_req.execute()
 
-    return response 
+
+    return stats_resp 
 
 
 
@@ -58,7 +69,7 @@ def ExtractAudioFromVideo(video_path: str) -> str:
     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return audio_path
 
-
+    
 
 @tool
 def Log_Agent_Progress(chat_display: ScrolledText, stage: str, message: str) -> str:

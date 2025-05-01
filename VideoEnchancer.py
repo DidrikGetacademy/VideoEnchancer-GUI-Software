@@ -349,7 +349,7 @@ def load_model_background():
             device_map=device,
             torch_dtype=dtype,
             trust_remote_code=True,
-            max_new_tokens=256, ###THIS IS the output token of the final answear, for this usertask 256 is nice perfectooooo
+            max_new_tokens=400, ###THIS IS the output token of the final answear, for this usertask 256 is nice perfectooooo
             do_sample=False,
             )
         print("✅ Model loaded successfully in the background!")
@@ -544,9 +544,18 @@ class Agent_GUI():
             self.chat_display.insert(tk.END, "Not a valid file path" + "\n")
             self.chat_display.config(state=tk.DISABLED)  
             return
-                
-        user_task = "Provide me with SEO optimized metadata for my video. Do not copy paste from the information you gather. provide me final answear with a uniqe creative (title, description, hashtag, keyword)"
-       
+                        
+        user_task = (
+                "Step 1: Use the `ExtractAudioFromVideo(video_path: str) -> str` tool to extract mono 16 kHz WAV audio from the provided video. "
+                "Step 2: Use the `SpeechToTextTool(audio: str) -> str` tool to transcribe the extracted audio into text. "
+                "Step 3: Analyze transcript to identify its top 5 themes/keywords, then derive a broad search query.\n"
+                "Step 4: Use the `Fetch_top_trending_youtube_videos(Search_Query: str) -> dict` tool to fetch metadata for the top 10 trending YouTube videos matching that query. "
+                "Step 5: Use the `web_search(query: str) -> dict` tool to search the web for additional trending content on the same query. "
+                "Step 6: Synthesize all insights (transcript themes, YouTube metadata, web results) into a unique, SEO-optimized metadata package—title, description, keywords, and hashtags—without copying any text verbatim. "
+                "Return the final metadata as a JSON object with the keys: title, description, keywords, hashtags."
+            )
+
+
         uploaded_file = self.file_menu_var.get()
         context_vars = {
                "video_path": Video_path,
@@ -565,14 +574,18 @@ class Agent_GUI():
         fetch_youtube_video_information = Fetch_top_trending_youtube_videos
         log_every_step = Log_Agent_Progress
         transcriber = SpeechToTextTool()
+        PythonInterpeter = PythonInterpreterTool()
+
+        ###Create 2-3 new agents that can take care of web search and youtube information. and that agent passes that information too the second agent that will find secret virality keys ( tips/idea  and also summarize the api response of both search query before it gives it too manager agent. NB: THIS WAY I CAN MAKE SURE THAT THE AGENT DON'T GET SCREWED BY INFORMATION. AND THAT BY USING 3 AGENTS INFORMATION AND REASONING WILL FLOW BETTER)
 
         manager_agent  = CodeAgent(
             model=self.model,
-            tools=[final_answer, web_search, log_every_step, Extract_audio, fetch_youtube_video_information,transcriber], 
-            max_steps=13,
+            tools=[final_answer, web_search, log_every_step, Extract_audio, fetch_youtube_video_information,transcriber,PythonInterpeter], 
+            max_steps=12,
             verbosity_level=2,
             prompt_templates=prompt_templates,
-            additional_authorized_imports=['datetime']
+            additional_authorized_imports=['datetime'],
+            add_base_tools=True
         )
 
         Response = manager_agent.run(
@@ -613,7 +626,8 @@ class Agent_GUI():
             f"🎬 Title:\n  {md.get('title', 'N/A')}\n\n"
             f"📝 Description:\n  {md.get('description', 'N/A')}\n\n"
             f"🔑 Keywords:\n  {', '.join(md.get('keywords', []))}\n\n"
-            f"🏷️ Hashtags:\n  {' '.join(md.get('hashtags', []))}\n"
+            f"🏷️ Hashtags:\n  {' '.join(md.get('hashtags', []))}\n\n\n"
+            f" Tips/ideas: \n {' '.join(md.get('hashtags', []))}"
         )
     
 
@@ -5808,7 +5822,7 @@ def on_app_close() -> None:
 class VideoEnhancer():
     def __init__(self, Master):
         #Master.attributes('-fullscreen', True)
-       # Thread(target=load_model_background, daemon=True).start()
+        Thread(target=load_model_background, daemon=True).start()
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
