@@ -555,7 +555,6 @@ class Agent_GUI():
                 "Return the final metadata as a JSON object with the keys: title, description, keywords, hashtags."
             )
 
-
         uploaded_file = self.file_menu_var.get()
         context_vars = {
                "video_path": Video_path,
@@ -563,11 +562,20 @@ class Agent_GUI():
                "chat_display": self.chat_display,
             }       
 
- 
-        with open(find_by_relative_path("./Assets//prompts.yaml"), 'r') as stream:
-                prompt_templates = yaml.safe_load(stream)
 
-        #didrik
+        
+        #Agent Prompts
+        with open(find_by_relative_path("./Assets//prompts.yaml"), 'r') as stream:
+                    Manager_Agent_prompt_templates = yaml.safe_load(stream)
+
+        with open(find_by_relative_path("./Assets//Web_search_Prompt_template.yaml"), 'r') as stream:
+                    Web_search_Prompt_template = yaml.safe_load(stream)
+
+        with open(find_by_relative_path("./Assets//Analytic_Reasoning_Prompt_Template.yaml"), 'r') as stream:
+                    Analytic_Reasoning_Prompt_Template = yaml.safe_load(stream)
+
+
+        #Tool initalization
         final_answer = FinalAnswerTool()
         web_search = DuckDuckGoSearchTool()
         Extract_audio = ExtractAudioFromVideo
@@ -576,31 +584,43 @@ class Agent_GUI():
         transcriber = SpeechToTextTool()
         PythonInterpeter = PythonInterpreterTool()
 
-        ###Create 2-3 new agents that can take care of web search and youtube information. and that agent passes that information too the second agent that will find secret virality keys ( tips/idea  and also summarize the api response of both search query before it gives it too manager agent. NB: THIS WAY I CAN MAKE SURE THAT THE AGENT DON'T GET SCREWED BY INFORMATION. AND THAT BY USING 3 AGENTS INFORMATION AND REASONING WILL FLOW BETTER)
-        Web_Search_agent = CodeAgent (
-            name="Web Search Agent",
-            description="Performs web searches and returns concise, structured summaries.",
-            add_base_tools=True,
 
-        )
-        Analytic_reason_agent = CodeAgent (
-            name="Analytic Reasoner",
-            description="Performs reasoning and thought on data from api response",
-            add_base_tools=True,
 
+
+        Web_Search_Assistant = CodeAgent (
+            model=self.model,
+            name="Web_Search_Assistant",
+            description="Receives transcribed text from the manager agent, performs a web and YouTube search for the most recent and relevant content on the topic, and forwards the gathered information to Analytic_reasoning_assistant for summarization and viral insight extraction.",
+            tools=[web_search,fetch_youtube_video_information],
+            add_base_tools=True,
+            managed_agents=[Analytic_reasoning_assistant],
+            prompt_templates=Web_search_Prompt_template,
+            max_steps=4,
         )
+
+        Analytic_reasoning_assistant = CodeAgent (
+            model=self.model,
+            name="Analytic_reasoning_assistant",
+            description="Analyzes search results from Web_Search_Assistant and extracts viral insights. Generates a concise content package including: title, description, hashtags, keywords, and creative tips or ideas. Returns this package to the manager agent for final output.",
+            add_base_tools=True,
+            prompt_templates=Analytic_Reasoning_Prompt_Template,
+            planning_interval=2, 
+            tools=[],
+            max_steps=3
+        )
+
+
         manager_agent  = CodeAgent(
             model=self.model,
-            tools=[final_answer, web_search, log_every_step, Extract_audio, fetch_youtube_video_information,transcriber,PythonInterpeter], 
+            tools=[final_answer,log_every_step, Extract_audio,transcriber,PythonInterpeter], 
+            managed_agents=[Web_Search_Assistant],
+            description="Extracts & transcribes the audio from video, and sends the transcribed text to Web_Search_Assistant who performs web and YouTube search.",
             max_steps=12,
             verbosity_level=2,
-            prompt_templates=prompt_templates,
+            prompt_templates=Manager_Agent_prompt_templates,
             additional_authorized_imports=['datetime'],
             add_base_tools=True,
-            managed_agents={
-                "Web_searcher": Web_Search_agent,
-                "AnalyticsHelper": Analytic_reason_agent
-            }
+            planning_interval=2,
         )
 
         Response = manager_agent.run(
