@@ -10,6 +10,10 @@ from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
 from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool,PythonInterpreterTool
+from local_model.Old_photos__colorizing.Vizualise import get_image_colorizer
+from local_model.Old_photos__colorizing.device_id import DeviceId
+import numpy as np
+from PIL import Image, ImageTk
 from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress
 import yaml
 from tkinter import filedialog
@@ -343,14 +347,15 @@ def load_model_background():
     global Global_offline_model
     try:
         global Global_offline_model
-        model_path = find_by_relative_path("./local_model/Qwen2.5-Coder-3B-Instruct")
+        model_path = find_by_relative_path("./local_model/microsoft/microsoft/Phi-3-mini-128k-instruct")
         Global_offline_model = TransformersModel(
             model_path,
             device_map=device,
             torch_dtype=dtype,
-            trust_remote_code=True,
             max_new_tokens=400, ###THIS IS the output token of the final answear, for this usertask 256 is nice perfectooooo
             do_sample=False,
+            trust_remote_code=True,
+            load_in_8bit=True,
             )
         print("✅ Model loaded successfully in the background!")
         logging.info("✅ Model loaded successfully in the background!")
@@ -553,7 +558,15 @@ class Agent_GUI():
                 "Step 5: Use the `web_search(query: str) -> dict` tool to search the web for additional trending content on the same query. "
                 "Step 6: Synthesize all insights (transcript themes, YouTube metadata, web results) into a unique, SEO-optimized metadata package—title, description, keywords, and hashtags—without copying any text verbatim. "
                 "Return the final metadata as a JSON object with the keys: title, description, keywords, hashtags."
+                "Return your result as a JSON dictionary with these **exact lowercase keys**:\n"
+                "- `title`: a short, clickable video title.\n"
+                "- `description`: a compelling paragraph (1–3 sentences).\n"
+                "- `keywords`: a list of relevant keywords (no more than 10).\n"
+                "- `hashtags`: a list of hashtags with `#` (e.g. `#Fitness`).\n"
+                "- `tips`: a list of creative suggestions to improve engagement.\n\n"
+                "⚠️ Use the exact key names: `title`, `description`, `keywords`, `hashtags`, and `tips`. No additional fields."
             )
+      
 
         uploaded_file = self.file_menu_var.get()
         context_vars = {
@@ -583,20 +596,9 @@ class Agent_GUI():
         log_every_step = Log_Agent_Progress
         transcriber = SpeechToTextTool()
         PythonInterpeter = PythonInterpreterTool()
+        Visit_WebPage = VisitWebpageTool()
 
 
-
-
-        Web_Search_Assistant = CodeAgent (
-            model=self.model,
-            name="Web_Search_Assistant",
-            description="Receives transcribed text from the manager agent, performs a web and YouTube search for the most recent and relevant content on the topic, and forwards the gathered information to Analytic_reasoning_assistant for summarization and viral insight extraction.",
-            tools=[web_search,fetch_youtube_video_information],
-            add_base_tools=True,
-            managed_agents=[Analytic_reasoning_assistant],
-            prompt_templates=Web_search_Prompt_template,
-            max_steps=4,
-        )
 
         Analytic_reasoning_assistant = CodeAgent (
             model=self.model,
@@ -608,6 +610,18 @@ class Agent_GUI():
             tools=[],
             max_steps=3
         )
+        Web_Search_Assistant = CodeAgent (
+            model=self.model,
+            name="Web_Search_Assistant",
+            description="Receives transcribed text from the manager agent, performs a web and YouTube search for the most recent and relevant content on the topic, and forwards the gathered information to Analytic_reasoning_assistant for summarization and viral insight extraction.",
+            tools=[web_search, Visit_WebPage, fetch_youtube_video_information],
+            add_base_tools=True,
+            managed_agents=[Analytic_reasoning_assistant],
+            prompt_templates=Web_search_Prompt_template,
+            max_steps=4,
+        )
+
+  
 
 
         manager_agent  = CodeAgent(
@@ -627,6 +641,9 @@ class Agent_GUI():
             task=user_task,
             additional_args=context_vars
         )
+        from rich.console import Console
+        manager_agent.logger.console = Console(file=open("./agent_tree.txt", "w"), force_terminal=True)
+        manager_agent.visualize()
 
 
         if isinstance(Response, dict):
@@ -1806,7 +1823,8 @@ class LR_Agent_Automation:
 
     def __init__(self, parent_container):
         self.parent_container = parent_container
-      
+        #self.Model_VectorBase = QwenVectorbase
+
         
         self.should_stop = False
         self.container = CTkFrame(
@@ -1837,7 +1855,6 @@ class LR_Agent_Automation:
 
         self.loading_label.configure(text="✅ Model loaded successfully.")
         self.model = Global_offline_model
-        #self.Model_VectorBase = QwenVectorbase
 
 
      
@@ -2052,11 +2069,14 @@ class LR_Agent_Automation:
 
 
 class ColorRestorer:
+
     def __init__(self, parent_container):
         self.parent_container = parent_container
-        self.selected_file_list = selected_file_list
-        self.truncated_to_full = {}
-
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.uploaded_image  = None
+        self.colorizer = None
+        self.colorized_image = None
+        self.selected_resolution = 800
 
         self.container = CTkFrame(
             master=self.parent_container,
@@ -2067,11 +2087,81 @@ class ColorRestorer:
         )
         self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
+        self.resolution_entry = CTkOptionMenu(
+            self.container,
+            values=["512x512", "768x768", "1024x1024", "1280x1280", "1920x1920"],
+            command=self.on_resolution_change,
+            width=200
+        )
+        self.resolution_entry.pack(pady=10)
 
-        #upload files/images
-        #Run model
-        #Output Colorized image 
-        #Took files from a huggingface, files is in C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Old_photos__colorizing
+        self.upload_button = CTkButton(
+            self.container,
+            text="Upload Image",
+            command=self.upload_image
+        )
+        self.upload_button.pack(pady=10)
+   
+        self.save_button = CTkButton(
+            self.container,
+            text="Save Image",
+            command=self.save_image,
+            state="disabled"
+        )
+        self.upload_button.pack(pady=10)
+   
+
+        self.colorize_button = CTkButton(
+            self.container,
+            text="Colorize",
+            command=self.colorize_image,
+            state="disabled"
+        )
+        self.colorize_button.pack(pady=10)
+
+
+        self.image_label = CTkLabel(self.container, text="").pack(pady=10)
+
+
+    def on_resolution_change(self,value):
+        try:
+            w, h = value.lower().split("x")
+            self.selected_resolution = (int(w), int(h))
+        except:
+            self.selected_resolution = (800,800)
+
+    def upload_image(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+        if file_path:
+            self.uploaded_image = Image.open(file_path).convert("RGB")
+            preview = self.uploaded_image.resize((300,300))
+            tk_img = ImageTk.PhotoImage(preview)
+            self.image_label.image = tk_img
+            self.colorize_button.configure(state="normal")
+
+
+    def colorize_image(self):
+        if self.uploaded_image:
+            self.colorizer = get_image_colorizer(artistic=True)
+            resized = self.uploaded_image.resize((self.selected_resolution))
+            colorized_img = self.colorizer.plot_transformed_pil_image(resized, render_factor=35, compare=False)
+            self.colorized_image = colorized_img
+            tk_img = ImageTk.PhotoImage(colorized_img.resize((300,300)))
+            self.image_label.configure(image=tk_img)
+            self.image_label.image = tk_img
+            self.save_button.configure(state="normal")
+
+    def save_image(self):
+        if self.colorized_image:
+            save_path = filedialog.asksaveasfilename(defaultextension=".jpg",
+                                                     filetypes=[("JPEG", "*.jpg"), ("PNG", "*.png")])
+            if save_path:
+                final_img = self.colorized_image.resize((self.selected_resolution, self.selected_resolution))
+                final_img.save(save_path)
+
+
+
+
 
 
 

@@ -101,27 +101,25 @@ def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
     enriched = []
     for vid in stats_resp.get("items",[]):
         snippet = vid["snippet"]
-        statistics = vid["statistics"]
-        content = vid["contentDetails"]
+        statistics = vid.get("statistics", {})
+        content = vid.get("contentDetails", {})
 
         enriched.append({
             "videoId": vid["id"],
-            "title": snippet["title"],
-            "description": snippet["description"],
+            "title": snippet.get("title"),
+            "description": snippet.get("description"),
             "tags": snippet.get("tags", []),
-            "channelTitle": snippet["channelTitle"],
-            "subscriberCount": channel_map.get(snippet["channelId"], None),
-            "category": category_map.get(snippet["categoryId"], None),
-            "PublihedAT": snippet["PublishedAt"],
-            "duration": content["publishedAt"],
-            "viewCount": snippet.get("viewCount"),
-            "likeCount": snippet.get("likeCount"),
-            "commentCount": snippet.get("commentCount"),
+            "channelTitle": snippet.get("channelTitle"),
+            "subscriberCount": channel_map.get(snippet.get("channelId")),
+            "category": category_map.get(snippet.get("categoryId")),
+            "publishedAt": snippet.get("publishedAt"),
+            "duration": content.get("duration"),
+            "viewCount": statistics.get("viewCount"),
+            "likeCount": statistics.get("likeCount"),
+            "commentCount": statistics.get("commentCount"),
            })
         return {"items": enriched}
 
-
-
     
 
 
@@ -129,20 +127,6 @@ def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
 
     
 
-
-
-# ## 4. Fine-tuning Qwen-2.5-Coder on “Video Metadata → Virality Drivers”  
-# Because there’s no publicly available guide specifically for Qwen-2.5-Coder tuning, here’s a **standard recipe**:
-
-# 1. **Dataset construction**  
-#    - **Inputs**: JSON blobs of the enriched metadata above (`title`, `tags`, `category`, `viewCount`, etc.).  
-#    - **Labels**: Human-written bullet-point “virality drivers” for each video (e.g. “uses power verbs,” “short duration,” “high tag density”).  
-#    - Aim for **1,000–2,000** examples spanning multiple categories.
-
-# 2. **Formatting examples**  
-#    ```json
-#    {"input": {"title": "...", "tags": [...], "category": "Education", "viewCount": "...", ...},
-#     "output": ["Power-word headline", "Sub-5 min length", "Use top-searched tags"]}
 
 
 

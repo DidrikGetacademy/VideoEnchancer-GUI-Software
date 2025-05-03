@@ -1,3 +1,0 @@
-$env:TORCH_CUDA_ARCH_LIST="8.6"
-$env:FORCE_CUDA="1"
-pip install --no-cache-dir flash-attn --no-build-isolation

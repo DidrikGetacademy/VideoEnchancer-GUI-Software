@@ -119,9 +119,9 @@ def download_Qwen_Coder_Instruct_7bb():
         print(f"✅ Model already exists at {local_dir}, skipping download.")
 
 
-def download_Deepseek_Coder_67B_Instruct():
-    model_repo = "Deepseek-Coder-6.7B-Instruct"
-    local_dir = "./local_model/Deepseek-Coder-6.7B-Instruct"
+def download_Qwen2_5_Coder_3B_Instruct():
+    model_repo = "Qwen/Qwen2.5-Coder-3B-Instruct"
+    local_dir = "./local_model/Qwen/Qwen2.5-Coder-3B-Instruct"
 
     if not os.path.exists(local_dir):
         print(f"📥 Downloading {model_repo} into {local_dir}...")
@@ -135,9 +135,25 @@ def download_Deepseek_Coder_67B_Instruct():
     else:
         print(f"✅ Model already exists at {local_dir}, skipping download.")
 
+def download_microsoft():
+    model_repo = "microsoft/Phi-3-mini-128k-instruct"
+    local_dir = "./local_model/microsoft/microsoft/Phi-3-mini-128k-instruct"
+
+    if not os.path.exists(local_dir):
+        print(f"📥 Downloading {model_repo} into {local_dir}...")
+        snapshot_download(
+            repo_id=model_repo,
+            local_dir=local_dir,
+            resume_download=True,
+            local_dir_use_symlinks=False
+        )
+        print(f"✅ microsoft/Phi-3-mini-128k-instruct downloaded successfully.")
+    else:
+        print(f"✅ Model already exists at {local_dir}, skipping download.")
+
 
 
 
 
 if __name__ == "__main__":
-     download_Qwen_Coder_Instruct_3b()
+     download_microsoft()
