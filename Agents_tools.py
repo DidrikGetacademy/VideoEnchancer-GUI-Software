@@ -123,15 +123,6 @@ def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
     
 
 
-    
-
-    
-
-
-
-
-
-
 @tool
 def ExtractAudioFromVideo(video_path: str) -> str:
     """Extracts  mono 16kHz WAV audio from a video using ffmpeg.
