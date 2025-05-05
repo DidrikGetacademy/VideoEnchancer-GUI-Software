@@ -1,6 +1,7 @@
 import sys
 import os
 import torch 
+import torch
 import Vocal_Isolation
 import onnxruntime as ort
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
@@ -142,21 +143,23 @@ from customtkinter import (
 )
 
 
-def check_hardware():
-    torch_dtype  = None
-    if torch.cuda.is_available():
-        device = "cuda"
 
-        if torch.cuda.get_device_capability(0)[0] >= 7:
-            torch_dtype = torch.float16
-            return device, torch_dtype
-        else:
-            torch_dtype = torch.bfloat16
-            return device, torch_dtype
+
+def check_hardware():
+    if torch.cuda.is_available():
+        try:
+            major = torch.cuda.get_device_capability(0)[0]
+            if major >= 7:
+                return "cuda", torch.float16
+            else:
+                return "cuda", torch.bfloat16
+        except (AssertionError, RuntimeError) as e:
+            print(f"Warning: Unable to access CUDA device. Falling back to CPU. Reason: {e}")
+            return "cpu", torch.float32
     else:
-        device = "cpu"
-        torch_dtype = torch.float32
-        return device, torch_dtype
+        print("CUDA not available. Using CPU.")
+        return "cpu", torch.float32
+
 def get_gpu_vram():
     import psutil
     try:
@@ -608,7 +611,7 @@ class Agent_GUI():
             prompt_templates=Analytic_Reasoning_Prompt_Template,
             planning_interval=2, 
             tools=[],
-            max_steps=3
+            max_steps=3,
             provide_run_summary=True
         )
         Web_Search_Assistant = CodeAgent (
@@ -1116,7 +1119,7 @@ def place_youtube_download_menu(parent_container):
         text="waiting",
         width=100
     )
-    progress_label.grid(row=6, column=0, sticky="w", padx=10, pady=10)
+    progress_label.grid(row=6, column=2, sticky="w", padx=10, pady=10)
 
 
 
@@ -1331,7 +1334,6 @@ def place_youtube_download_menu(parent_container):
         border_color="#3b82f6",  
         border_width=1
     )
-    upload_button.grid(row=6,column=3, padx=10, pady=10, sticky="w")
     if cookie_file_path is None:
       upload_button.grid(row=6,column=3, padx=10, pady=10, sticky="w")
     
