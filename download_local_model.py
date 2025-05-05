@@ -1,5 +1,8 @@
 from huggingface_hub import snapshot_download
+from smolagents import CodeAgent, FinalAnswerTool,TransformersModel,DuckDuckGoSearchTool,FinalAnswerTool
+import time
 import os
+import torch
 
 
 
@@ -395,9 +398,98 @@ def download_microsoft_microsoft_Phi_4_reasoning_plus():
         print(f"✅ Model already exists at {local_dir}, skipping download.")
 
 
+def setup_logger(model_id=""):
+    import logging
+    model_id= model_id.replace("/", "_").replace("\\","_")
+    logging.basicConfig(
+        filename=f"model_{model_id}_loading_Inference_time.txt",
+        filemode='a',
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    return logging.getLogger(__name__)
 
 
+logger = setup_logger()
+
+def load_local_model(model_id):
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
+    start_time = time.time()
+    model = TransformersModel(
+    model_id=model_id,
+    device_map="cuda", #rtx 3060 ti gpu
+    torch_dtype=torch.float16,
+    max_new_tokens=5000
+    )
+    load_duration = time.time() - start_time
+
+    total_mem_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+    mem_used_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
+    logger.info(f"Model Loaded Successfully! \n Loading Time: {load_duration:.2f} seconds")
+    logger.info(f"Total GPU Memory Available: {total_mem_gb:.2f} GB")
+    logger.info(f"GPU Memory used after Model Load: {mem_used_gb:.2f} GB")
+    return model, load_duration
+
+
+
+def run_model_prompt(Model, user_task):
+    torch.cuda.reset_peak_memory_stats()
+    Agent = CodeAgent(
+        model=Model,
+        verbosity_level=1,
+        tools=[FinalAnswerTool(),DuckDuckGoSearchTool()]
+    )
+    start_time = time.time()
+    result = Agent.run(user_task)
+    inference_duration = time.time() - start_time
+    mem_used_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
+    logger.info(f"Inference Time: {inference_duration:.2f} seconds.")
+    logger.info(f"GPU Memory used after Inference: {mem_used_gb:.2f} GB")
+    logger.info(f"Agent result:\n{result}")
+    return result, inference_duration
 
 def test_infernece_and_modelloading_time():
+    model_path = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\local_model\microsoft\microsoft\Phi-3-mini-128k-instruct"
+    global logger 
+    logger = setup_logger(model_path)
+    logger.info(f"Testing model: {model_path}")
+    user_task1 = "Hello tell me your name!"
+    user_task2 = "Hello tell me your name, i also want you to search the web for the funniest video, provide me with the title, and link to the video in your final answer, Don't forget too mention how many steps it took you to give a final answer"
+    
+    model, load_time = load_local_model(model_path)
+
+    logger.info("--- Task 1 ---")
+    result1, inferencetime1 = run_model_prompt(model,user_task1)
+
+
+    logger.info("--- Task 2 ---")
+    result2, inferencetime2 = run_model_prompt(model,user_task2)
+
+    return {
+        "load_time": load_time,
+        "task1": {
+        "inference_time": inferencetime1,
+        "result": result1
+        },
+        "task2": {
+            "inference_time": inferencetime2,
+            "result": result2
+        }
+    }
+
+
 
 if __name__ == "__main__":
+    torch.cuda.empty_cache()
+    import gc 
+    gc.collect()
+    
+    result = test_infernece_and_modelloading_time()
+
+    logger.info("\nSummary:")
+    logger.info(f"Model load time: {result['load_time']:.2f}s\n")
+    logger.info(f"task 1 inference time: {result['task1']['inference_time']:.2f}s \n")
+    logger.info(f"task 2 inference time: {result['task2']['inference_time']:.f}s")
+
+    logger.info(f"------------------------------------------------------------------------------------------------------------------------------------\n\n")

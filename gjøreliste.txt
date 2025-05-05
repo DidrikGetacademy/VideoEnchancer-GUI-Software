@@ -46,9 +46,9 @@ så jeg må finne ut en måte og låse videoenehcancer.exe sånn at det ikke kan
 
 13. sett opp ai agent som kan generere video basert på brukers ønske, også få ai agenten til og få tilgang til youtube download så den kan laste ned videoer fra youtube. sette opp en slags tool/agent som man kan kjøre så vil den kjøre til man stopper, eller i en vis tidsperiode, for automatisk laging av videoer og evt laste opp 
 
-14. evt implementere et verktøy i learnreflects eller en eget nettside med popupadds for inntekt, mål ---> vis noen har glemt hva en film heter men husker hva den handler om,  så kan de skrive inn kriterer for eksempel beskrivelse( dette er et must) tidsperiode de så filmen, så filmen ble hvertfall laget før det.   resultat --> film navn + strømmingstjeneste den er tilgjengelig på.
+14. evt implementere et verktøy i learnreflects eller en eget nettside med popupadds for inntekt, mål ---> vis noen har glemt hva en film heter men husker hva den handler om,  så kan de skrive inn kriterer for eksempel beskrivelse( dette er et must) tidsperiode de så filmen, så filmen ble hvertfall laget før det. agent kjører og outputer   resultat --> film navn + strømmingstjeneste den er tilgjengelig på.
 
-15. ai agent automation, en agent som kan kjøre i loop for å lage videoer/opplaste videoer basert på forhåndsdefinerte ønsker.. tanke her er og  spare tid, kunne lage motivational videos som dette  https://www.youtube.com/watch?v=h6vDPKtk804 som mulig for en ai agent og lage basert på kriterer
+15. ai agent automation, en agent som kan kjøre i loop for å lage videoer/opplaste videoer basert på forhåndsdefinerte ønsker.. tanke her er og  spare tid, kunne lage motivational videos som dette  https://www.youtube.com/watch?v=h6vDPKtk804 som mulig for en ai agent og lage basert på kriterer/ bruker kan legge inn video/bilder sammen med sin beskrivelse sånn at ai kan se på video/bilder for å få en bedre forstårelse over ønsket bruker resultat.
 
 
 
@@ -73,7 +73,7 @@ Nettside: https://learnreflects.com/
 
 
 
-3. Egen nettside med fokus på distrubering av AI-Agenter for bedrifter. salg av forskjellige agenter med forskjellige evner innenfor forskjellige bedrifts kategorier. 
+3. Egen nettside med fokus på distrubering av AI-Agenter for bedrifter. salg av forskjellige agenter med forskjellige evner innenfor forskjellige bedrifts kategorier, dette er evt hva https://github.com/DidrikGetacademy/Agent-Tools-Repo repoet er til for. 1 stort prosjekt som innholder mal for forskjellige mål, altså frameworks som . llama, langgraph, smolagents. at man bygger opp ferdig modeller/systemer innen for generelle kategorier. så vis en bedrift vil implementere AI, så kan vi tilby/vise frem mal, evt notere endring/verktøy bedrifter ønsker. så eneste som må gjøres da er å legge til verktøy/små endringer for å oppnå bedrifts ønske, dette sparer mye tid og er egt en plug and use for bedrifter.
 nettside: http://aiadoptionagents.com/
 
 

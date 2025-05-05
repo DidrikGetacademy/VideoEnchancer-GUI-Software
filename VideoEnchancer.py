@@ -609,6 +609,7 @@ class Agent_GUI():
             planning_interval=2, 
             tools=[],
             max_steps=3
+            provide_run_summary=True
         )
         Web_Search_Assistant = CodeAgent (
             model=self.model,
@@ -619,6 +620,7 @@ class Agent_GUI():
             managed_agents=[Analytic_reasoning_assistant],
             prompt_templates=Web_search_Prompt_template,
             max_steps=4,
+            provide_run_summary=True
         )
 
   
