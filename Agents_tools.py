@@ -6,7 +6,8 @@ import subprocess
 import datetime
 import tkinter as tk
 from dotenv import load_dotenv
-
+import wave
+import contextlib
 ####FETCH MORE DETAILS TOO PROVIDE AGENT WITH MORE INFORMATION####
 @tool
 def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
@@ -121,8 +122,19 @@ def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
         return {"items": enriched}
 
     
+@tool
+def ReadTextFile(file_path: str) -> str:
+    """Reads text from a .txt file.
+    Args:
+    file_path (str): Path to the .txt file.
+    Returns:
+    str: The text from the file.
+    
+    """
+    with open(file_path, "r", encoding="utf-8") as f:
+        return f.read()
 
-
+        
 @tool
 def ExtractAudioFromVideo(video_path: str) -> str:
     """Extracts  mono 16kHz WAV audio from a video using ffmpeg.
@@ -144,6 +156,13 @@ def ExtractAudioFromVideo(video_path: str) -> str:
         audio_path
     ]
     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with contextlib.closing(wave.open(audio_path, 'r')) as f:
+        frames = f.getnframes()
+        rate = f.getframerate()
+        duration = frames / float(rate)
+
+    print(f"[LOG] Extracted audio duration: {duration:.2f} seconds (~{duration/60:.2f} minutes)")
+
     return audio_path
 
     
