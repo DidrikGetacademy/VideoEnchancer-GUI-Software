@@ -123,18 +123,52 @@ def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
 
     
 @tool
-def ReadTextFile(file_path: str) -> str:
-    """Reads text from a .txt file.
+def Proccess_transcript_in_chunks(file_path: str, max_chars: int = 1000) -> str:
+    """
+    Reads the next chunk from the transcript and deletes it from the file.
+    This ensures no chunk is read twice.
+
     Args:
-    file_path (str): Path to the .txt file.
+        file_path (str): Path to the .txt file.
+        max_chars (int): Max number of characters to read in a chunk.
+
     Returns:
-    str: The text from the file.
-    
+        str: The next chunk of text, or empty string if file is done.
     """
     with open(file_path, "r", encoding="utf-8") as f:
-        return f.read()
+        text = f.read()
 
-        
+    if not text.strip():
+        return ""  # File is empty — done
+
+    # Find the cut point (on a newline if possible)
+    split_idx = text.rfind("\n", 0, max_chars)
+    if split_idx == -1:
+        split_idx = min(len(text), max_chars)
+    chunk = text[:split_idx].strip()
+    remaining = text[split_idx:].lstrip()
+
+    # Overwrite the file with remaining content
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(remaining)
+
+    return chunk
+
+
+@tool
+def SaveMotivationalQuote(text: str, text_file: str) -> None:
+    """
+    Appends a motivational quote or summary with timestamp to the output text file.
+
+    Args:
+        text (str): The quote or message to save.
+        text_file (str): Path to the file where results are stored.
+    """
+    with open(text_file, "a", encoding="utf-8") as f:
+        f.write(text.strip() + "\n\n")
+
+
+
 @tool
 def ExtractAudioFromVideo(video_path: str) -> str:
     """Extracts  mono 16kHz WAV audio from a video using ffmpeg.
