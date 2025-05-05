@@ -50,7 +50,7 @@ så jeg må finne ut en måte og låse videoenehcancer.exe sånn at det ikke kan
 
 15. ai agent automation, en agent som kan kjøre i loop for å lage videoer/opplaste videoer basert på forhåndsdefinerte ønsker.. tanke her er og  spare tid, kunne lage motivational videos som dette  https://www.youtube.com/watch?v=h6vDPKtk804 som mulig for en ai agent og lage basert på kriterer/ bruker kan legge inn video/bilder sammen med sin beskrivelse sånn at ai kan se på video/bilder for å få en bedre forstårelse over ønsket bruker resultat.
 
-
+16. jeg må få gjort ferdig ai agent kurs sånn at jeg kan få RAG-arkitektur kurs bevis for å ha fullført huggingface ai agent kurs!!! 
 
 [ERROR LISTE] -->  ligger i errors.txt: Oppdateres underveis og tas til slutt for mer effeketivitet
 
