@@ -11,11 +11,11 @@ from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
 from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool,PythonInterpreterTool
+from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress,Upload_video_to_socialMedia_platform,add_text_to_video,add_audio_to_video,add_filter_to_video
 from local_model.Old_photos__colorizing.Vizualise import get_image_colorizer
 from local_model.Old_photos__colorizing.device_id import DeviceId
 import numpy as np
 from PIL import Image, ImageTk
-from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress
 import yaml
 from tkinter import filedialog
 import os
@@ -1949,36 +1949,6 @@ class LR_Agent_Automation:
 
 
     def run_single_video_task(self):
-            @tool
-            def Upload_video_to_socialMedia_platform(title: str, description: str, time: int):
-                """
-                
-                """
-                return   
-            
-            @tool 
-            def add_text_to_video():
-                """
-                
-                """
-                return
-
-            @tool
-            def add_audio_to_video():
-                """
-                
-                """
-                return
-
-            @tool
-            def add_filter_to_video():
-                """
-                
-                """
-                return 
-
-
-
 
             try:
                 prompts = find_by_relative_path(f"Assets{os_separator}prompts_video_creator.yaml")
@@ -2014,6 +1984,9 @@ class LR_Agent_Automation:
                         GoogleSearchTool(),
                         Fetch_top_trending_youtube_videos,
                         Upload_video_to_socialMedia_platform,
+                        add_text_to_video,
+                        add_audio_to_video,
+                        add_filter_to_video,
                     ], 
                     max_steps=10,
                     verbosity_level=1,

@@ -1,4 +1,4 @@
-from smolagents import tool
+from smolagents import tool,Tool
 from tkinter.scrolledtext import ScrolledText
 import os
 from googleapiclient.discovery import build
@@ -8,7 +8,12 @@ import tkinter as tk
 from dotenv import load_dotenv
 import wave
 import contextlib
+
 ####FETCH MORE DETAILS TOO PROVIDE AGENT WITH MORE INFORMATION####
+
+
+
+
 @tool
 def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
     """
@@ -122,37 +127,80 @@ def Fetch_top_trending_youtube_videos(Search_Query: str) -> dict:
         return {"items": enriched}
 
     
-@tool
-def Proccess_transcript_in_chunks(file_path: str, max_chars: int = 1000) -> str:
-    """
-    Reads the next chunk from the transcript and deletes it from the file.
-    This ensures no chunk is read twice.
 
-    Args:
-        file_path (str): Path to the .txt file.
-        max_chars (int): Max number of characters to read in a chunk.
 
-    Returns:
-        str: The next chunk of text, or empty string if file is done.
-    """
-    with open(file_path, "r", encoding="utf-8") as f:
-        text = f.read()
 
-    if not text.strip():
-        return ""  # File is empty — done
 
-    # Find the cut point (on a newline if possible)
-    split_idx = text.rfind("\n", 0, max_chars)
-    if split_idx == -1:
-        split_idx = min(len(text), max_chars)
-    chunk = text[:split_idx].strip()
-    remaining = text[split_idx:].lstrip()
+class ChunkLimiterTool(Tool):
+    name = "chunk_limiter"
+    description = (
+        "Call this tool as a function using: chunk = chunk_limiter(file_path=..., max_chars=...) "
+        "It returns one chunk of transcript text per call. You must only call it once per reasoning step. "
+        "This tool keeps track of remaining transcript content internally, and will return the next chunk each time it's called. "
+        "When it returns an empty string, the full transcript has been processed. "
+        "If 'file_path' is omitted in future calls, it will reuse the last known value automatically."
+    )
 
-    # Overwrite the file with remaining content
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(remaining)
+    inputs = {
+        "file_path": {
+            "type": "string",
+            "description": "Path to the transcript .txt file",
+        },
+        "max_chars": {
+            "type": "integer",
+            "description": "Maximum number of characters per chunk (suggested 1000)",
+        },
+    }
+    output_type = "string"
 
-    return chunk
+    def __init__(self):
+        super().__init__()
+        self.called = False
+        self.saved_file_path = None
+
+    def reset(self):
+        self.called = False
+
+    def forward(self, file_path: str, max_chars: int) -> str:
+        if self.called:
+            raise Exception(
+                "ChunkLimiterTool was already called in this reasoning step. "
+                "You must wait for the ReasoningAgent to finish processing before calling this tool again."
+            )
+        self.called = True
+
+        if file_path:
+            self.saved_file_path = file_path
+        elif not self.saved_file_path:
+            raise ValueError("file_path must be provided the first time ChunkLimiterTool is used.")
+        
+        with open(self.saved_file_path, "r", encoding="utf-8") as f:
+            text = f.read()
+
+        if not text.strip():
+            return ""
+        
+        split_idx = text.rfind("\n", 0, max_chars)
+        if split_idx == -1: 
+            split_idx = min(len(text),max_chars)
+
+        chunk = text[:split_idx].strip()
+        remaing = text[split_idx:].lstrip()
+
+        with open(self.saved_file_path, "w", encoding="utf-8") as f:
+                f.write(remaing)
+            
+        return f"[CHUNK_OUTPUT]\n {chunk}"
+
+
+
+
+
+
+
+
+
+
 
 
 @tool
@@ -166,6 +214,10 @@ def SaveMotivationalQuote(text: str, text_file: str) -> None:
     """
     with open(text_file, "a", encoding="utf-8") as f:
         f.write(text.strip() + "\n\n")
+
+
+
+
 
 
 
@@ -199,6 +251,11 @@ def ExtractAudioFromVideo(video_path: str) -> str:
 
     return audio_path
 
+
+
+
+
+
     
 
 @tool
@@ -230,3 +287,36 @@ def Log_Agent_Progress(chat_display: ScrolledText, stage: str, message: str) -> 
 
     print(f"[{stage.upper()}] {log_entry['timestamp']}: {message}")
     return "Log recorded successfully."
+
+
+
+
+
+#####TOOLS FOR LR-AGENT AUTOMATION#####
+@tool
+def Upload_video_to_socialMedia_platform(title: str, description: str, time: int):
+                """
+                
+                """
+                return   
+            
+@tool 
+def add_text_to_video():
+                """
+                
+                """
+                return
+
+@tool
+def add_audio_to_video():
+                """
+                
+                """
+                return
+
+@tool
+def add_filter_to_video():
+                """
+                
+                """
+                return 
