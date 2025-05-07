@@ -1,0 +1,13 @@
+[Tokens] Prompt: 5110 tokens | Max new tokens: 2500
+[Tokens] Generated: 53 tokens | Total used: 5163 tokens
+[Tokens] Prompt: 5257 tokens | Max new tokens: 2500
+[Tokens] Generated: 79 tokens | Total used: 5336 tokens
+[Tokens] Prompt: 5456 tokens | Max new tokens: 2500
+[Tokens] Generated: 80 tokens | Total used: 5536 tokens
+[Tokens] Prompt: 6075 tokens | Max new tokens: 2500
+[Tokens] Generated: 89 tokens | Total used: 6164 tokens
+[Tokens] Prompt: 5797 tokens | Max new tokens: 2500
+[Tokens] Generated: 81 tokens | Total used: 5878 tokens
+[Tokens] Prompt: 5963 tokens | Max new tokens: 2500
+[Tokens] Generated: 356 tokens | Total used: 6319 tokens
+[Tokens] Prompt: 6552 tokens | Max new tokens: 2500

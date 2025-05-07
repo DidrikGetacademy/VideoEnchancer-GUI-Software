@@ -1,7 +1,60 @@
+
+"""CUSTOM SPEECTOTEXTTOOL WITH onnx/CTranslate2  for faster inference""" 
+
+import torch
+from .agent_types import AgentAudio  
+from smolagents.tools import PipelineTool
+from faster_whisper import WhisperModel
+
+class SpeechToTextTool(PipelineTool):
+    default_checkpoint = "/local_model/whisper_ct2/"
+    description = "Fast tool that transcribes audio into text using faster-whisper. It eturns the path to the transcript file "
+    name = "transcriber"
+    inputs = {
+        "audio": {
+            "type": "audio",
+            "description": "The audio to transcribe. Can be a local path, a URL, or a tensor.",
+        }
+    }
+    output_type = "string"
+
+    def setup(self):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = WhisperModel(
+            model_size_or_path=self.default_checkpoint,
+            device=self.device,
+            compute_type="float16" if self.device == "cuda" else "int8"
+        )
+
+    def forward(self, inputs):
+        audio_path = inputs["audio"]
+
+        segments, info = self.model.transcribe(
+            audio_path,
+            vad_filter=True,
+            vad_parameters={"min_silence_duration_ms": 500}
+        )
+        print(f"[INFO] Detected Language: {info.language} (confidence: {info.language_probability:.2f})")
+        print(f"[INFO] Audio Duration: {info.duration:.2f} seconds")
+        
+        text_output_path = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Motivational_Transcript_parts.txt"
+        with open(text_output_path, "w", encoding="utf-8") as f:
+            for segment in segments:
+                f.write(f"[{segment.start:.2f}s - {segment.end:.2f}s] {segment.text.strip()}\n")
+
+        return text_output_path
+
+    def encode(self, audio):
+        return {"audio": audio}
+
+    def decode(self, outputs):
+        return outputs
+
+
+
+
+
 """THIS IS THE CLASS TOO USE. Changed/added small details in transformermodels -smolagents libary """
-
-
-
 class TransformersModel(Model):
     """A class that uses Hugging Face's Transformers library for language model interaction.
 

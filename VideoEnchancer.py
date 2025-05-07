@@ -11,9 +11,7 @@ from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
 from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool,PythonInterpreterTool
-from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress,Upload_video_to_socialMedia_platform,add_text_to_video,add_audio_to_video,add_filter_to_video
-from local_model.Old_photos__colorizing.Vizualise import get_image_colorizer
-from local_model.Old_photos__colorizing.device_id import DeviceId
+from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress#,Upload_video_to_socialMedia_platform,add_text_to_video,add_audio_to_video,add_filter_to_video
 import numpy as np
 from PIL import Image, ImageTk
 import yaml
@@ -144,7 +142,6 @@ from customtkinter import (
 
 
 
-
 def check_hardware():
     if torch.cuda.is_available():
         try:
@@ -159,6 +156,7 @@ def check_hardware():
     else:
         print("CUDA not available. Using CPU.")
         return "cpu", torch.float32
+device, dtype = check_hardware()
 
 def get_gpu_vram():
     import psutil
@@ -234,6 +232,7 @@ Global_offline_model = None
 
 
 
+from local_model.Old_photos__colorizing.Vizualise import get_image_colorizer
 import onnxruntime as ort
 model_loading_lock = threading.Lock()
 AI_models_list         = ( SRVGGNetCompact_models_list + AI_LIST_SEPARATOR + RRDB_models_list + AI_LIST_SEPARATOR + IRCNN_models_list )
@@ -350,7 +349,7 @@ def load_model_background():
     global Global_offline_model
     try:
         global Global_offline_model
-        model_path = find_by_relative_path("./local_model/microsoft/microsoft/Phi-3-mini-128k-instruct")
+        model_path = find_by_relative_path("./local_model/Phi-4-mini-reasoning/")
         Global_offline_model = TransformersModel(
             model_path,
             device_map=device,
@@ -581,13 +580,13 @@ class Agent_GUI():
 
         
         #Agent Prompts
-        with open(find_by_relative_path("./Assets//prompts.yaml"), 'r') as stream:
+        with open(find_by_relative_path("./Assets/agent_prompts/prompts.yaml"), 'r') as stream:
                     Manager_Agent_prompt_templates = yaml.safe_load(stream)
 
-        with open(find_by_relative_path("./Assets//Web_search_Prompt_template.yaml"), 'r') as stream:
+        with open(find_by_relative_path("./Assets/agent_prompts//Web_search_Prompt_template.yaml"), 'r') as stream:
                     Web_search_Prompt_template = yaml.safe_load(stream)
 
-        with open(find_by_relative_path("./Assets//Analytic_Reasoning_Prompt_Template.yaml"), 'r') as stream:
+        with open(find_by_relative_path("./Assets/agent_prompts/Analytic_Reasoning_Prompt_Template.yaml"), 'r') as stream:
                     Analytic_Reasoning_Prompt_Template = yaml.safe_load(stream)
 
 
@@ -609,7 +608,7 @@ class Agent_GUI():
             description="Analyzes search results from Web_Search_Assistant and extracts viral insights. Generates a concise content package including: title, description, hashtags, keywords, and creative tips or ideas. Returns this package to the manager agent for final output.",
             add_base_tools=True,
             prompt_templates=Analytic_Reasoning_Prompt_Template,
-            planning_interval=2, 
+            #planning_interval=0, 
             tools=[],
             max_steps=3,
             provide_run_summary=True
@@ -639,7 +638,7 @@ class Agent_GUI():
             prompt_templates=Manager_Agent_prompt_templates,
             additional_authorized_imports=['datetime'],
             add_base_tools=True,
-            planning_interval=2,
+            #planning_interval=2,
         )
 
         Response = manager_agent.run(
@@ -1119,7 +1118,7 @@ def place_youtube_download_menu(parent_container):
         text="waiting",
         width=100
     )
-    progress_label.grid(row=6, column=2, sticky="w", padx=10, pady=10)
+    progress_label.grid(row=6, column=3, sticky="w", padx=10, pady=10)
 
 
 
@@ -1727,7 +1726,7 @@ def start_youtube_download():
     if not output_path:
         info_message.set("Choose a folder for saving!")
         return
-    stop_youtube_download_btn.grid(row=4, column=1, sticky="ew", padx=10, pady=5)
+    stop_youtube_download_btn.grid(row=4, column=3, sticky="ew", padx=10, pady=5)
     youtube_progress_var.set("0%")
     Thread(target=download_thread, args=(url, output_path)).start()
     
@@ -1983,10 +1982,10 @@ class LR_Agent_Automation:
                         VisitWebpageTool(),
                         GoogleSearchTool(),
                         Fetch_top_trending_youtube_videos,
-                        Upload_video_to_socialMedia_platform,
-                        add_text_to_video,
-                        add_audio_to_video,
-                        add_filter_to_video,
+                        #Upload_video_to_socialMedia_platform,
+                        #add_text_to_video,
+                        #add_audio_to_video,
+                        #add_filter_to_video,
                     ], 
                     max_steps=10,
                     verbosity_level=1,

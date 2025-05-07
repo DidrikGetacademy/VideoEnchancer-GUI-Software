@@ -14,12 +14,12 @@ model = TransformersModel(
     model_id=model_path,
     load_in_8bit=True,
     device_map="cuda",
-    max_new_tokens=500, 
+    max_new_tokens=2500, 
     trust_remote_code=True,
 )
 
 
-model_path_assistant = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\local_model\Phi-4-reasoning-plus"
+#model_path_assistant = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\local_model\Phi-4-reasoning-plus"
 # model_assistant_agent= TransformersModel(
 #     model_id=model_path_assistant,
 #         load_in_8bit=True,
@@ -31,7 +31,7 @@ model_path_assistant = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer pro
 # video_path = r"c:\Users\didri\AppData\Local\CapCut\Videos\A Process for Finding Purpose： Do THIS to Build the Life You Want ｜ Jay Shetty.mp4"
 video_path = r"c:\Users\didri\AppData\Local\CapCut\Videos\A Process for Finding Purpose： Do THIS to Build the Life You Want ｜ Jay Shetty.mp4"
 
-text_file = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Motivational_sentence.txt"
+text_file = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\ManagedAgent_Storage.txt"
 
 
 
