@@ -11,3 +11,5 @@
 [Tokens] Prompt: 5963 tokens | Max new tokens: 2500
 [Tokens] Generated: 356 tokens | Total used: 6319 tokens
 [Tokens] Prompt: 6552 tokens | Max new tokens: 2500
+[Tokens] Prompt: 2018 | Generated: 166 | Total: 2184
+[Tokens] Prompt: 27 | Generated: 25 | Total: 52

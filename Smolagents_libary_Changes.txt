@@ -1,4 +1,102 @@
 
+
+
+""" Custom Class for Ctranslate2model converted model loading and made compitable with the smolagents libary."""
+class CTranslate2Model(Model):
+    def __init__(self, model_id: str, compute_type="int8", device="cuda", max_new_tokens=2048, **kwargs):
+        super().__init__(flatten_messages_as_text=True, **kwargs)
+        self.model_id = model_id
+        self.device = device
+        self.compute_type = compute_type
+        self.max_new_tokens = max_new_tokens
+        self.token_log_path = "Agent_logging.txt"
+
+        try:
+            self.generator = Generator(model_id, device=device, compute_type=compute_type)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+        except Exception as e:
+            raise RuntimeError(f"❌ Failed to load CTranslate2 model/tokenizer from {model_id}: {e}") from e
+
+    def __call__(
+        self,
+        messages: List[Dict[str, str]],
+        stop_sequences: Optional[List[str]] = None,
+        grammar: Optional[str] = None,
+        tools_to_call_from: Optional[List[Tool]] = None,
+        **kwargs,
+    ) -> ChatMessage:
+        completion_kwargs = self._prepare_completion_kwargs(
+            messages=messages,
+            stop_sequences=stop_sequences,
+            grammar=grammar,
+            tools_to_call_from=tools_to_call_from,
+            **kwargs,
+        )
+
+        messages = completion_kwargs.pop("messages")
+        stop_sequences = completion_kwargs.pop("stop", None)
+        _ = completion_kwargs.pop("grammar", None)
+        completion_kwargs.pop("tools", None)
+        completion_kwargs.pop("tool_choice", None)
+
+        self.max_new_tokens = (
+            kwargs.get("max_new_tokens")
+            or kwargs.get("max_tokens")
+            or self.kwargs.get("max_new_tokens")
+            or self.kwargs.get("max_tokens")
+            or self.max_new_tokens
+        )
+
+        prompt = self.tokenizer.apply_chat_template(
+            messages,
+            tools=[get_tool_json_schema(tool) for tool in tools_to_call_from] if tools_to_call_from else None,
+            add_generation_prompt=True,
+            tokenize=False,
+        )
+
+        input_ids = self.tokenizer.encode(prompt, add_special_tokens=False)
+        input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids)
+
+        results = self.generator.generate_batch(
+            [input_tokens],
+            max_length=self.max_new_tokens,
+            include_prompt_in_result=False,
+            sampling_topk=40,
+            sampling_temperature=0.8,
+        )
+
+        output_tokens = results[0].sequences[0]
+        output_ids = self.tokenizer.convert_tokens_to_ids(output_tokens)
+        output_text = self.tokenizer.decode(output_ids, skip_special_tokens=True)
+
+        self.last_input_token_count = len(input_tokens)
+        self.last_output_token_count = len(output_ids)
+
+        if stop_sequences is not None:
+            output_text = remove_stop_sequences(output_text, stop_sequences)
+
+        with open(self.token_log_path, "a", encoding="utf-8") as f:
+            f.write(
+                f"[Tokens] Prompt: {self.last_input_token_count} | Generated: {self.last_output_token_count} | Total: {self.last_input_token_count + self.last_output_token_count}\n"
+            )
+
+        chat_message = ChatMessage(
+            role=MessageRole.ASSISTANT,
+            content=output_text,
+            raw={"out": output_text, "completion_kwargs": completion_kwargs},
+        )
+
+        if tools_to_call_from:
+            chat_message.tool_calls = [
+                get_tool_call_from_text(output_text, self.tool_name_key, self.tool_arguments_key)
+            ]
+
+        return chat_message
+
+
+
+
+
 """CUSTOM SPEECTOTEXTTOOL WITH onnx/CTranslate2  for faster inference""" 
 
 import torch
