@@ -14,7 +14,7 @@ model = TransformersModel(
     model_id=model_path,
     load_in_8bit=True,
     device_map="cuda",
-    max_new_tokens=2000, 
+    max_new_tokens=500, 
     trust_remote_code=True,
 )
 
@@ -29,9 +29,9 @@ model_path_assistant = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer pro
 
 
 # video_path = r"c:\Users\didri\AppData\Local\CapCut\Videos\A Process for Finding Purpose： Do THIS to Build the Life You Want ｜ Jay Shetty.mp4"
-video_path = r"c:\Users\didri\AppData\Local\CapCut\Videos\0504.mp4"
+video_path = r"c:\Users\didri\AppData\Local\CapCut\Videos\A Process for Finding Purpose： Do THIS to Build the Life You Want ｜ Jay Shetty.mp4"
 
-text_file = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Motivational_Transcript_parts.txt"
+text_file = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Motivational_sentence.txt"
 
 
 
@@ -53,6 +53,7 @@ Reasoning_Text_Agent = CodeAgent(
         "which invokes the SaveMotivationalQuote tool to record it. If no relevant content is detected, the chunk is ignored."
         ),
         tools=[SaveMotivationalQuote,FinalAnswerTool()],
+        max_steps=25,
         prompt_templates=loaded_reasoning_agent_prompts  
 
 )
@@ -61,7 +62,7 @@ Reasoning_Text_Agent = CodeAgent(
 manager_agent  = CodeAgent(
             model=model,
             tools=[ExtractAudioFromVideo,ChunkLimiterTool(), SpeechToTextTool(),FinalAnswerTool()], 
-            max_steps=20,
+            max_steps=25,
             verbosity_level=4,
             #planning_interval=3,
             prompt_templates=loaded_prompt_templates,
@@ -81,7 +82,7 @@ user_task = (
     "Note: This tool returns one small portion of the transcript at a time. It does not return the full transcript. Choose a chunk size that allows for safe reasoning (e.g., 1000 characters).\n"
 
     "4. Pass the current chunk to the managed agent `ReasoningAgent` by calling it as:\n"
-    " `ReasoningAgent.run(task=chunk, additional_args={\"text_file\": text_file})`\n"
+    " `ReasoningAgent.run(task=chunk, additional_args={\"text_file\: text_file})`\n"
     "This agent will reason through the chunk and extract any motivational or inspirational quotes. Refer to its description for details on behavior and tool usage.\n"
     "Wait for the response from `ReasoningAgent` before proceeding to the next chunk.\n\n"
 
@@ -108,11 +109,12 @@ Response = manager_agent.run(
             }       
         )
 
-with open(r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\agent_tree.txt", "w") as f:
+with open(r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Agent_logging.txt", "w") as f:
     manager_agent.logger.console = Console(file=f, force_terminal=True)
     manager_agent.visualize()
 manager_agent.visualize()
 del model
 
 
-
+###huske liste imorgen
+####Jeg må fokusere på å gjøre system prompt for begge agentene så verdifull og liten så mye så jeg ikke bruker opp context token/vinduet på modellen

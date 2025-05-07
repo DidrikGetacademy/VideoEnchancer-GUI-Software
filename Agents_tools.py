@@ -135,7 +135,7 @@ class ChunkLimiterTool(Tool):
     name = "chunk_limiter"
     description = (
         "Call this tool as a function using: chunk = chunk_limiter(file_path=..., max_chars=...) "
-        "It returns one chunk of transcript text per call. You must only call it once per reasoning step. "
+        "It returns one chunk of transcript text per call. You must only call it once per reasoning step, if you have run this function before, you must call `chunk_limiter.reset()` in the code block."
         "This tool keeps track of remaining transcript content internally, and will return the next chunk each time it's called. "
         "When it returns an empty string, the full transcript has been processed. "
         "If 'file_path' is omitted in future calls, it will reuse the last known value automatically."
@@ -292,31 +292,41 @@ def Log_Agent_Progress(chat_display: ScrolledText, stage: str, message: str) -> 
 
 
 
-#####TOOLS FOR LR-AGENT AUTOMATION#####
-@tool
-def Upload_video_to_socialMedia_platform(title: str, description: str, time: int):
-                """
+# @tool
+# def Upload_video_to_socialMedia_platform(title: str, description: str, time: int):
+#                 """
                 
-                """
-                return   
+#                 """
+#                 return   
             
-@tool 
-def add_text_to_video():
-                """
-                
-                """
-                return
 
-@tool
-def add_audio_to_video():
-                """
-                
-                """
-                return
 
-@tool
-def add_filter_to_video():
-                """
+
+# @tool 
+# def add_text_to_video():
+#                 """
                 
-                """
-                return 
+#                 """
+#                 return
+
+
+
+
+
+# @tool
+# def add_audio_to_video():
+#                 """
+                
+#                 """
+#                 return
+
+
+
+
+
+# @tool
+# def add_filter_to_video():
+#                 """
+                
+#                 """
+#                 return 
