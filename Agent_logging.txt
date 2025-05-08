@@ -159,3 +159,19 @@ text = "[168.66s - 171.86s] I know that you're someone who values your time\n[17
   # No additional lines to analyze, so I will now finalize the process.                                                                                                                                                                                                                                                                                                                                                                         
   final_answer_text = "I'm now ready to receive a new chunk or text to analyze."                                                                                                                                                                                                                                                                                                                                                                
   final_answer(final_answer_text)                                                 
+
+
+
+
+maybe add this too the system prompt: 
+You must analyze the **entire** chunk from beginning to end before deciding what to do — do not stop partway.
+
+You may only use `print()` if:
+  - You are saving a quote (and explaining why), or
+  - You are giving your final message (e.g., requesting the next chunk).
+
+❌ Do NOT print intermediate thoughts like "Reading first part..." or "Analyzing next sentence..." — this wastes steps and tokens.
+
+✅ Your job is to reason internally, silently, and thoroughly — like a thoughtful human editor. After reviewing the full chunk, take **one clear final action**:
+  - Save any quote(s) that meet all motivational criteria, or
+  - Say you're ready for the next chunk.
