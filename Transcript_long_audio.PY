@@ -7,108 +7,119 @@ from smolagents.models import CTranslate2Model
 import yaml
 from rich.console import Console
 from VideoEnchancer import find_by_relative_path
-torch.cuda.empty_cache()
-gc.collect()
+
 
 model = None
 
 video_path = r"c:\Users\didri\AppData\Local\CapCut\Videos\A Process for Finding Purpose： Do THIS to Build the Life You Want ｜ Jay Shetty.mp4"
-Chunk_saving_text_file = find_by_relative_path("/ManagedAgent_Storage.txt")
+Chunk_saving_text_file = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\ManagedAgent_Storage.txt"
 
 
-prompt_template = find_by_relative_path("/Assets/agent_prompts/videotext_prompt.yaml"),
+prompt_template = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Assets\agent_prompts\videotext_prompt.yaml"
 with open(prompt_template, 'r', encoding='utf-8') as f:
         loaded_Manager_prompt_templates = yaml.safe_load(f)
 
-
-loaded_reasoning_agent_prompts = find_by_relative_path("/Assets/agent_prompts/loaded_reasoning_agent_prompts.yaml")  
+loaded_reasoning_agent_prompts = r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Assets\agent_prompts\loaded_reasoning_agent_prompts.yaml'
 with open(loaded_reasoning_agent_prompts, 'r', encoding='utf-8') as f:
-        loaded_reasoning_agent_prompts = yaml.safe_load(f)
+        loaded_managed_agent_prompts = yaml.safe_load(f)
 
 
 def get_model(CTranslate = False):
+    global model
     if CTranslate:
         model = CTranslate2Model(
             model_id=find_by_relative_path("./local_model/qwen_7b_1m_ct2_ctranslate2model"),
             device="cuda",
             compute_type="int8",
-            max_new_tokens=2500
+            max_new_tokens=1500 
         )
-        return model
+       
     else:
         model = TransformersModel(
-            model_id=find_by_relative_path("/local_model/local_models_path/Qwen2.5-7B-Instruct-1M"),
+            model_id=r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program\local_model\local_models_path\Qwen2.5-7B-Instruct-1M',
             load_in_8bit=True,
             device_map="cuda",
             max_new_tokens=2500, 
             trust_remote_code=True,
         )
-        return model
+
+    return model
 
 
 
 
-def debugging_managed_agent():
-    Reasoning_Text_Agent = CodeAgent(
-            name="ReasoningAgent",
-            model=get_model(),
-            description=(
-            "An agent that processes transcript chunks one at a time, reasoning through each to identify motivational quotes, deep insights, wisdom, or inspiring and meaningful content in the text.",
-            " If such content is found, it execute the `SaveMotivationalQuote` Tool and stores the text/quote it found and the correct timestamp in the `text_file` variable that the manager agent has access to and must provide to the ReasoningAgent."
-            "which invokes the SaveMotivationalQuote tool to record it. If no relevant content is detected, the chunk is ignored."
-            ),
-            tools=[SaveMotivationalQuote,FinalAnswerTool()],
-            max_steps=25,
-            prompt_templates=loaded_reasoning_agent_prompts
+# def debugging_managed_agent():
+#     global model
+#     Reasoning_Text_Agent = CodeAgent(
+#             name="ReasoningAgent",
+#             model=model,
+#             description=(
+#             "An agent that processes transcript chunks one at a time, reasoning through each to identify motivational quotes, deep insights, wisdom, or inspiring and meaningful content in the text.",
+#             " If such content is found, it execute the `SaveMotivationalQuote` Tool and stores the text/quote it found and the correct timestamp in the `text_file` variable that the manager agent has access to and must provide to the ReasoningAgent."
+#             "which invokes the SaveMotivationalQuote tool to record it. If no relevant content is detected, the chunk is ignored."
+#             ),
+#             tools=[SaveMotivationalQuote,FinalAnswerTool()],
+#             max_steps=25,
+#             prompt_templates=loaded_managed_agent_prompts
 
-    )
+#     )
 
-    chunk_limiter = ChunkLimiterTool()
-
-
-    transcript_path = find_by_relative_path("/Transcript_long_audio.PY")
-    text_file = Chunk_saving_text_file
+#     chunk_limiter = ChunkLimiterTool()
 
 
-    chunk_limiter.reset()
+#     transcript_path = r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Motivational_Transcript_parts.txt"
+#     text_file = r'C:\Users\didri\Desktop\Programmering\VideoEnchancer program\ManagedAgent_Storage.txt'
 
 
-    while True:
-        try:
-            chunk = chunk_limiter.forward(file_path=transcript_path, max_chars=1000)
-        except Exception as e:
-            print(f"Error during chunking: {e}")
-            break
-
-        if not chunk.strip():
-            print("Finished processing transcript.")
-            break
-
-        print(f"Processing chunk:\n{chunk[:80]}...") 
+#     chunk_limiter.reset()
 
 
-        result = Reasoning_Text_Agent.run(
-            task=chunk,
-            additional_args={"text_file": text_file}
-        )
+#     while True:
+#         try:
+#             chunk = chunk_limiter.forward(file_path=transcript_path, max_chars=1000)
+#             YourTask = (
+#                 "You are being provided with a transcript chunk to analyze. "
+#                 "Do NOT attempt to fetch or regenerate the chunk — use only what you are given. \n\n"
+#                 "Your job is to act like a thoughtful human editor. Carefully analyze the following text chunk for motivational quotes or inspiring insights. "
+#                 "If you find a valid quote, save it using the `SaveMotivationalQuote` tool. If no meaningful content is found, print: "
+#                 "'I'm now ready to receive a new chunk or text to analyze.' and call the `final_answer()` function with a message indicating that you're ready for the next chunk.\n\n"
+#                 f"--- Transcript Chunk Start ---\n{chunk.strip()}\n--- Transcript Chunk End ---"
+#             )
+#         except Exception as e:
+#             print(f"Error during chunking: {e}")
+#             break
 
-        print(f"Agent response: {result}\n")
+#         if not chunk.strip():
+#             print("Finished processing transcript.")
+#             break
+
+#         print(f"Processing chunk:\n{chunk[:80]}...") 
 
 
-        chunk_limiter.called = False
+#         result = Reasoning_Text_Agent.run(
+#             task=YourTask,
+#             additional_args={"text_file": text_file}
+#         )
 
-    with open(find_by_relative_path("/Agent_logging.txt"), "w") as f:
-        Reasoning_Text_Agent.logger.console = Console(file=f, force_terminal=True)
-        Reasoning_Text_Agent.visualize()
-    Reasoning_Text_Agent.visualize()
-    del model
+#         print(f"Agent response: {result}\n")
 
+
+#         chunk_limiter.called = False
+
+#     with open(r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Agent_logging.txt", "w") as f:
+#         Reasoning_Text_Agent.logger.console = Console(file=f, force_terminal=True)
+#         Reasoning_Text_Agent.visualize()
+#     del Reasoning_Text_Agent
+#     del model
+#     gc.collect()
+#     torch.cuda.empty_cache()
+#     debugging_managed_agent()
 
 
 
 
 def test_agent_Wisdom_finder():
-
+    global model
     user_task = (
         "YOU MUST Follow these steps to achieve the user task.\n\n"
         
@@ -144,25 +155,25 @@ def test_agent_Wisdom_finder():
 
     Reasoning_Text_Agent = CodeAgent(
                 name="ReasoningAgent",
-                model=get_model(),
+                model=model,
                 description=(
                 "An agent that processes transcript chunks one at a time, reasoning through each to identify motivational quotes, deep insights, wisdom, or inspiring and meaningful content in the text.",
                 " If such content is found, it execute the `SaveMotivationalQuote` Tool and stores the text/quote it found and the correct timestamp in the `text_file` variable that the manager agent has access to and must provide to the ReasoningAgent."
                 "which invokes the SaveMotivationalQuote tool to record it. If no relevant content is detected, the chunk is ignored."
                 ),
                 tools=[SaveMotivationalQuote,FinalAnswerTool()],
-                max_steps=25,
-                prompt_templates=loaded_Manager_prompt_templates
+                max_steps=30,
+                prompt_templates=loaded_managed_agent_prompts
 
         )
 
 
     manager_agent  = CodeAgent(
-                model=get_model(),
+                model=model,
                 tools=[ExtractAudioFromVideo,ChunkLimiterTool(), SpeechToTextTool(),FinalAnswerTool()], 
                 managed_agents=[Reasoning_Text_Agent],
-                max_steps=25,
-                verbosity_level=4,
+                max_steps=30,
+                verbosity_level=1,
                 prompt_templates=loaded_Manager_prompt_templates
             )
 
@@ -178,8 +189,17 @@ def test_agent_Wisdom_finder():
             )
     print(Response)
 
-    with open(find_by_relative_path("/Agent_logging.txt"), "w") as f:
+    with open(find_by_relative_path(r"C:\Users\didri\Desktop\Programmering\VideoEnchancer program\Agent_logging.txt"), "w") as f:
         manager_agent.logger.console = Console(file=f, force_terminal=True)
         manager_agent.visualize()
     manager_agent.visualize()
     del model
+
+
+if __name__ == "__main__":
+    gc.collect()
+    torch.cuda.empty_cache()
+    del model
+    model = get_model()
+    test_agent_Wisdom_finder()
+    #debugging_managed_agent()

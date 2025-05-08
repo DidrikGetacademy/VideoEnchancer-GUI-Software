@@ -232,7 +232,7 @@ Global_offline_model = None
 
 
 
-from local_model.Old_photos__colorizing.Vizualise import get_image_colorizer
+from local_model.local_models_path.Old_photos__colorizing.Vizualise import get_image_colorizer
 import onnxruntime as ort
 model_loading_lock = threading.Lock()
 AI_models_list         = ( SRVGGNetCompact_models_list + AI_LIST_SEPARATOR + RRDB_models_list + AI_LIST_SEPARATOR + IRCNN_models_list )
@@ -349,7 +349,7 @@ def load_model_background():
     global Global_offline_model
     try:
         global Global_offline_model
-        model_path = find_by_relative_path("./local_model/Phi-4-mini-reasoning/")
+        model_path = find_by_relative_path("./local_model/local_models_path/Qwen2.5-7B-Instruct-1M/")
         Global_offline_model = TransformersModel(
             model_path,
             device_map=device,
@@ -554,7 +554,7 @@ class Agent_GUI():
                         
         user_task = (
                 "Step 1: Use the `ExtractAudioFromVideo(video_path: str) -> str` tool to extract mono 16 kHz WAV audio from the provided video. "
-                "Step 2: Use the `SpeechToTextTool(audio: str) -> str` tool to transcribe the extracted audio into text. "
+                "Step 2: Use the `transcriber` tool an instance of `SpeechToTextTool()` tool to transcribe the extracted audio into text. "
                 "Step 3: Analyze transcript to identify its top 5 themes/keywords, then derive a broad search query.\n"
                 "Step 4: Use the `Fetch_top_trending_youtube_videos(Search_Query: str) -> dict` tool to fetch metadata for the top 10 trending YouTube videos matching that query. "
                 "Step 5: Use the `web_search(query: str) -> dict` tool to search the web for additional trending content on the same query. "
@@ -583,7 +583,7 @@ class Agent_GUI():
         with open(find_by_relative_path("./Assets/agent_prompts/prompts.yaml"), 'r') as stream:
                     Manager_Agent_prompt_templates = yaml.safe_load(stream)
 
-        with open(find_by_relative_path("./Assets/agent_prompts//Web_search_Prompt_template.yaml"), 'r') as stream:
+        with open(find_by_relative_path("./Assets/agent_prompts/Web_search_Prompt_template.yaml"), 'r') as stream:
                     Web_search_Prompt_template = yaml.safe_load(stream)
 
         with open(find_by_relative_path("./Assets/agent_prompts/Analytic_Reasoning_Prompt_Template.yaml"), 'r') as stream:
@@ -619,7 +619,6 @@ class Agent_GUI():
             description="Receives transcribed text from the manager agent, performs a web and YouTube search for the most recent and relevant content on the topic, and forwards the gathered information to Analytic_reasoning_assistant for summarization and viral insight extraction.",
             tools=[web_search, Visit_WebPage, fetch_youtube_video_information],
             add_base_tools=True,
-            managed_agents=[Analytic_reasoning_assistant],
             prompt_templates=Web_search_Prompt_template,
             max_steps=4,
             provide_run_summary=True
@@ -630,8 +629,8 @@ class Agent_GUI():
 
         manager_agent  = CodeAgent(
             model=self.model,
-            tools=[final_answer,log_every_step, Extract_audio,transcriber,PythonInterpeter], 
-            managed_agents=[Web_Search_Assistant],
+            tools=[final_answer,log_every_step, Extract_audio, transcriber, PythonInterpeter], 
+            managed_agents=[Web_Search_Assistant,Analytic_reasoning_assistant],
             description="Extracts & transcribes the audio from video, and sends the transcribed text to Web_Search_Assistant who performs web and YouTube search.",
             max_steps=12,
             verbosity_level=2,
@@ -1084,7 +1083,8 @@ def place_youtube_download_menu(parent_container):
 
     youtube_widget_container = CTkFrame(
         master=input_frame,
-        fg_color="#161b22",  
+        #fg_color="#161b22",  
+        fg_color="black",  
         border_width=2,
         border_color="white"  
 
@@ -1094,15 +1094,15 @@ def place_youtube_download_menu(parent_container):
 
   
     #youtube image
-    bg_image = Image.open(find_by_relative_path("Assets" + os_separator + "youtubebackground(1).png")).resize((frame_width, frame_height))
+    bg_image = Image.open(find_by_relative_path("Assets" + os_separator + "youtube_img.png")).resize((frame_width, frame_height))
     bg_image_tk = CTkImage(bg_image, size=(frame_width, frame_height))
     bg_label = CTkLabel(
         master=youtube_widget_container,
         image=bg_image_tk,
         width=frame_width,
         height=frame_height,
-        bg_color='transparent',
-        fg_color="transparent",
+        bg_color='black',
+        fg_color="black",
         text="",
     )
     bg_label.grid(row=2,column=8, padx=(2,0), sticky="w")
@@ -1138,7 +1138,8 @@ def place_youtube_download_menu(parent_container):
         font=bold11,
         fg_color="black",
         bg_color="black",
-        justify="center"
+        justify="center",
+        border_color="black"
     )
     youtube_output_path_entry.grid(row=0, column=1, sticky="w", padx=10, pady=10)
     youtube_output_path_entry.insert(0,DOCUMENT_PATH)
@@ -1152,7 +1153,7 @@ def place_youtube_download_menu(parent_container):
         height=25,
         fg_color="black",
         hover_color="#2563eb",  
-        border_color="#3b82f6", 
+        border_color="black", 
         font=bold11,
         text_color="#ffffff",
         command=lambda: select_youtube_output_path()
@@ -1189,7 +1190,7 @@ def place_youtube_download_menu(parent_container):
         height=30,
         corner_radius=8,
         font=bold11,
-        fg_color="black",
+        fg_color="white",
         placeholder_text="Add youtube Link",
         bg_color="black",
         text_color="#f0f0f0",
@@ -5930,9 +5931,9 @@ class VideoEnhancer():
         Master.geometry("1920x1080")
         Master.resizable(False, False)
         Master.iconbitmap(find_by_relative_path("Assets" + os_separator + "logo.ico"))
-        self.bg_image = CTkImage(Image.open(find_by_relative_path("Assets" + os_separator + "prov.png")), size=(1920, 1080))
+        self.bg_image = CTkImage(Image.open(find_by_relative_path("Assets" + os_separator + "testbilde.png")), size=(1920, 1080))
         self.background_label = CTkLabel(Master, image=self.bg_image, fg_color="black")
-        self.background_label.place(relx=-0.22,rely=-0.25, relwidth=1, relheight=0.64) 
+        self.background_label.place(relx=-0.23,rely=-0.25, relwidth=0.8, relheight=0.64) 
         self.background_label.lower() 
         load_cookie_file_path()
         self.ToolWindowClass = ToolWindowClass(Master)
