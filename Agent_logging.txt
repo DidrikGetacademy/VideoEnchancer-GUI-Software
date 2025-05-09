@@ -175,3 +175,7 @@ You may only use `print()` if:
 ✅ Your job is to reason internally, silently, and thoroughly — like a thoughtful human editor. After reviewing the full chunk, take **one clear final action**:
   - Save any quote(s) that meet all motivational criteria, or
   - Say you're ready for the next chunk.
+
+
+
+#before creating a new tool in toolwindow, make sure the whisper model is removed from gpu after it has transcribed text.

@@ -338,49 +338,81 @@ if CPU_ONLY:
     FRAMES_FOR_CPU = 5
 
 
+
+def load_model_async():
+    modelmanager.load_model(
+        find_by_relative_path("./local_model/local_models_path/Qwen2.5-7B-Instruct-1M"),
+        device="cuda" if torch.cuda.is_available() else "cpu",
+        dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+    )
+ 
+
+class modelmanager:
+    """Class manager for AI model"""
+    _model = None
+    _lock = threading.Lock()
+
+    @classmethod
+    def load_model(cls, model_path, **kwargs):
+        """Load model & return model instance"""
+
+        with cls._lock:
+            if cls._model is None:
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                cls._model = TransformersModel(
+                model_path,
+                device_map=device,
+                torch_dtype=dtype,
+                max_new_tokens=400, 
+                do_sample=False,
+                trust_remote_code=True,
+                load_in_8bit=True,
+                )
+        return cls._model
+    
+    @classmethod
+    def get_model(cls):
+        """Return model instance"""
+        if cls._model is None:
+            raise RuntimeError("model has not been loaded yet")
+        return cls._model
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #didrik
-def load_model_background():
-    device, dtype = check_hardware()
-    print(f"🧠 Loading model on {device} using dtype: {dtype}")
-    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    global Global_offline_model
-    try:
-        global Global_offline_model
-        model_path = find_by_relative_path("./local_model/local_models_path/Qwen2.5-7B-Instruct-1M/")
-        Global_offline_model = TransformersModel(
-            model_path,
-            device_map=device,
-            torch_dtype=dtype,
-            max_new_tokens=400, ###THIS IS the output token of the final answear, for this usertask 256 is nice perfectooooo
-            do_sample=False,
-            trust_remote_code=True,
-            load_in_8bit=True,
-            )
-        print("✅ Model loaded successfully in the background!")
-        logging.info("✅ Model loaded successfully in the background!")
-    except Exception as e:
-         print(f"error: {str(e)}")
-         logging.error(f"error: {str(e)}")
-    
-   
-
-
-
-
-
-
-
-    
-
-
-
-
-
-
-class Agent_GUI():
+class vidintel_agent_gui():
     """Agent that retrieves transcripts, searches the web, and generates optimized metadata for videos."""
 
     def __init__(self, parent_container):
@@ -644,10 +676,6 @@ class Agent_GUI():
             task=user_task,
             additional_args=context_vars
         )
-        from rich.console import Console
-        manager_agent.logger.console = Console(file=open("./agent_tree.txt", "w"), force_terminal=True)
-        manager_agent.visualize()
-
 
         if isinstance(Response, dict):
             self._append_chat(self._format_metadata(Response))
@@ -715,6 +743,416 @@ class Agent_GUI():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class corelytics_InsightCatcher():
+    """Agent that retrieves transcripts, Analyze the transcript and provide insights too the user """
+
+    def __init__(self, parent_container):
+        self.parent_container = parent_container
+        self.uploaded_files = selected_file_list
+        self.container = CTkFrame(
+            master=self.parent_container,
+            fg_color="#282828",
+            border_width=2,
+            border_color="#404040",
+            corner_radius=10
+        )
+        self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+        self.loading_label = CTkLabel(
+            master=self.container,
+            text="",
+            text_color="#00FF00",
+            font=("Arial", 14)
+        )
+        self.loading_label.grid(row=2, column=0, pady=5, sticky="nsew")
+
+        wait_time = 0
+        
+        global Global_offline_model
+        while Global_offline_model is None:
+            self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
+            self.loading_label.update_idletasks()
+            time.sleep(1)
+            wait_time += 1
+            if wait_time > 60:
+                self.loading_label.configure(text="❌ Timeout waiting for model to load.")
+                return
+
+        self.loading_label.configure(text="✅ Model loaded successfully.")
+        self.model = Global_offline_model
+        #self.Model_VectorBase = QwenVectorbase
+
+
+        self.create_widgets()
+        global file_list_update_callback
+        file_list_update_callback = self.sync_uploaded_files
+        file_names = [os_path_basename(f) for f in self.uploaded_files]
+        self.file_menu.configure(values=file_names)
+        if file_names:
+           self.file_menu_var.set(file_names[0])
+
+    def create_widgets(self):
+        self.top_bar = CTkFrame(
+            master=self.container,
+            fg_color="#282828"
+        )
+        self.top_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+
+        self.file_menu_var = StringVar(value="No files uploaded")
+        self.file_menu = CTkOptionMenu(
+            master=self.top_bar,
+            variable=self.file_menu_var,
+            values=[],
+            width=200,
+            height=30,
+            font=bold11,
+            dropdown_font=bold11,
+            fg_color="#282828",
+            button_color="#404040",
+            text_color="#FFFFFF"
+        )
+        self.file_menu.pack(side="left", padx=10, pady=5)
+
+    
+        self.InsightCatcher_btn = CTkButton(
+            master=self.top_bar,
+            text="Run InsightCatcher",
+            width=140,
+            height=30,
+            font=bold11,
+            border_width=1,
+            fg_color="#282828",
+            text_color="#E0E0E0",
+            border_color="#0096FF",
+            command=lambda: self.start_metadata_thread(),
+        )
+        self.InsightCatcher_btn.pack(side="left", padx=10, pady=5)
+        
+    
+        self.info_button_LearnReflect_Agent = create_info_button(
+            open_LR_Agent_tool_info,
+            text="INFO",
+            width=15,
+            master=self.top_bar
+        )
+        self.info_button_LearnReflect_Agent.pack(side="left", padx=10, pady=5)
+
+  
+        self.InSightCatcher_chatlogger  = scrolledtext.ScrolledText(
+          self.container,
+          wrap=tk.WORD,
+          width=55,
+          height=25,
+          font=("Helvetica",12),
+          bg="black",  
+          fg="white",
+          state="disabled",
+        )
+        self.InSightCatcher_chatlogger.config(
+            insertbackground="yellow",
+            selectbackground="#444444",
+            selectforeground="white",
+            borderwidth=2,
+            relief="sunken"
+        )
+        self.InSightCatcher_chatlogger.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        self.InSightCatcher_chatlogger.yview(END)
+        self.container.columnconfigure(0, weight=1)
+        self.container.rowconfigure(1, weight=1)
+
+    def sync_uploaded_files(self):
+        """Sync uploaded_files with global list and refresh the dropdown"""
+        self.uploaded_files = selected_file_list
+        self.update_file_list()
+        if self.uploaded_files:
+            self.InsightCatcher_btn.configure(state="normal")
+
+    def start_metadata_thread(self):
+        thread = threading.Thread(target=self.load_llama_instruct, daemon=True)
+        thread.start()
+        self.InsightCatcher_btn.configure(state="DISABLED")
+      
+    def load_llama_instruct(self, uploaded_file=None):
+        load_dotenv()
+        uploaded_file = self.file_menu_var.get()
+        if uploaded_file: 
+                file_extension = os.path.splitext(uploaded_file)[1].lower()
+                if file_extension in ['.mp4', '.avi', '.mov', '.mkv']:
+                        file = "Video file"
+                elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+                        file = "Image file"
+                                    
+                        self.InSightCatcher_chatlogger.config(state=tk.NORMAL)
+                        self.InSightCatcher_chatlogger.insert(tk.END, "Sorry we do not read any pitcures at this moment, this will be available in later updates\n")
+                        self.InSightCatcher_chatlogger.update()
+                        return
+
+
+        self.InSightCatcher_chatlogger.config(state=tk.NORMAL)
+        self.InSightCatcher_chatlogger.insert(tk.END, "1. 🤖 AI-agenten transcribes video now...\n")
+        self.InSightCatcher_chatlogger.configure(state="disabled")
+        self.InSightCatcher_chatlogger.update()
+        uploaded_file_name = self.file_menu_var.get()
+        Video_path = next((f for f in self.uploaded_files if os_path_basename(f) == uploaded_file_name), None)
+        if not Video_path:
+            print("Error: File not found!")
+            self.InSightCatcher_chatlogger.config(state=tk.NORMAL)
+            self.InSightCatcher_chatlogger.insert(tk.END, "Not a valid file path" + "\n")
+            self.InSightCatcher_chatlogger.config(state=tk.DISABLED)  
+            return
+                        
+        user_task = (
+               
+                  )
+      
+
+        uploaded_file = self.file_menu_var.get()
+        context_vars = {
+               "video_path": Video_path,
+               "file_type": file,
+               "chat_display": self.InSightCatcher_chatlogger,
+            }       
+
+
+        
+        #Agent Prompts
+        with open(find_by_relative_path("./Assets/agent_prompts/videotext_Manger_agent_prompt.yaml"), 'r') as stream:
+                    Manager_Agent_prompt_templates = yaml.safe_load(stream)
+
+
+        with open(find_by_relative_path("./Assets/agent_prompts/loaded_reasoning_agent_prompts.yaml"), 'r') as stream:
+                    Reasoning_Agent_Prompt_Template = yaml.safe_load(stream)
+
+
+        #Tool initalization
+        final_answer = FinalAnswerTool()
+        Extract_audio = ExtractAudioFromVideo
+        log_every_step = Log_Agent_Progress
+        transcriber = SpeechToTextTool()
+  
+
+
+
+        Chunk_reasoning_Agent = CodeAgent (
+            model=self.model,
+            name="Reasoning_Agent",
+            description="",
+            add_base_tools=True,
+            prompt_templates=Reasoning_Agent_Prompt_Template,
+            tools=[],
+            max_steps=30,
+            provide_run_summary=True
+        )
+
+
+        manager_agent  = CodeAgent(
+            model=self.model,
+            tools=[final_answer,log_every_step, Extract_audio, transcriber], 
+            managed_agents=[Chunk_reasoning_Agent],
+            description="",
+            max_steps=30,
+            verbosity_level=1,
+            prompt_templates=Manager_Agent_prompt_templates,
+            additional_authorized_imports=['datetime'],
+        )
+
+        Response = manager_agent.run(
+            task=user_task,
+            additional_args=context_vars
+        )
+
+
+
+        if isinstance(Response, dict):
+            self._append_chat(self._format_metadata(Response))
+            self.clean_temp_audio()
+
+        else:
+            self._append_chat(str(Response))
+
+
+        try:
+            if os.path.exists("temp_audio.wav"):
+                os.remove("temp_audio.wav")
+                logging.info("🗑️ temp_audio.wav deleted successfully.")
+        except Exception as e:
+            logging.info(f"⚠️ Error deleting temp audio: {e}")
+
+         
+    def clean_temp_audio(self):
+        try:
+            if os.path.exists("temp_audio.wav"):
+                os.remove("temp_audio.wav")
+                logging.info("🗑️ temp_audio.wav deleted successfully.")
+        except Exception as e:
+            logging.info(f"⚠️ Error deleting temp audio: {e}")
+
+    
+
+    def update_file_list(self):
+        """Update dropdown with current files"""
+        file_names = [os_path_basename(f) for f in self.uploaded_files]
+        self.file_menu.configure(values=file_names)
+        if file_names:
+            self.file_menu_var.set(file_names[0])
+             
+
+    def _append_chat(self, text: str):
+        self.InSightCatcher_chatlogger.config(state=tk.NORMAL)
+        self.InSightCatcher_chatlogger.insert(tk.END, text + "\n")
+        self.InSightCatcher_chatlogger.see(tk.END)
+        self.InSightCatcher_chatlogger.config(state=tk.DISABLED)
+
+    def clear_file_list(self):
+        """Reset dropdown to empty state"""
+        self.uploaded_files = []
+        self.file_menu.configure(values=[])
+        self.file_menu_var.set("No files uploaded")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class social_media_optimizer_Gui:
+    def __init__(self, parent_container):
+            self.parent_container = parent_container
+            self.credentials = None  
+
+            self.container = CTkFrame(
+                master=self.parent_container,
+                fg_color="black",
+                border_width=2,
+                border_color="#404040",
+                corner_radius=10,
+                height=1000
+            )
+            self.container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+            self.container.update_idletasks()
+
+
+            self.create_widgets()
+
+    def create_widgets(self):
+            row=1
+            self.container.columnconfigure(0, weight=1)
+            self.container.columnconfigure(1, weight=1)
+            self.container.rowconfigure(1, weight=1)
+
+        
+            self.add_account_button = CTkButton(
+                self.container,
+                text="Add New YouTube Account",
+                command=lambda: Thread(target=self.authenticate).start(),
+                font=("Arial", 14),
+                fg_color="#1c2636",
+                text_color="white",
+                height=36
+            )
+            self.add_account_button.place(relx=0.01, rely=0.01, anchor="nw")
+            row += 1
+
+            self.channel_dropdown = CTkOptionMenu(
+                self.container,
+                values=self.get_saved_channels(),
+                command=self.select_channel,
+                width=200
+            )
+            self.channel_dropdown.set("Select Channel")
+            self.channel_dropdown.place(relx=0.99, rely=0.2, anchor="ne")
+
+            row = 1
+
+           
+            run_optimization = CTkButton(
+                self.container,
+                text="Browse",
+               # command=,
+                fg_color="#1c2636",
+                text_color="white"
+            )
+            run_optimization.grid(row=row, column=1, padx=10, pady=(60, 10), sticky="w")
+            row += 1
+
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#didrik
 #Upload videos too (instagram,facebook,youtube,tiktok) if available for api's. (options too use smolgent with a generate button for automatic generation of (title,description,keywords,hashtags.))
 class SocialMediaUploading:
     def __init__(self, parent_container):
@@ -929,10 +1367,6 @@ class SocialMediaUploading:
                 return
           
 
-
-
-
-
     def upload_to_youtube_actual(self):
             video_path = self.video_path_entry.get()
             title = self.title_entry.get()
@@ -1035,9 +1469,47 @@ class SocialMediaUploading:
             self.channel_label.configure(text=f"Authenticated: {channel_name}")
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#didrik
 ####Youtube Download#####
 global youtube_progress_var
-
 def place_youtube_download_menu(parent_container):
     global youtube_link_entry, youtube_output_path_entry ,video_format_var, audio_format_var
     frame_width, frame_height = 250, 150
@@ -1293,7 +1765,7 @@ def place_youtube_download_menu(parent_container):
     text="Clear List",
     width=100,
     height=30,
-    #command=clear_download_list,
+    command=clear_download_list,
     fg_color="black",
     hover_color="#2563eb",
     border_color="#3b82f6",
@@ -1373,6 +1845,22 @@ def place_youtube_download_menu(parent_container):
         state="disabled"
     )
     download_btn.grid(row=3, column=3,  padx=10, pady=10, sticky="w")
+
+    download_all_btn = CTkButton(
+        master=youtube_widget_container,
+        text="Download All",
+        width=100,
+        height=30,
+        font=bold11,
+        command=download_all_from_list,
+        fg_color="black",
+        hover_color="#2563eb",  
+        border_color="#3b82f6", 
+        border_width=1,
+        text_color="#ffffff",
+        state="disabled"
+    )
+    download_all_btn.grid(row=5, column=3, padx=10, pady=10, sticky="w")
     
     # def Configure_format_youtube_list():
     #         return
@@ -1385,35 +1873,42 @@ def place_youtube_download_menu(parent_container):
     #     configure_format_btn.grid(row=0,column=0, padx=(10,5), pady=(10,5), sticky="w")
 
 
-    #     def download_all_from_list():
-    #         output_path = youtube_output_path_entry.get()
-    #         if not output_path:
-    #             info_message.set("Choose a folder for saving!")
-    #             return
-    #     download_all_btn = CTkButton(
-    #         master=left_half_frame,
-    #         text="Download all",
-    #         command=download_all_from_list
-    #     )
-    #     download_all_btn.grid(row=0,column=0, padx=(10,5), pady=(10,5), sticky="w")
+    def download_all_from_list():
+            output_path = youtube_output_path_entry.get()
+            if not output_path:
+                info_message.set("Choose a folder for saving!")
+                return
+            if not youtube_download_list:
+                info_message.set("The list is empty!")
+            
+            stop_youtube_download_btn.grid(row=4, column=3, sticky="ew", padx=10, pady=5)
+            youtube_progress_var.set("Starting batch download...")
+
+
+            def download_worker():
+                for idx, link in enumerate(youtube_download_list, 1):
+                    youtube_progress_var.set(f"Downloading: ({idx}/{len(youtube_download_list)}): {link}")
+                    message = download_youtube_link(link, output_path, update_progress)
+                    if stop_download_flag:
+                        break
+                    if not stop_download_flag:
+                        youtube_progress_var.set("All downloads complete!")
+                        info_message.set("All downloads completed successully")
+                    else:
+                        youtube_progress_var.set("Download stopped.")
+                        info_message.set("All downloads stopped by user.")
+
+            Thread(target=download_worker).start()
 
         
 
 
-        
-    #     def download_worker():
-    #         for link in youtube_download_list:
-    #             youtube_progress_var.set(f"downloading: {link}")
-    #             download_youtube_link(link, output_path, update_progress)
-    #         youtube_progress_var.set("All downloads complete!")
 
-    #     Thread(target=download_worker).start()
-
-
-
-    # def clear_download_list():
-    #         youtube_download_list.clear()
-    #        # list_display.delete('1.0', END)
+    def clear_download_list():
+            youtube_download_list.clear()
+            youtubelist_variable.set("")
+            youtube_list_menu.configure(values=[])
+           # list_display.delete('1.0', END)
 
 
     def select_youtube_output_path():
@@ -1754,6 +2249,32 @@ def get_ffmpeg_details(file_path):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#didrik
 class ToolMenu:
     def __init__(self, parent_container):
         self.parent_container = parent_container
@@ -1823,7 +2344,42 @@ class ToolMenu:
 
  
 
-class LR_Agent_Automation:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#didrik
+class VidGenesis_Automation_Agent:
 
     def __init__(self, parent_container):
         self.parent_container = parent_container
@@ -1859,14 +2415,7 @@ class LR_Agent_Automation:
 
         self.loading_label.configure(text="✅ Model loaded successfully.")
         self.model = Global_offline_model
-
-
-     
-
         self.create_widgets()
-
-
-
 
     def create_widgets(self):
         #Top section with all user inputs
@@ -2045,11 +2594,32 @@ class LR_Agent_Automation:
         
 
 
-class ColorRestorer:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#didrik
+class ColorRestorer_gui:
 
     def __init__(self, parent_container):
         self.parent_container = parent_container
-        device = "cuda" if torch.cuda.is_available() else "cpu"
         self.uploaded_image  = None
         self.colorizer = None
         self.colorized_image = None
@@ -2148,8 +2718,54 @@ class ColorRestorer:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#didrik
 ####TOOL(1) FOR TOOLCLASS#####
-class MediaInfoAnalyst:
+class MediaTree_Inspector_gui:
     def __init__(self, parent_container):
         self.parent_container = parent_container
         self.selected_file_list = selected_file_list
@@ -2381,6 +2997,34 @@ class MediaInfoAnalyst:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#didrik
 ####TOOLCLASS#####
 ### a class with list of available tools that changes window for each tool on the main window.
 class ToolWindowClass:
@@ -2399,7 +3043,7 @@ class ToolWindowClass:
         self.menu_frame.pack(side="top", pady=(20, 10))
 
   
-        self.tool_list = ['YouTube Downloader','LR-Agent Automation', 'LR Metadata Agent', 'Mediainfo_analyst','Social Media Uploading','Tool Menu','ColorRestorer']
+        self.tool_list = ['Tool Menu','YouTube Downloader', 'MediaTree Inspector', 'SocialMedia Uploading','VidIntel Agent','VidGenesis Automation Agent','ColorRestorer AI','Corelytics InsightCatcher AI','Social Media Optimizer AI']
         self.tool_menu_var = StringVar(value=self.tool_list[0])
         self.tool_menu = CTkOptionMenu(
             master=self.menu_frame,
@@ -2423,56 +3067,126 @@ class ToolWindowClass:
      
         for widget in self.content_frame.winfo_children():
             widget.destroy()
+
+          
         if selected_tool == 'Tool Menu':
             self.CreateToolMenu_info()
-
-
-     
-        elif selected_tool == 'LR Metadata Agent':
-            self.create_smol_agent()
+        elif selected_tool == 'VidIntel Agent':
+            self.create_vidintel_agent()
         elif selected_tool == 'YouTube Downloader':
             self.create_youtube_downloader()
-        elif selected_tool == "Mediainfo_analyst":
-            self.create_mediainfo_Analysist()
-        elif selected_tool == "Social Media Uploading":
+        elif selected_tool == "MediaTree Inspector":
+            self.create_MediaTree_Inspector()
+        elif selected_tool == "SocialMedia Uploading":
             self.Create_Social_Media_uploading()
-        elif selected_tool == "LR-Agent Automation":
-            self.create_LR_Agent_Automation()
-        elif selected_tool == "ColorRestorer":
-            self.create_ColorRestorer()
+        elif selected_tool == "VidGenesis Automation Agent":
+            self.create_VidGenesis_Automation_Agent
+        elif selected_tool == "ColorRestorer AI":
+            self.create_ColorRestorer_ai()
+        elif selected_tool == "Corelytics InsightCatcher AI":
+            self.Corelytics_InsightCatcher()
+        elif selected_tool == "Social Media Optimizer AI":
+            self.create_Social_Media_Optimizer_AI
 
-        
-
-    def create_smol_agent(self):
-        self.smol_agent = Agent_GUI(self.content_frame)
-        self.smol_agent.container.pack(fill="both", expand=True, padx=10, pady=10)
-
-
-    def create_youtube_downloader(self):
-        place_youtube_download_menu(self.content_frame)
+    def create_Social_Media_Optimizer_AI(self):
+        self.social_media_optimizer_Gui = social_media_optimizer_Gui(self.content_frame)
+        self.social_media_optimizer_Gui.pack(fill="both", expand=True, padx=10, pady=10)
 
     def CreateToolMenu_info(self):
        self.ToolMenu = ToolMenu(self.content_frame)
        self.ToolMenu.container.pack(fill="both",expand=True,padx=10,pady=10)
+        
+    def Corelytics_InsightCatcher(self):
+        self.create_corelytics_InsightCatcher = corelytics_InsightCatcher(self.content_frame)
+        self.create_corelytics_InsightCatcher.pack(fill="both", expand=True, padx=10, pady=10)
 
+    def create_vidintel_agent(self):
+        self.vidintel_agent = vidintel_agent_gui(self.content_frame)
+        self.vidintel_agent.container.pack(fill="both", expand=True, padx=10, pady=10)
 
-    def create_LR_Agent_Automation(self):
-        self.LR_Agent_automation = LR_Agent_Automation(self.content_frame)
-        self.LR_Agent_automation.container.pack(fill="both",expand=True,padx=10,pady=10)
-        return
-
-    def create_mediainfo_Analysist(self):
-        self.mediainfo_analyst = MediaInfoAnalyst(self.content_frame)
-        self.mediainfo_analyst.container.pack(fill="both", expand=True, padx=10, pady=10)
-
+    def create_VidGenesis_Automation_Agent(self):
+        self.VidGenesis_Automation_Agent = VidGenesis_Automation_Agent(self.content_frame)
+        self.VidGenesis_Automation_Agent.container.pack(fill="both",expand=True,padx=10,pady=10)
+    
+    def create_MediaTree_Inspector(self):
+        self.MediaTree_Insepctor = MediaTree_Inspector_gui(self.content_frame)
+        self.MediaTree_Insepctor.container.pack(fill="both", expand=True, padx=10, pady=10)
 
     def Create_Social_Media_uploading(self):
         self.socialMediaUploading = SocialMediaUploading(self.content_frame)
         self.socialMediaUploading.container.pack(fill="both", expand=True, padx=10, pady=10)
     
-    def create_ColorRestorer(self):
-        self.colorRestorer = ColorRestorer(self.content_frame)
-        self.colorRestorer.container.pack(fill="both", expand=True, padx=10, pady=10)
+    def create_ColorRestorer_ai(self):
+        self.colorRestorer_ai = ColorRestorer_gui(self.content_frame)
+        self.colorRestorer_ai.container.pack(fill="both", expand=True, padx=10, pady=10)
+
+    def create_youtube_downloader(self):
+        place_youtube_download_menu(self.content_frame)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5855,6 +6569,8 @@ def create_option_background():
 
 # Main functions ---------------------------
 def on_app_close() -> None:
+    global Global_offline_model
+    del Global_offline_model
     window.grab_release()
     window.destroy()
     load_model_inference()
@@ -5923,8 +6639,7 @@ def on_app_close() -> None:
     
 class VideoEnhancer():
     def __init__(self, Master):
-        #Master.attributes('-fullscreen', True)
-        Thread(target=load_model_background, daemon=True).start()
+        threading.Thread(target=load_model_async, daemon=True).start()
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
@@ -5948,6 +6663,7 @@ class VideoEnhancer():
         place_message_label()
         place_upscale_button()
         selected_VRAM_limiter.set(str(round(get_gpu_vram() / 1000)) if get_gpu_vram() else "4")
+    
  
     
             
