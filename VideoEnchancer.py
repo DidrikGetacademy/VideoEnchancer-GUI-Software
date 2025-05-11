@@ -2,7 +2,7 @@ import sys
 import os
 import torch 
 import torch
-import Vocal_Isolation
+import Vocal_isolation
 import onnxruntime as ort
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -10,7 +10,7 @@ from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel, tool, SpeechToTextTool,PythonInterpreterTool
+from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel, SpeechToTextTool,PythonInterpreterTool
 from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress#,Upload_video_to_socialMedia_platform,add_text_to_video,add_audio_to_video,add_filter_to_video
 import numpy as np
 from PIL import Image, ImageTk
@@ -232,7 +232,7 @@ Global_offline_model = None
 
 
 
-from local_model.local_models_path.Old_photos__colorizing.Vizualise import get_image_colorizer
+from Old_photos__colorizing.Vizualise import get_image_colorizer
 import onnxruntime as ort
 model_loading_lock = threading.Lock()
 AI_models_list         = ( SRVGGNetCompact_models_list + AI_LIST_SEPARATOR + RRDB_models_list + AI_LIST_SEPARATOR + IRCNN_models_list )
@@ -1541,8 +1541,8 @@ def place_youtube_download_menu(parent_container):
 
     input_frame = CTkFrame(
         master=parent_container,
-        fg_color="black",
-        bg_color="black",
+        fg_color=dark_color,
+        bg_color=dark_color,
         corner_radius=15,
         border_width=4,
         border_color="white"  
@@ -1573,8 +1573,8 @@ def place_youtube_download_menu(parent_container):
         image=bg_image_tk,
         width=frame_width,
         height=frame_height,
-        bg_color='black',
-        fg_color="black",
+        bg_color='white',
+        fg_color="white",
         text="",
     )
     bg_label.grid(row=2,column=8, padx=(2,0), sticky="w")
@@ -1636,13 +1636,6 @@ def place_youtube_download_menu(parent_container):
 
  
 
-    def update_fetch_button_state(event=None):
-        url = youtube_link_entry.get()
-        if "youtube.com" in url or "youtu.de" in url:
-            fetch_button.configure(state="normal")  
-        else:       
-            fetch_button.configure(state="disabled")
-
 
     youtube_url_label = CTkLabel(
         master=youtube_widget_container,
@@ -1668,9 +1661,18 @@ def place_youtube_download_menu(parent_container):
         text_color="#f0f0f0",
         justify="center"
     )
+
+    def update_fetch_button_state(event=None):
+        url = youtube_link_entry.get()
+        if "youtube.com" in url or "youtu.de" in url:
+            fetch_button.configure(state="normal")  
+        else:       
+            fetch_button.configure(state="disabled")
+
     youtube_link_entry.grid(row=2,column=1, padx=10, pady=10, sticky="w")
 
     youtube_link_entry.bind("<KeyRelease>", update_fetch_button_state)
+#
 
 
 
@@ -1694,9 +1696,9 @@ def place_youtube_download_menu(parent_container):
             variable=youtubelist_variable,
             values=youtube_download_list,
             width=300,
-            button_color="black",
-            bg_color="black",
-            fg_color="black",
+            button_color="white",
+            bg_color="white",
+            fg_color="white",
             text_color="#FFFFFF",
         )
     youtube_list_menu.grid(row=1, column=1, sticky="w", padx=10, pady=10)
@@ -1760,6 +1762,12 @@ def place_youtube_download_menu(parent_container):
         state="DISABLED"
     )
     
+    def clear_download_list():
+            youtube_download_list.clear()
+            youtubelist_variable.set("")
+            youtube_list_menu.configure(values=[])
+           # list_display.delete('1.0', END)
+
     clear_list_btn = CTkButton(
     master=youtube_widget_container,
     text="Clear List",
@@ -1828,6 +1836,7 @@ def place_youtube_download_menu(parent_container):
         state="disabled"  
     )
     fetch_button.grid(row=2,column=3, padx=10, pady=10, sticky="w")
+
 
     global download_btn
     download_btn = CTkButton(
@@ -1903,12 +1912,6 @@ def place_youtube_download_menu(parent_container):
         
 
 
-
-    def clear_download_list():
-            youtube_download_list.clear()
-            youtubelist_variable.set("")
-            youtube_list_menu.configure(values=[])
-           # list_display.delete('1.0', END)
 
 
     def select_youtube_output_path():
@@ -3193,6 +3196,20 @@ class ToolWindowClass:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ####VIDEO PREVIEW CLASS######
 class VideoPreview:
     def __init__(self, parent_container, original_label, upscaled_label, video_path):
@@ -3424,6 +3441,143 @@ class VideoPreview:
 
 
 
+# GUI place functions ---------------------------
+def create_placeholder_image(width, height):
+    img = Image.new('RGB', (width, height), color='#000000')
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("arial.ttf", 100)
+    except IOError:
+        font = ImageFont.load_default()
+    text = "?"
+    text_width = draw.textlength(text, font=font)
+    text_height = font.size
+    x = (width - text_width) // 2
+    y = (height - text_height) // 2
+    draw.text((x, y), text, fill="#FFFFFF", font=font)
+    return img
+
+
+
+#didrik
+
+
+
+def place_loadFile_section(window):
+    global container, original_preview, upscaled_preview,original_label_title, upscaled_label_title
+
+    preview_width = 1400  
+    preview_height = 1080  
+
+
+    window.preview_frame = CTkFrame(
+        master=window, 
+        fg_color=dark_color,
+        width=preview_width,
+        height=preview_height,
+        corner_radius=3
+    )
+    window.preview_frame.place(relx=0.78, rely=0.5, relwidth=0.45, relheight=1.0, anchor="center")
+    window.preview_frame.pack_propagate(False)  
+
+
+    placeholder_img = create_placeholder_image(1920, 1080)
+    placeholder_photo = CTkImage(placeholder_img, size=(preview_width, preview_height))
+
+ 
+    container = CTkFrame(window.preview_frame, fg_color=dark_color)
+    container.pack(pady=13, padx=21, fill='both', expand=True) 
+
+
+    original_frame = CTkFrame(container, fg_color=dark_color)
+    original_frame.pack(side='left', fill='both', expand=True, padx=5)
+    original_frame.pack_propagate(False)
+    original_label_title = CTkLabel(original_frame, text="Original", font=bold18, text_color=app_name_color).pack(pady=5)
+
+    original_preview = CTkLabel(original_frame, image=placeholder_photo, text="")
+    original_preview.pack(fill='both', expand=True)
+    original_preview.pack_propagate(False)
+    
+    upscaled_frame = CTkFrame(container, fg_color=dark_color)
+    upscaled_frame.pack(side='right', fill='both', expand=True, padx=10)
+    upscaled_frame.pack_propagate(False)
+    upscaled_label_title = CTkLabel(upscaled_frame, text="Upscaled Preview", font=bold18, text_color=app_name_color).pack(pady=5)
+
+    upscaled_preview = CTkLabel(upscaled_frame, image=placeholder_photo, text="")
+    upscaled_preview.pack(fill='both', expand=True)
+    upscaled_preview.pack_propagate(False)
+   
+    globals()['container'] = container
+    globals()['original_preview'] = original_preview
+    globals()['upscaled_preview'] = upscaled_preview
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+#didrik
+###Loading-ICON####
+class LoadingIcon:
+    def __init__(self,master):
+        self.master = master
+        self.loading_gif = Image.open(find_by_relative_path("Assets" + os_separator + "Loading.gif"))
+        self.frames = [CTkImage(frame.convert('RGBA'), size=(100, 100)) 
+               for frame in ImageSequence.Iterator(self.loading_gif)]
+
+        self.label = CTkLabel(master,text="", image=self.frames[0],bg_color='transparent')
+        self.label.place(relx=0.5, rely=0.5, anchor="center")
+        self.current_frame = 0
+        self.animating = False
+
+    def start(self):
+        self.animating = True
+        logging.info("Started loading animation")
+        self.animate()
+
+    def stop(self):
+        self.animating = False
+        self.label.destroy()
+        logging.info("Stopped loading animation")
+    
+    def animate(self):
+        if self.animating:
+            self.label.configure(image=self.frames[self.current_frame])
+            self.current_frame = (self.current_frame + 1) % len(self.frames)
+            self.master.after(50,self.animate)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3559,109 +3713,6 @@ def check_model_loading_progress():
 
 
 
-###Loading-ICON####
-class LoadingIcon:
-    def __init__(self,master):
-        self.master = master
-        self.loading_gif = Image.open(find_by_relative_path("Assets" + os_separator + "Loading.gif"))
-        self.frames = [CTkImage(frame.convert('RGBA'), size=(100, 100)) 
-               for frame in ImageSequence.Iterator(self.loading_gif)]
-
-        self.label = CTkLabel(master,text="", image=self.frames[0],bg_color='transparent')
-        self.label.place(relx=0.5, rely=0.5, anchor="center")
-        self.current_frame = 0
-        self.animating = False
-
-    def start(self):
-        self.animating = True
-        logging.info("Started loading animation")
-        self.animate()
-
-    def stop(self):
-        self.animating = False
-        self.label.destroy()
-        logging.info("Stopped loading animation")
-    
-    def animate(self):
-        if self.animating:
-            self.label.configure(image=self.frames[self.current_frame])
-            self.current_frame = (self.current_frame + 1) % len(self.frames)
-            self.master.after(50,self.animate)
-
-
-
-# GUI place functions ---------------------------
-def create_placeholder_image(width, height):
-    img = Image.new('RGB', (width, height), color='#000000')
-    draw = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("arial.ttf", 100)
-    except IOError:
-        font = ImageFont.load_default()
-    text = "?"
-    text_width = draw.textlength(text, font=font)
-    text_height = font.size
-    x = (width - text_width) // 2
-    y = (height - text_height) // 2
-    draw.text((x, y), text, fill="#FFFFFF", font=font)
-    return img
-
-
-
-
-def place_loadFile_section(window):
-    global container, original_preview, upscaled_preview,original_label_title, upscaled_label_title
-
-    preview_width = 1400  
-    preview_height = 1080  
-
-
-    window.preview_frame = CTkFrame(
-        master=window, 
-        fg_color=dark_color,
-        width=preview_width,
-        height=preview_height,
-        corner_radius=3
-    )
-    window.preview_frame.place(relx=0.78, rely=0.5, relwidth=0.45, relheight=1.0, anchor="center")
-    window.preview_frame.pack_propagate(False)  
-
-
-    placeholder_img = create_placeholder_image(1920, 1080)
-    placeholder_photo = CTkImage(placeholder_img, size=(preview_width, preview_height))
-
- 
-    container = CTkFrame(window.preview_frame, fg_color=dark_color)
-    container.pack(pady=13, padx=21, fill='both', expand=True) 
-
-
-    original_frame = CTkFrame(container, fg_color=dark_color)
-    original_frame.pack(side='left', fill='both', expand=True, padx=5)
-    original_frame.pack_propagate(False)
-    original_label_title = CTkLabel(original_frame, text="Original", font=bold18, text_color=app_name_color).pack(pady=5)
-
-    original_preview = CTkLabel(original_frame, image=placeholder_photo, text="")
-    original_preview.pack(fill='both', expand=True)
-    original_preview.pack_propagate(False)
-    
-    upscaled_frame = CTkFrame(container, fg_color=dark_color)
-    upscaled_frame.pack(side='right', fill='both', expand=True, padx=10)
-    upscaled_frame.pack_propagate(False)
-    upscaled_label_title = CTkLabel(upscaled_frame, text="Upscaled Preview", font=bold18, text_color=app_name_color).pack(pady=5)
-
-    upscaled_preview = CTkLabel(upscaled_frame, image=placeholder_photo, text="")
-    upscaled_preview.pack(fill='both', expand=True)
-    upscaled_preview.pack_propagate(False)
-   
-    globals()['container'] = container
-    globals()['original_preview'] = original_preview
-    globals()['upscaled_preview'] = upscaled_preview
-
-
- 
-
-
-
 def select_AI_from_menu(selected_option: str) -> None:
     global selected_AI_model, current_loaded_model, model_loading_thread
     logging.info(f"AI model selected: {selected_option}")
@@ -3683,6 +3734,7 @@ def select_AI_from_menu(selected_option: str) -> None:
         daemon=True
     )
     model_loading_thread.start()
+
 
  
 
@@ -3823,7 +3875,7 @@ class AI:
   
     def run_vocal_isolation(self,video_path: str) -> str:
         import soundfile as sf
-        from Vocal_Isolation.app import main
+        from Vocal_isolation import main
         audio_file_path = self.extract_audio_from_video(video_path)
         audio_session = self._load_audio_inferenceSession()
         vocals_array, samplerate = main(self.audio_model_path,audio_file_path,audio_session)
@@ -4524,23 +4576,23 @@ class FileWidget(CTkScrollableFrame):
                     self.file_widget.destroy()
                 if hasattr(self, 'preview_frame'):
                     self.preview_frame.destroy()
-                place_loadFile_section(window)
+                    place_loadFile_section(window) 
             
 
 
 
 
     def preview_file(self, file_path):
-        global preview_instance, container, original_preview, upscaled_preview
+        global preview_instance, container, original_preview, upscaled_preview,shared_view_mode_var
 
         if preview_instance:
             preview_instance.close()
             preview_instance = None
 
-  
+   
         preview_instance = VideoPreview(container, original_preview, upscaled_preview, file_path)
         preview_button.configure(state=DISABLED)
-        #DIDRIK
+        #didrik
   
     
 
@@ -6643,12 +6695,18 @@ class VideoEnhancer():
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
-        Master.geometry("1920x1080")
+        screen_width = Master.winfo_screenwidth()
+        screen_height = Master.winfo_screenheight()
+        window_width= int(screen_width * 0.85)
+        window_height = int(screen_height * 0.85)
+        x_offset = (screen_width - window_width) // 2
+        y_offset = (screen_height - window_height) // 2
+        Master.geometry(f"{window_width}x{window_height}+{x_offset}+{y_offset}")
         Master.resizable(False, False)
         Master.iconbitmap(find_by_relative_path("Assets" + os_separator + "logo.ico"))
         self.bg_image = CTkImage(Image.open(find_by_relative_path("Assets" + os_separator + "testbilde.png")), size=(1920, 1080))
-        self.background_label = CTkLabel(Master, image=self.bg_image, fg_color="black")
-        self.background_label.place(relx=-0.23,rely=-0.25, relwidth=0.8, relheight=0.64) 
+        self.background_label = CTkLabel(Master, image=self.bg_image, text="", fg_color="black")
+        self.background_label.place(relx=-0.1,rely=-0.22, relwidth=0.8, relheight=0.64) 
         self.background_label.lower() 
         load_cookie_file_path()
         self.ToolWindowClass = ToolWindowClass(Master)
@@ -6669,7 +6727,7 @@ class VideoEnhancer():
             
         
 if __name__ == "__main__":
-    from Decryption import validate_jwt
+    #from Decryption import validate_jwt
     # if not validate_jwt():
     #     logging.info(f"Validating with jwt error")
     #     sys.exit(1)
@@ -6682,17 +6740,10 @@ if __name__ == "__main__":
     set_appearance_mode("Dark")
     set_default_color_theme("dark-blue")
 
-    def exit_fullscreen( event=None):
-                 """Exit fullscreen when ESC is pressed"""
-                 window.attributes("-fullscreen", False)
+ 
     
     window = CTk()
-    window.attributes('-fullscreen', True)
-    window.bind("<Escape>", exit_fullscreen) 
-
- 
-
-
+    window.configure(fg_color="black")
     youtube_progress_var = StringVar()
     processing_queue = multiprocessing_Queue(maxsize=1)
     info_message            = StringVar()

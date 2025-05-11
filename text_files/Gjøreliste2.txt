@@ -1,0 +1,17 @@
+
+-Få RAG agent sertifikasjon fra huggingface.
+
+- Implementere mer brukersystem logikk/personlig utvikling logikk i learnreflect og gjør siden mer fin/profesjonell med css styling
+
+-Finne løsning til hvordan jeg kan implementere kjøring/kode logikk for lokal llm modeller som er i (onnx format) i Smolagents libary, siden smolagents ikke støtter lasting av onnx format i transformers, evt lage en egen klasse logikk som fungerer med smolagents libary, 
+
+-få ferdig 2 verktøy klasser i learnreflect altså  vidintel_agent_gui og corelytics_InsightCatcher, ordne sånn at begge klarer og kjøre sin oppgave fullt ut
+
+-få ferdig styling i videoenchancer, så hele programvaren ser ordentlig ut.
+
+-pakke programvaren og lage en installer (legge ut installer på one.com og aktivere betaling igjen)
+
+-Fikse logikk så jeg kan kjøre whisper modell i onnx format i smolagents libary. (dette må gjøres før corelytics_insightcather og vidintel_agent_gui) kan fungere 100%
+
+
+
