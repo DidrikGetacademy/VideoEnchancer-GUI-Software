@@ -1513,6 +1513,8 @@ global youtube_progress_var
 def place_youtube_download_menu(parent_container):
     global youtube_link_entry, youtube_output_path_entry ,video_format_var, audio_format_var
     frame_width, frame_height = 250, 150
+    youtube_link_settings = {}
+    formats_fetched = {}
 
     youtube_progress_var.set("")
     parent_container.grid_rowconfigure(0, weight=1)
@@ -1520,9 +1522,17 @@ def place_youtube_download_menu(parent_container):
 
         
     def update_format_list():
+        window.after(0, lambda: addlist_btn.configure(state="normal"))
         url = youtube_link_entry.get()
-        if url:
+        if not url:
+            return
+        
+        if url in formats_fetched:
+            video_formats, audio_formats = formats_fetched[url]
+        else:
             video_formats, audio_formats = get_available_formats(url)
+            formats_fetched[url] = (video_formats,audio_formats)
+            print("Formats fetched and cached.")
 
             if video_formats or audio_formats:
                 video_format_dropdown.configure(values=video_formats if video_formats else ["No video formats available"])
@@ -1585,8 +1595,9 @@ def place_youtube_download_menu(parent_container):
     progress_label = CTkLabel(
         master=youtube_widget_container,
         textvariable=youtube_progress_var,
-        font=bold12,
-        text_color="#00FF00",
+        text_color="#CCCCCC",
+        bg_color="transparent",
+        font=("Segoe UI", 12, "bold"),
         text="waiting",
         width=100
     )
@@ -1606,12 +1617,13 @@ def place_youtube_download_menu(parent_container):
         master=youtube_widget_container,
         width=300,
         height=25,
-        corner_radius=5,
-        font=bold11,
-        fg_color="black",
+        corner_radius=10,
+        font=("Segoe UI", 12),
+        fg_color="#1e1e1e",  
+        border_color="#3b82f6", 
+        border_width=2,
         bg_color="black",
         justify="center",
-        border_color="black"
     )
     youtube_output_path_entry.grid(row=0, column=1, sticky="w", padx=10, pady=10)
     youtube_output_path_entry.insert(0,DOCUMENT_PATH)
@@ -1640,11 +1652,11 @@ def place_youtube_download_menu(parent_container):
     youtube_url_label = CTkLabel(
         master=youtube_widget_container,
         text="YouTube URL:", 
-        font=bold12,
-        text_color="#C0C0C0",
-        bg_color="transparent",
         fg_color="transparent",
-        justify="center"
+        justify="center",
+        text_color="#CCCCCC",
+        bg_color="transparent",
+        font=("Segoe UI", 12, "bold"),
     )
     youtube_url_label.grid(row=2, column=0, padx=10, pady=10, sticky="w")
         
@@ -1653,9 +1665,11 @@ def place_youtube_download_menu(parent_container):
         master=youtube_widget_container,
         width=300,
         height=30,
-        corner_radius=8,
-        font=bold11,
-        fg_color="white",
+        corner_radius=10,
+        font=("Segoe UI", 12),
+        fg_color="#1e1e1e", 
+        border_color="#3b82f6",  
+        border_width=2,
         placeholder_text="Add youtube Link",
         bg_color="black",
         text_color="#f0f0f0",
@@ -1680,13 +1694,48 @@ def place_youtube_download_menu(parent_container):
     Youtubelist_label =  CTkLabel(
         master=youtube_widget_container,
         text="YouTube List: ", 
-        font=bold12,
-        text_color="#C0C0C0",
-        bg_color='transparent',
+        font=("Segoe UI", 12, "bold"),
+        text_color="#CCCCCC",
+        bg_color="transparent",
         fg_color="transparent",
         justify="center"
     )
     Youtubelist_label.grid(row=1, column=0, sticky="w", padx=10, pady=10)
+
+
+    def on_link_selected(selected_url):
+        youtube_link_entry.delete(0,tk.END)
+        youtube_link_entry.insert(0, selected_url)
+
+        if selected_url in formats_fetched:
+            video_formats, audio_formats = formats_fetched[selected_url]
+        else:
+             video_formats, audio_formats = get_available_formats(selected_url)
+             formats_fetched[selected_url] = (video_formats, audio_formats)
+
+        video_format_dropdown.configure(values=video_formats if video_formats else ["No video formats available"])
+        audio_format_dropdown.configure(values=audio_formats if audio_formats else ["No audio formats available"])
+
+        saved_settings = youtube_link_settings.get(selected_url, {})
+        saved_video_format = saved_settings.get("video_format")
+        saved_audio_format = saved_settings.get("audio_format")
+
+        if saved_video_format in video_formats:
+            video_format_var.set(saved_video_format)
+        else:
+            video_format_var.set(video_format_var.get() if video_formats else "Video Formats...")
+        if saved_audio_format in audio_formats:
+            audio_format_var.set(saved_audio_format)
+            audio_format_var.set(audio_format_var.get() if audio_formats else "Audio Formats...")
+
+       
+
+
+        youtube_link_settings[selected_url] = {
+            "video_format": video_format_var.get(),
+            "audio_format": audio_format_var.get()
+        }
+
 
     global youtubelist_variable
     global youtube_list_menu
@@ -1696,20 +1745,35 @@ def place_youtube_download_menu(parent_container):
             variable=youtubelist_variable,
             values=youtube_download_list,
             width=300,
-            button_color="white",
+            button_color="#0f172a",      
             bg_color="white",
-            fg_color="white",
+            fg_color="#1e1e1e",         
             text_color="#FFFFFF",
+            button_hover_color="#2563eb",   
+            dropdown_fg_color="#1e1e1e",    
+            dropdown_hover_color="#3b82f6", 
+            dropdown_text_color="#ffffff",
+            font=("Segoe UI", 12),
         )
     youtube_list_menu.grid(row=1, column=1, sticky="w", padx=10, pady=10)
+    youtube_list_menu.configure(command=on_link_selected)
 
+    def on_video_format_change(event=None):
+        selected_url = youtubelist_variable.get().strip()
+        if selected_url in youtube_link_settings:
+            youtube_link_settings[selected_url]["audio_format"] = audio_format_var.get()
+
+    def on_audio_format_change(event=None):
+        selected_url = youtubelist_variable.get().strip()
+        if selected_url in youtube_link_settings:
+            youtube_link_settings[selected_url]["video_format"] = video_format_var.get()
 
 
     video_format_label = CTkLabel(
         master=youtube_widget_container,
         text="Video Format:",
-        font=bold12,
-        text_color="#C0C0C0",
+        font=("Segoe UI", 12, "bold"),
+        text_color="#CCCCCC",
         bg_color="transparent",
     )
     video_format_label.grid(row=3,column=0, padx=10, pady=10, sticky="w")
@@ -1719,21 +1783,28 @@ def place_youtube_download_menu(parent_container):
         variable=video_format_var,
         values=["Enter Link First..."],
         width=300,
+        font=("Segoe UI", 12),
         fg_color="black",
         border_color="#3b82f6",
-        button_color="#1f2937",
+        border_width=2,
+        button_color="#0f172a",     
+        button_hover_color="#2563eb",  
+        dropdown_fg_color="#1e1e1e",
+        dropdown_hover_color="#3b82f6",
         text_color="#ffffff"
     )
     video_format_dropdown.grid(row=3,column=1, padx=10, pady=10, sticky="w")
+    video_format_dropdown.bind("<<ComboboxSelected>>", on_video_format_change)
+
 
 
 
     audioformat_label = CTkLabel(
         master=youtube_widget_container,
         text="Audio Format:",
-        font=bold12,
-        text_color="#C0C0C0",
-        bg_color="transparent",
+         font=("Segoe UI", 12, "bold"),
+         text_color="#CCCCCC",
+         bg_color="transparent",
     )
     audioformat_label.grid(row=4,column=0, padx=10, pady=10, sticky="w")
 
@@ -1743,9 +1814,19 @@ def place_youtube_download_menu(parent_container):
         master=youtube_widget_container,
         variable=audio_format_var,
         values=["Enter Link First..."],
-        width=300
+        width=300,
+        font=("Segoe UI", 12),
+        fg_color="#1e1e1e",         
+        border_color="#3b82f6",    
+        border_width=2,
+        button_color="#0f172a",    
+        button_hover_color="#2563eb", 
+        dropdown_fg_color="#1e1e1e",
+        dropdown_hover_color="#3b82f6",
+        text_color="#ffffff"      
     )
     audio_format_dropdown.grid(row=4,column=1, padx=10, pady=10, sticky="w")
+    audio_format_dropdown.bind("<<ComboboxSelected>>", on_audio_format_change)
 
 
     global stop_youtube_download_btn
@@ -1766,7 +1847,7 @@ def place_youtube_download_menu(parent_container):
             youtube_download_list.clear()
             youtubelist_variable.set("")
             youtube_list_menu.configure(values=[])
-           # list_display.delete('1.0', END)
+            download_all_btn.configure(state="disabled")
 
     clear_list_btn = CTkButton(
     master=youtube_widget_container,
@@ -1783,7 +1864,26 @@ def place_youtube_download_menu(parent_container):
     clear_list_btn.grid(row=0, column=3, padx=10, pady=10, sticky="w")
 
 
+    def add_link_to_download_list():
+            if video_format_var.get() == "":
+                print("Select video formats first ")
+                return
+            
+            url = youtube_link_entry.get().strip()
+            if url and url not in youtube_download_list:
+                youtube_download_list.append(url)
+                youtube_link_entry.delete(0, END)
 
+                youtubelist_variable.set(youtube_download_list[-1])
+                youtube_list_menu.configure(values=youtube_download_list)
+                youtube_link_settings[url] = {
+                    "video_format": video_format_var.get(),
+                    "audio_format": audio_format_var.get()
+                }
+                if len(youtube_download_list) > 0:
+                    download_all_btn.configure(state="normal")
+                video_format_var.set("")
+                audio_format_var.set("")
 
     addlist_btn = CTkButton(
         master=youtube_widget_container,
@@ -1795,7 +1895,8 @@ def place_youtube_download_menu(parent_container):
         border_color="#3b82f6",  
         border_width=1,
         text_color="#ffffff",
-        command=add_link_to_download_list
+        command=add_link_to_download_list,
+        state="disabled"
     )
     addlist_btn.grid(row=1, column=3, sticky="w", padx=10, pady=10)
  
@@ -1855,6 +1956,54 @@ def place_youtube_download_menu(parent_container):
     )
     download_btn.grid(row=3, column=3,  padx=10, pady=10, sticky="w")
 
+
+    def download_all_from_list():
+            output_path = youtube_output_path_entry.get()
+            if not output_path:
+                info_message.set("Choose a folder for saving!")
+                return
+            if not youtube_download_list:
+                info_message.set("The list is empty!")
+                return
+            
+            stop_youtube_download_btn.grid(row=4, column=3, sticky="ew", padx=10, pady=5)
+            youtube_progress_var.set("Starting batch download...")
+            def batch_worker():
+                for idx, link in enumerate(youtube_download_list, 1):
+                    if stop_download_flag:
+                        youtube_progress_var.set("Download stopped.")
+                        return
+
+                    window.after(0, lambda l=link, i=idx: youtube_progress_var.set(
+                        f"⬇️ Downloading ({i}/{len(youtube_download_list)}): {l[:50]}"
+                    ))
+
+                
+                    format_data = formats_fetched.get(link)
+                    if format_data:
+                        video_formats, audio_formats = format_data
+                    else:
+                      
+                        video_formats, audio_formats = get_available_formats(link)
+                        formats_fetched[link] = (video_formats, audio_formats)
+
+               
+                    settings = youtube_link_settings.get(link, {})
+                    video_format_id = settings.get("video_format", "best").split(" - ")[0]
+                    audio_format_id = settings.get("audio_format", "bestaudio").split(" - ")[0]
+
+           
+                    video_format_var.set(video_format_id)
+                    audio_format_var.set(audio_format_id)
+
+                    download_youtube_link(link, output_path, update_progress)
+
+                window.after(0, lambda: youtube_progress_var.set("✅ All downloads finished."))
+                info_message.set("✅ Batch download completed.")
+
+                Thread(target=batch_worker).start()
+                
+
     download_all_btn = CTkButton(
         master=youtube_widget_container,
         text="Download All",
@@ -1870,46 +2019,6 @@ def place_youtube_download_menu(parent_container):
         state="disabled"
     )
     download_all_btn.grid(row=5, column=3, padx=10, pady=10, sticky="w")
-    
-    # def Configure_format_youtube_list():
-    #         return
-
-    #     configure_format_btn = CTkButton(
-    #         master=left_half_frame,
-    #         text="Configure format for each link",
-    #         #command=Configure_format_youtube_list
-    #     )
-    #     configure_format_btn.grid(row=0,column=0, padx=(10,5), pady=(10,5), sticky="w")
-
-
-    def download_all_from_list():
-            output_path = youtube_output_path_entry.get()
-            if not output_path:
-                info_message.set("Choose a folder for saving!")
-                return
-            if not youtube_download_list:
-                info_message.set("The list is empty!")
-            
-            stop_youtube_download_btn.grid(row=4, column=3, sticky="ew", padx=10, pady=5)
-            youtube_progress_var.set("Starting batch download...")
-
-
-            def download_worker():
-                for idx, link in enumerate(youtube_download_list, 1):
-                    youtube_progress_var.set(f"Downloading: ({idx}/{len(youtube_download_list)}): {link}")
-                    message = download_youtube_link(link, output_path, update_progress)
-                    if stop_download_flag:
-                        break
-                    if not stop_download_flag:
-                        youtube_progress_var.set("All downloads complete!")
-                        info_message.set("All downloads completed successully")
-                    else:
-                        youtube_progress_var.set("Download stopped.")
-                        info_message.set("All downloads stopped by user.")
-
-            Thread(target=download_worker).start()
-
-        
 
 
 
@@ -1920,17 +2029,6 @@ def place_youtube_download_menu(parent_container):
                 youtube_output_path_entry.delete(0,'end')
                 youtube_output_path_entry.insert(0,path)
 
-
-
-
-def add_link_to_download_list():
-        url = youtube_link_entry.get().strip()
-        if url and url not in youtube_download_list:
-            youtube_download_list.append(url)
-            youtube_link_entry.delete(0, END)
-
-            youtubelist_variable.set(youtube_download_list[-1])
-            youtube_list_menu.configure(values=youtube_download_list)
 
 def delete_cookie_file_and_reset_button():
     """ Deletes the cookie file if it exists and resets the upload button visibility. """
@@ -2150,7 +2248,8 @@ def download_youtube_link(youtube_url,output_path, progress_callback=None):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
              ydl.download([youtube_url])
-        return "Download Complete!"  and stop_youtube_download_btn.pack_forget()
+        return "Download Complete!"  and window.after(0, lambda: [stop_youtube_download_btn.pack_forget(), stop_youtube_download_btn.update_idletasks()])
+
     except yt_dlp.utils.DownloadError as e:
         return f"Error: {str(e)}"
     
@@ -6691,7 +6790,7 @@ def on_app_close() -> None:
     
 class VideoEnhancer():
     def __init__(self, Master):
-        threading.Thread(target=load_model_async, daemon=True).start()
+       #threading.Thread(target=load_model_async, daemon=True).start()
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
