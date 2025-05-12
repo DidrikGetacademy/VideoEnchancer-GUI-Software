@@ -2,7 +2,7 @@ import sys
 import os
 import torch 
 import torch
-import Vocal_isolation
+import LocalModelAssets.Old_photos__colorizing.Vocal_isolation as Vocal_isolation
 import onnxruntime as ort
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -3974,7 +3974,7 @@ class AI:
   
     def run_vocal_isolation(self,video_path: str) -> str:
         import soundfile as sf
-        from Vocal_isolation import main
+        from LocalModelAssets.Old_photos__colorizing.Vocal_isolation import main
         audio_file_path = self.extract_audio_from_video(video_path)
         audio_session = self._load_audio_inferenceSession()
         vocals_array, samplerate = main(self.audio_model_path,audio_file_path,audio_session)
