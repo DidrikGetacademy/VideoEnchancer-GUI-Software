@@ -1,17 +1,16 @@
-import sys
 import os
-import torch 
-import torch
-import LocalModelAssets.Old_photos__colorizing.Vocal_isolation as Vocal_isolation
-import onnxruntime as ort
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+import sys
+import torch 
+import torch
+import onnxruntime as ort
 from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
 from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel, SpeechToTextTool,PythonInterpreterTool
-from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress#,Upload_video_to_socialMedia_platform,add_text_to_video,add_audio_to_video,add_filter_to_video
+from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress
 import numpy as np
 from PIL import Image, ImageTk
 import yaml
@@ -230,9 +229,6 @@ media_info_update_callback = None
 stop_download_flag = False
 Global_offline_model = None  
 
-
-
-from Old_photos__colorizing.Vizualise import get_image_colorizer
 import onnxruntime as ort
 model_loading_lock = threading.Lock()
 AI_models_list         = ( SRVGGNetCompact_models_list + AI_LIST_SEPARATOR + RRDB_models_list + AI_LIST_SEPARATOR + IRCNN_models_list )
@@ -584,41 +580,22 @@ class vidintel_agent_gui():
             self.chat_display.config(state=tk.DISABLED)  
             return
                         
-        user_task = (
-                "Step 1: Use the `ExtractAudioFromVideo(video_path: str) -> str` tool to extract mono 16 kHz WAV audio from the provided video. "
-                "Step 2: Use the `transcriber` tool an instance of `SpeechToTextTool()` tool to transcribe the extracted audio into text. "
-                "Step 3: Analyze transcript to identify its top 5 themes/keywords, then derive a broad search query.\n"
-                "Step 4: Use the `Fetch_top_trending_youtube_videos(Search_Query: str) -> dict` tool to fetch metadata for the top 10 trending YouTube videos matching that query. "
-                "Step 5: Use the `web_search(query: str) -> dict` tool to search the web for additional trending content on the same query. "
-                "Step 6: Synthesize all insights (transcript themes, YouTube metadata, web results) into a unique, SEO-optimized metadata package—title, description, keywords, and hashtags—without copying any text verbatim. "
-                "Return the final metadata as a JSON object with the keys: title, description, keywords, hashtags."
-                "Return your result as a JSON dictionary with these **exact lowercase keys**:\n"
-                "- `title`: a short, clickable video title.\n"
-                "- `description`: a compelling paragraph (1–3 sentences).\n"
-                "- `keywords`: a list of relevant keywords (no more than 10).\n"
-                "- `hashtags`: a list of hashtags with `#` (e.g. `#Fitness`).\n"
-                "- `tips`: a list of creative suggestions to improve engagement.\n\n"
-                "⚠️ Use the exact key names: `title`, `description`, `keywords`, `hashtags`, and `tips`. No additional fields."
-            )
+        user_task = "Please generate a Title, Description, Hashtags, Keywords, and a unique message for my video. The goal is to help it go viral by leveraging current trends and analyzing similar successful videos. The unique message should highlight key insights, secret strategies, or specific elements that contributed to the virality of similar content. Think of it as a short, strategic note or idea that could help this video stand out and perform exceptionally well.in your final answer Use the exact key names: `title`, `description`, `keywords`, `hashtags`, and `Unique message`. No additional fields."
+            
       
 
         uploaded_file = self.file_menu_var.get()
-        context_vars = {
-               "video_path": Video_path,
-               "file_type": file,
-               "chat_display": self.chat_display,
-            }       
 
 
         
         #Agent Prompts
-        with open(find_by_relative_path("./Assets/agent_prompts/prompts.yaml"), 'r') as stream:
+        with open(find_by_relative_path("./Assets/agent_prompts/Prompts Ready/CodeAgent_DEFAULT_prompt.yaml"), 'r') as stream:
                     Manager_Agent_prompt_templates = yaml.safe_load(stream)
 
         with open(find_by_relative_path("./Assets/agent_prompts/Web_search_Prompt_template.yaml"), 'r') as stream:
                     Web_search_Prompt_template = yaml.safe_load(stream)
 
-        with open(find_by_relative_path("./Assets/agent_prompts/Analytic_Reasoning_Prompt_Template.yaml"), 'r') as stream:
+        with open(find_by_relative_path("./Assets/agent_prompts/Prompts Ready/Managed_agent_analytics_prompt.yaml"), 'r') as stream:
                     Analytic_Reasoning_Prompt_Template = yaml.safe_load(stream)
 
 
@@ -636,46 +613,58 @@ class vidintel_agent_gui():
 
         Analytic_reasoning_assistant = CodeAgent (
             model=self.model,
-            name="Analytic_reasoning_assistant",
+            name="Analytic_reasoning_ManagedAgent",
             description="Analyzes search results from Web_Search_Assistant and extracts viral insights. Generates a concise content package including: title, description, hashtags, keywords, and creative tips or ideas. Returns this package to the manager agent for final output.",
-            add_base_tools=True,
             prompt_templates=Analytic_Reasoning_Prompt_Template,
-            #planning_interval=0, 
             tools=[],
+            add_base_tools=True,
             max_steps=3,
             provide_run_summary=True
         )
         Web_Search_Assistant = CodeAgent (
             model=self.model,
-            name="Web_Search_Assistant",
-            description="Receives transcribed text from the manager agent, performs a web and YouTube search for the most recent and relevant content on the topic, and forwards the gathered information to Analytic_reasoning_assistant for summarization and viral insight extraction.",
+            name="Web_Search_ManagedAgent",
+            description="Receives transcribed text from the manager agent, performs a web and YouTube search using the tools available for the most recent and relevant content on the similar content/topic, and forwards the gathered information to Analytic_reasoning_assistant for summarization and viral insight extraction. to reason and create a optimized title, description, hashtags, keywords and unique message",
             tools=[web_search, Visit_WebPage, fetch_youtube_video_information],
-            add_base_tools=True,
             prompt_templates=Web_search_Prompt_template,
+            add_base_tools=True,
             max_steps=4,
             provide_run_summary=True
         )
-
-  
-
-
         manager_agent  = CodeAgent(
             model=self.model,
-            tools=[final_answer,log_every_step, Extract_audio, transcriber, PythonInterpeter], 
-            managed_agents=[Web_Search_Assistant,Analytic_reasoning_assistant],
-            description="Extracts & transcribes the audio from video, and sends the transcribed text to Web_Search_Assistant who performs web and YouTube search.",
+            tools=[
+                final_answer,log_every_step,
+                  Extract_audio,
+                  transcriber,
+                  PythonInterpeter
+                  ], 
+            managed_agents=[
+                Web_Search_Assistant,
+                Analytic_reasoning_assistant
+                ],
             max_steps=12,
             verbosity_level=2,
             prompt_templates=Manager_Agent_prompt_templates,
             additional_authorized_imports=['datetime'],
             add_base_tools=True,
-            #planning_interval=2,
+            planning_interval=2
+            
         )
+        context_vars = {
+               "video_path": Video_path,
+               'Transcript_text_filepath': None,
+               "file_type": file,
+               "chat_display": self.chat_display,
+            }       
 
         Response = manager_agent.run(
             task=user_task,
             additional_args=context_vars
         )
+        runsummary = manager_agent.visualize()
+        with open("./Agent_Orchestrator_Visualize.txt", "w") as f:
+            f.write(runsummary)
 
         if isinstance(Response, dict):
             self._append_chat(self._format_metadata(Response))
@@ -2790,6 +2779,7 @@ class ColorRestorer_gui:
 
 
     def colorize_image(self):
+        from LocalModelAssets.Old_photos__colorizing.Vizualise  import get_image_colorizer
         if self.uploaded_image:
             self.colorizer = get_image_colorizer(artistic=True)
             resized = self.uploaded_image.resize((self.selected_resolution))

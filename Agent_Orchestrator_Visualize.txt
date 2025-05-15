@@ -1,0 +1,1 @@
+ffmpeg -i c:\Users\didri\AppData\Local\CapCut\Videos\dinner.mp4 -c:v prores_ks -profile:v 3 -pix_fmt yuv422p10le -color_primaries bt2020 -color_trc arib-std-b67 -colorspace bt2020nc -c:a copy youtubeferdig2.mov
