@@ -260,10 +260,9 @@ def ExtractAudioFromVideo(video_path: str) -> str:
 
 @tool
 def Log_Agent_Progress(chat_display: ScrolledText, stage: str, message: str) -> str:
-    """
-        A tool for logging agent thoughts, actions, and reflections during task execution.
+    """A tool for logging agent thoughts, actions, and reflections during task execution.
         Args:
-            chat_display(str):  you have access too the chat_display variable just do chat_display=chat_display when you call this function.
+            chat_display(str): you have access too the chat_display variable just do chat_display=chat_display when you call this function.
             stage (str): One of "info", "action", "reflection".
             message (str): A descriptive message of what the agent is doing or thinking.
 
@@ -290,6 +289,26 @@ def Log_Agent_Progress(chat_display: ScrolledText, stage: str, message: str) -> 
 
 
 
+@tool 
+def Read_transcript(transcript_path: str, start_count: int = 0) -> str:
+    """Reads up to 1000 characters from a transcript starting at a given position, note: If more content exists, a message is added to indicate that you must call the function again.
+    Args:
+        transcript_path (str): The path to the transcript file.
+        start_count (int): The position in the file to start reading from.
+
+    Returns:
+        str: A chunk of the transcript (max 1000 chars) and a message if there's more content.
+    """
+    chunk_size = 1000
+    with open(transcript_path , "r") as file:
+        file.seek(start_count)
+        content = file.read(chunk_size + 1)  # Read 1 extra char to check if more content exists
+
+        if len(content) > chunk_size:
+            output = content[:chunk_size] + "\n\nThe transcript has more content please run the `Read_transcript` tool call again"
+        else: output = content  
+
+        return output
 
 
 # @tool

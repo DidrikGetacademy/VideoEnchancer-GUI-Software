@@ -1,6 +1,6 @@
 import os
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+# os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+# os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import sys
 import torch 
 import torch
@@ -9,8 +9,8 @@ from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel, SpeechToTextTool,PythonInterpreterTool
-from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress
+from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel,VLLMModel, SpeechToTextTool,PythonInterpreterTool
+from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress,Read_transcript
 import numpy as np
 from PIL import Image, ImageTk
 import yaml
@@ -335,11 +335,13 @@ if CPU_ONLY:
 
 
 
+
 def load_model_async():
+    _, dtype = check_hardware()
     modelmanager.load_model(
-        find_by_relative_path("./local_model/local_models_path/Qwen2.5-7B-Instruct-1M"),
-        device="cuda" if torch.cuda.is_available() else "cpu",
-        dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+        find_by_relative_path(r"C:\Users\didri\Desktop\LLM-models\mistralai\Mistral-7B-Instruct-v0.3"),
+        device="auto",
+        dtype=dtype
     )
  
 
@@ -347,9 +349,9 @@ class modelmanager:
     """Class manager for AI model"""
     _model = None
     _lock = threading.Lock()
-
+    model_loaded_event = threading.Event()
     @classmethod
-    def load_model(cls, model_path, **kwargs):
+    def load_model(cls, model_path, **Kwargs):
         """Load model & return model instance"""
 
         with cls._lock:
@@ -358,14 +360,18 @@ class modelmanager:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                 cls._model = TransformersModel(
-                model_path,
+                model_id=model_path,
                 device_map=device,
                 torch_dtype=dtype,
-                max_new_tokens=400, 
+                max_new_tokens=1000, 
                 do_sample=False,
                 trust_remote_code=True,
-                load_in_8bit=True,
+                load_in_8bit=True
                 )
+                print("videoencancer.exe: dtype= ", dtype)
+        global model_loaded_event
+        cls.model_loaded_event.set()
+        print("Model loaded successfully! :)")
         return cls._model
     
     @classmethod
@@ -414,6 +420,7 @@ class vidintel_agent_gui():
     def __init__(self, parent_container):
         self.parent_container = parent_container
         self.uploaded_files = selected_file_list
+
         self.container = CTkFrame(
             master=self.parent_container,
             fg_color="#282828",
@@ -433,19 +440,17 @@ class vidintel_agent_gui():
 
         wait_time = 0
         
-        global Global_offline_model
-        while Global_offline_model is None:
-            self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
-            self.loading_label.update_idletasks()
-            time.sleep(1)
-            wait_time += 1
-            if wait_time > 60:
-                self.loading_label.configure(text="❌ Timeout waiting for model to load.")
-                return
+
+        self.loading_label.configure(text=f"⏳ Waiting for model to load... {wait_time}s")
+        self.loading_label.update_idletasks()
+        loaded = modelmanager.model_loaded_event.wait(timeout=60)
+        if not loaded:
+             self.loading_label.configure(text="❌ Timeout waiting for model to load.")
+             return
 
         self.loading_label.configure(text="✅ Model loaded successfully.")
-        self.model = Global_offline_model
-        #self.Model_VectorBase = QwenVectorbase
+        self.model = modelmanager.get_model() 
+
 
 
         self.create_widgets()
@@ -587,15 +592,16 @@ class vidintel_agent_gui():
         uploaded_file = self.file_menu_var.get()
 
 
+
         
         #Agent Prompts
-        with open(find_by_relative_path("./Assets/agent_prompts/Prompts Ready/CodeAgent_DEFAULT_prompt.yaml"), 'r') as stream:
+        with open(find_by_relative_path("./agent_prompts/CodeAgent_DEFAULT_prompt.yaml"), 'r') as stream:
                     Manager_Agent_prompt_templates = yaml.safe_load(stream)
 
-        with open(find_by_relative_path("./Assets/agent_prompts/Web_search_Prompt_template.yaml"), 'r') as stream:
+        with open(find_by_relative_path("./agent_prompts/Managed_agent_webSearch.yaml"), 'r') as stream:
                     Web_search_Prompt_template = yaml.safe_load(stream)
 
-        with open(find_by_relative_path("./Assets/agent_prompts/Prompts Ready/Managed_agent_analytics_prompt.yaml"), 'r') as stream:
+        with open(find_by_relative_path("./agent_prompts/Managed_agent_analytics_prompt.yaml"), 'r') as stream:
                     Analytic_Reasoning_Prompt_Template = yaml.safe_load(stream)
 
 
@@ -605,7 +611,7 @@ class vidintel_agent_gui():
         Extract_audio = ExtractAudioFromVideo
         fetch_youtube_video_information = Fetch_top_trending_youtube_videos
         log_every_step = Log_Agent_Progress
-        transcriber = SpeechToTextTool()
+        transcribe = SpeechToTextTool()
         PythonInterpeter = PythonInterpreterTool()
         Visit_WebPage = VisitWebpageTool()
 
@@ -618,42 +624,42 @@ class vidintel_agent_gui():
             prompt_templates=Analytic_Reasoning_Prompt_Template,
             tools=[],
             add_base_tools=True,
-            max_steps=3,
-            provide_run_summary=True
+            max_steps=4,
+            provide_run_summary=True,
         )
         Web_Search_Assistant = CodeAgent (
             model=self.model,
             name="Web_Search_ManagedAgent",
             description="Receives transcribed text from the manager agent, performs a web and YouTube search using the tools available for the most recent and relevant content on the similar content/topic, and forwards the gathered information to Analytic_reasoning_assistant for summarization and viral insight extraction. to reason and create a optimized title, description, hashtags, keywords and unique message",
-            tools=[web_search, Visit_WebPage, fetch_youtube_video_information],
+            tools=[web_search, Visit_WebPage, fetch_youtube_video_information, Read_transcript],
             prompt_templates=Web_search_Prompt_template,
             add_base_tools=True,
             max_steps=4,
-            provide_run_summary=True
+            provide_run_summary=True,
         )
         manager_agent  = CodeAgent(
             model=self.model,
             tools=[
                 final_answer,log_every_step,
                   Extract_audio,
-                  transcriber,
+                  transcribe,
                   PythonInterpeter
                   ], 
             managed_agents=[
                 Web_Search_Assistant,
                 Analytic_reasoning_assistant
                 ],
-            max_steps=12,
-            verbosity_level=2,
+            max_steps=10,
+            verbosity_level=1,
             prompt_templates=Manager_Agent_prompt_templates,
-            additional_authorized_imports=['datetime'],
+            additional_authorized_imports=[],
             add_base_tools=True,
-            planning_interval=2
             
         )
+
         context_vars = {
                "video_path": Video_path,
-               'Transcript_text_filepath': None,
+               'Transcript_text_filepath': find_by_relative_path("./Project_text_files/Audio_TO_transcript.txt"), #kan endre dette så det finnes en .txt path som agent kan sende inn til speectotexttool når den er ferdig med extractaudiofromvideo, men må huske og endre system prompten også.
                "file_type": file,
                "chat_display": self.chat_display,
             }       
@@ -665,6 +671,9 @@ class vidintel_agent_gui():
         runsummary = manager_agent.visualize()
         with open("./Agent_Orchestrator_Visualize.txt", "w") as f:
             f.write(runsummary)
+        torch.cuda.empty_cache()
+        gc.collect()
+        del self.model
 
         if isinstance(Response, dict):
             self._append_chat(self._format_metadata(Response))
@@ -690,9 +699,6 @@ class vidintel_agent_gui():
         except Exception as e:
             logging.info(f"⚠️ Error deleting temp audio: {e}")
 
-
-
-    
     def _format_metadata(self, md: dict) -> str:
         return (
             f"🎬 Title:\n  {md.get('title', 'N/A')}\n\n"
@@ -797,7 +803,7 @@ class corelytics_InsightCatcher():
 
         self.loading_label.configure(text="✅ Model loaded successfully.")
         self.model = Global_offline_model
-        #self.Model_VectorBase = QwenVectorbase
+
 
 
         self.create_widgets()
@@ -966,7 +972,6 @@ class corelytics_InsightCatcher():
             model=self.model,
             tools=[final_answer,log_every_step, Extract_audio, transcriber], 
             managed_agents=[Chunk_reasoning_Agent],
-            description="",
             max_steps=30,
             verbosity_level=1,
             prompt_templates=Manager_Agent_prompt_templates,
@@ -2474,7 +2479,7 @@ class VidGenesis_Automation_Agent:
 
     def __init__(self, parent_container):
         self.parent_container = parent_container
-        #self.Model_VectorBase = QwenVectorbase
+
 
         
         self.should_stop = False
@@ -6780,7 +6785,7 @@ def on_app_close() -> None:
     
 class VideoEnhancer():
     def __init__(self, Master):
-       #threading.Thread(target=load_model_async, daemon=True).start()
+        threading.Thread(target=load_model_async, daemon=True).start()
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
