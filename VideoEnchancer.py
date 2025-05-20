@@ -337,11 +337,10 @@ if CPU_ONLY:
 
 
 def load_model_async():
-    _, dtype = check_hardware()
+
     modelmanager.load_model(
-        find_by_relative_path(r"C:\Users\didri\Desktop\LLM-models\mistralai\Mistral-7B-Instruct-v0.3"),
-        device="auto",
-        dtype=dtype
+        find_by_relative_path(r"C:\Users\didri\Desktop\LLM-models\Qwen\Qwen2.5-7B-Instruct"),
+   
     )
  
 
@@ -353,7 +352,7 @@ class modelmanager:
     @classmethod
     def load_model(cls, model_path, **Kwargs):
         """Load model & return model instance"""
-
+        device, dtype = check_hardware()
         with cls._lock:
             if cls._model is None:
                 gc.collect()
@@ -705,7 +704,7 @@ class vidintel_agent_gui():
             f"📝 Description:\n  {md.get('description', 'N/A')}\n\n"
             f"🔑 Keywords:\n  {', '.join(md.get('keywords', []))}\n\n"
             f"🏷️ Hashtags:\n  {' '.join(md.get('hashtags', []))}\n\n\n"
-            f" Tips/ideas: \n {' '.join(md.get('hashtags', []))}"
+            f" Tips/ideas: \n {' '.join(md.get('Unique message', []))}"
         )
     
 
@@ -1581,7 +1580,7 @@ def place_youtube_download_menu(parent_container):
         fg_color="white",
         text="",
     )
-    bg_label.grid(row=2,column=8, padx=(2,0), sticky="w")
+    bg_label.grid(row=1,column=7, padx=(1,0), sticky="w")
     bg_label.image = bg_image_tk
 
 
@@ -1995,7 +1994,7 @@ def place_youtube_download_menu(parent_container):
                 window.after(0, lambda: youtube_progress_var.set("✅ All downloads finished."))
                 info_message.set("✅ Batch download completed.")
 
-                Thread(target=batch_worker).start()
+            Thread(target=batch_worker).start()
                 
 
     download_all_btn = CTkButton(
