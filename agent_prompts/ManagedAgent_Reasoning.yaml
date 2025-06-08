@@ -524,12 +524,8 @@
     Here is the final answer from your managed agent '{{name}}':
     {{final_answer}}
 "final_answer":
-  "pre_messages": |-
-   This is the final output from the Web_Search_Assistant after  analysizing the chunk.
-
-  "final_answer": |-
-    The assistant has finished collecting trending content and passed it to the analysis agent. Below is the final content strategy prepared based on the original transcript and current trends:
-
-    {{final_answer}}  
-  "post_messages": |-
-   This completes the role in gathering and analyzing relevant content.
+  pre_messages: |-
+    An agent tried to answer a user query but it got stuck and failed to do so. You are tasked with providing an answer instead. Here is the agent's memory:
+  post_messages: |-
+    Based on the above, please provide an answer to the following user task:
+    {{task}}

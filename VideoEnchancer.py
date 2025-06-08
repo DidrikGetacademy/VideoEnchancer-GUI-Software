@@ -198,7 +198,8 @@ very_high_VRAM = 0.6
 AI_LIST_SEPARATOR           = [ "----" ]
 IRCNN_models_list           = [ "IRCNN_Mx1", "IRCNN_Lx1" ]
 SRVGGNetCompact_models_list = [ "RealESR_Gx4", "RealSRx4_Anime" ]
-RRDB_models_list            = [ "BSRGANx4", "BSRGANx2", "RealESRGANx4" ]
+RRDB_models_list            = [ "BSRGANx4", "BSRGANx2", "RealESRGANx4"]
+Facedetection_model_list = ["yolov8x-face-lindevs"]
 
 
 
@@ -339,7 +340,7 @@ if CPU_ONLY:
 def load_model_async():
 
     modelmanager.load_model(
-        find_by_relative_path(r"C:\Users\didri\Desktop\LLM-models\Qwen\Qwen2.5-7B-Instruct"),
+        find_by_relative_path(r"c:\Users\didri\Desktop\LLM-models\LLM-Models\DeepSeek-R1-0528-Qwen3-8B"),
    
     )
  
@@ -363,9 +364,9 @@ class modelmanager:
                 device_map=device,
                 torch_dtype=dtype,
                 max_new_tokens=1000, 
-                do_sample=False,
+                do_sample=True,
                 trust_remote_code=True,
-                load_in_8bit=True
+                load_in_4bit=True
                 )
                 print("videoencancer.exe: dtype= ", dtype)
         global model_loaded_event
@@ -621,19 +622,21 @@ class vidintel_agent_gui():
             name="Analytic_reasoning_ManagedAgent",
             description="Analyzes search results from Web_Search_Assistant and extracts viral insights. Generates a concise content package including: title, description, hashtags, keywords, and creative tips or ideas. Returns this package to the manager agent for final output.",
             prompt_templates=Analytic_Reasoning_Prompt_Template,
-            tools=[],
+            tools=[final_answer],
             add_base_tools=True,
             max_steps=4,
             provide_run_summary=True,
+            verbosity_level=2,
         )
         Web_Search_Assistant = CodeAgent (
             model=self.model,
             name="Web_Search_ManagedAgent",
             description="Receives transcribed text from the manager agent, performs a web and YouTube search using the tools available for the most recent and relevant content on the similar content/topic, and forwards the gathered information to Analytic_reasoning_assistant for summarization and viral insight extraction. to reason and create a optimized title, description, hashtags, keywords and unique message",
-            tools=[web_search, Visit_WebPage, fetch_youtube_video_information, Read_transcript],
+            tools=[web_search, Visit_WebPage, fetch_youtube_video_information, Read_transcript,final_answer],
             prompt_templates=Web_search_Prompt_template,
             add_base_tools=True,
             max_steps=4,
+            verbosity_level=2,
             provide_run_summary=True,
         )
         manager_agent  = CodeAgent(
@@ -649,7 +652,7 @@ class vidintel_agent_gui():
                 Analytic_reasoning_assistant
                 ],
             max_steps=10,
-            verbosity_level=1,
+            verbosity_level=2,
             prompt_templates=Manager_Agent_prompt_templates,
             additional_authorized_imports=[],
             add_base_tools=True,
@@ -1992,6 +1995,7 @@ def place_youtube_download_menu(parent_container):
                     download_youtube_link(link, output_path, update_progress)
 
                 window.after(0, lambda: youtube_progress_var.set("✅ All downloads finished."))
+                youtube_download_list.clear()#?clear
                 info_message.set("✅ Batch download completed.")
 
             Thread(target=batch_worker).start()
