@@ -340,7 +340,7 @@ if CPU_ONLY:
 def load_model_async():
 
     modelmanager.load_model(
-        find_by_relative_path(r"c:\Users\didri\Desktop\LLM-models\LLM-Models\DeepSeek-R1-0528-Qwen3-8B"),
+        find_by_relative_path(r"C:\Users\didri\Desktop\LLM-models\LLM-Models\Ministral-8B-Instruct-2410"),
    
     )
  
@@ -611,7 +611,7 @@ class vidintel_agent_gui():
         Extract_audio = ExtractAudioFromVideo
         fetch_youtube_video_information = Fetch_top_trending_youtube_videos
         log_every_step = Log_Agent_Progress
-        transcribe = SpeechToTextTool()
+        Transcriber = SpeechToTextTool()
         PythonInterpeter = PythonInterpreterTool()
         Visit_WebPage = VisitWebpageTool()
 
@@ -626,7 +626,8 @@ class vidintel_agent_gui():
             add_base_tools=True,
             max_steps=4,
             provide_run_summary=True,
-            verbosity_level=2,
+            verbosity_level=4,
+            stream_outputs=True
         )
         Web_Search_Assistant = CodeAgent (
             model=self.model,
@@ -636,15 +637,16 @@ class vidintel_agent_gui():
             prompt_templates=Web_search_Prompt_template,
             add_base_tools=True,
             max_steps=4,
-            verbosity_level=2,
+            verbosity_level=4,
             provide_run_summary=True,
+            stream_outputs=True
         )
         manager_agent  = CodeAgent(
             model=self.model,
             tools=[
                 final_answer,log_every_step,
                   Extract_audio,
-                  transcribe,
+                  Transcriber,
                   PythonInterpeter
                   ], 
             managed_agents=[
@@ -652,17 +654,17 @@ class vidintel_agent_gui():
                 Analytic_reasoning_assistant
                 ],
             max_steps=10,
-            verbosity_level=2,
+            verbosity_level=4,
+            planning_interval=1,
             prompt_templates=Manager_Agent_prompt_templates,
-            additional_authorized_imports=[],
             add_base_tools=True,
+            stream_outputs=True
             
         )
 
         context_vars = {
                "video_path": Video_path,
                'Transcript_text_filepath': find_by_relative_path("./Project_text_files/Audio_TO_transcript.txt"), #kan endre dette så det finnes en .txt path som agent kan sende inn til speectotexttool når den er ferdig med extractaudiofromvideo, men må huske og endre system prompten også.
-               "file_type": file,
                "chat_display": self.chat_display,
             }       
 
@@ -953,7 +955,7 @@ class corelytics_InsightCatcher():
         final_answer = FinalAnswerTool()
         Extract_audio = ExtractAudioFromVideo
         log_every_step = Log_Agent_Progress
-        transcriber = SpeechToTextTool()
+        transcribe = SpeechToTextTool()
   
 
 
@@ -972,10 +974,10 @@ class corelytics_InsightCatcher():
 
         manager_agent  = CodeAgent(
             model=self.model,
-            tools=[final_answer,log_every_step, Extract_audio, transcriber], 
+            tools=[final_answer,log_every_step, Extract_audio, transcribe], 
             managed_agents=[Chunk_reasoning_Agent],
             max_steps=30,
-            verbosity_level=1,
+            verbosity_level=4,
             prompt_templates=Manager_Agent_prompt_templates,
             additional_authorized_imports=['datetime'],
         )

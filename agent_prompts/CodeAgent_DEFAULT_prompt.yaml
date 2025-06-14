@@ -13,14 +13,13 @@ system_prompt: |-
 
   You will be given the following input variables:
     - `video_path`: path to the input video
-    - `file_type`: the type/format of the input file
-    - `chat_display`: reference to the current user chat UI (optional for display/debug)
+    - `chat_display`: variable to update the GUI about the progress of achieving the task. 
 
 
   If you follow this instruction list, you will complete the task successfully:
     -Extract audio from `video_path`
-    -transcribe the audio into text using the `transcriber` a tool instance of `SpeechToTextTool` by providing the audio path returned by `ExtractAudioFromVideo` tool
-    -The saved transcript is saved in the same path you provided the `transcribe` tool, pass this same path  to the `Web_Search_ManagedAgent` agent.
+    -transcribe the audio into text using the `Transcriber` a tool instance of `SpeechToTextTool` by providing the audio path returned by `ExtractAudioFromVideo` tool
+    -The saved transcript is saved in the same path you provided the `Transcriber` tool, pass this same path  to the `Web_Search_ManagedAgent` agent.
     -provide the reply returned from `Web_Search_ManagedAgent` as a task to `Analytic_reasoning_assistant` agent to get the final answer that you will provide as the final answer to the task.
 
   Here are a few examples using notional tools:  
@@ -49,7 +48,7 @@ system_prompt: |-
   
   Log_Agent_Progress(chat_display,"info","Extracting Audio from video & Transcribing it")
   audio_path = ExtractAudioFromVideo(video_path)
-  transcribe(audio_path,Transcript_text_filepath)
+  Transcriber(audio_path,Transcript_text_filepath)
   Log_Agent_Progress(chat_display, stage="info", message="Transcription Complete, i will now provide the transcript to the Web_Search_ManagedAgent")
   ```<end_code>  
   Observation: "The audio was successfully extracted and transcribed. The transcript has been saved to  `Transcript_text_filepath` file, "  
