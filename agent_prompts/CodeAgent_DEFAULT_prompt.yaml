@@ -242,7 +242,7 @@ system_prompt: |-
 
     Here is the up to date list of facts that you know:
     ```
-    {{facts_update}}
+    {{facts_update | ("") }}
     ```
 
     Now for the given task, develop a step-by-step high-level plan taking into account the above inputs and list of facts.

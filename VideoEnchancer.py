@@ -9,7 +9,7 @@ from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel,VLLMModel, SpeechToTextTool,PythonInterpreterTool
+from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel,VLLMModel, SpeechToTextTool,PythonInterpreterTool,SpeechToTextToolCPU_VIDEOENCHANCERPROGRAM
 from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress,Read_transcript
 import numpy as np
 from PIL import Image, ImageTk
@@ -340,7 +340,7 @@ if CPU_ONLY:
 def load_model_async():
 
     modelmanager.load_model(
-        find_by_relative_path(r"C:\Users\didri\Desktop\LLM-models\LLM-Models\Ministral-8B-Instruct-2410"),
+        find_by_relative_path(r"C:\Users\didri\Desktop\LLM-models\LLM-Models\Qwen2.5-Coder-7B-Instruct"),
    
     )
  
@@ -361,10 +361,9 @@ class modelmanager:
                     torch.cuda.empty_cache()
                 cls._model = TransformersModel(
                 model_id=model_path,
-                device_map=device,
-                torch_dtype=dtype,
-                max_new_tokens=1000, 
-                do_sample=True,
+                device_map="auto",
+                torch_dtype=torch.float16,
+                max_new_tokens=2500, 
                 trust_remote_code=True,
                 load_in_4bit=True
                 )
@@ -611,7 +610,7 @@ class vidintel_agent_gui():
         Extract_audio = ExtractAudioFromVideo
         fetch_youtube_video_information = Fetch_top_trending_youtube_videos
         log_every_step = Log_Agent_Progress
-        Transcriber = SpeechToTextTool()
+        Transcriber = SpeechToTextToolCPU_VIDEOENCHANCERPROGRAM()
         PythonInterpeter = PythonInterpreterTool()
         Visit_WebPage = VisitWebpageTool()
 
@@ -626,8 +625,8 @@ class vidintel_agent_gui():
             add_base_tools=True,
             max_steps=4,
             provide_run_summary=True,
-            verbosity_level=4,
-            stream_outputs=True
+            verbosity_level=1,
+          #  stream_outputs=True
         )
         Web_Search_Assistant = CodeAgent (
             model=self.model,
@@ -637,9 +636,9 @@ class vidintel_agent_gui():
             prompt_templates=Web_search_Prompt_template,
             add_base_tools=True,
             max_steps=4,
-            verbosity_level=4,
+            verbosity_level=1,
             provide_run_summary=True,
-            stream_outputs=True
+         #   stream_outputs=True
         )
         manager_agent  = CodeAgent(
             model=self.model,
@@ -654,11 +653,11 @@ class vidintel_agent_gui():
                 Analytic_reasoning_assistant
                 ],
             max_steps=10,
-            verbosity_level=4,
+            verbosity_level=1,
             planning_interval=1,
             prompt_templates=Manager_Agent_prompt_templates,
             add_base_tools=True,
-            stream_outputs=True
+           # stream_outputs=True
             
         )
 
