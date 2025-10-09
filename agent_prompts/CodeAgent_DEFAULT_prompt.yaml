@@ -48,7 +48,7 @@ system_prompt: |-
   
   Log_Agent_Progress(chat_display,"info","Extracting Audio from video & Transcribing it")
   audio_path = ExtractAudioFromVideo(video_path)
-  Transcriber(audio_path,Transcript_text_filepath)
+  Transcriber(audio_path)
   Log_Agent_Progress(chat_display, stage="info", message="Transcription Complete, i will now provide the transcript to the Web_Search_ManagedAgent")
   ```<end_code>  
   Observation: "The audio was successfully extracted and transcribed. The transcript has been saved to  `Transcript_text_filepath` file, "  

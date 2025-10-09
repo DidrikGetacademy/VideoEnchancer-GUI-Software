@@ -9,7 +9,7 @@ from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, TransformersModel,VLLMModel, SpeechToTextTool,PythonInterpreterTool,SpeechToTextToolCPU_VIDEOENCHANCERPROGRAM
+from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, LiteLLMModel,VLLMModel, SpeechToTextTool,PythonInterpreterTool,SpeechToTextToolCUDA
 from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress,Read_transcript
 import numpy as np
 from PIL import Image, ImageTk
@@ -339,10 +339,7 @@ if CPU_ONLY:
 
 def load_model_async():
 
-    modelmanager.load_model(
-        find_by_relative_path(r"C:\Users\didri\Desktop\LLM-models\LLM-Models\Qwen2.5-Coder-7B-Instruct"),
-   
-    )
+    modelmanager.load_model()
  
 
 class modelmanager:
@@ -359,13 +356,11 @@ class modelmanager:
                 gc.collect()
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-                cls._model = TransformersModel(
-                model_id=model_path,
-                device_map="auto",
-                torch_dtype=torch.float16,
-                max_new_tokens=2500, 
-                trust_remote_code=True,
-                load_in_4bit=True
+                cls._model = LiteLLMModel(
+                    model_id="gpt-5",
+                    reasoning_effort="minimal",
+                    api_key=os.getenv("GPT_5_API_KEY"),
+                    max_tokens=16000,
                 )
                 print("videoencancer.exe: dtype= ", dtype)
         global model_loaded_event
@@ -594,14 +589,8 @@ class vidintel_agent_gui():
 
         
         #Agent Prompts
-        with open(find_by_relative_path("./agent_prompts/CodeAgent_DEFAULT_prompt.yaml"), 'r') as stream:
+        with open(find_by_relative_path("./agent_prompts/viral_agent_prompt.yaml"), 'r') as stream:
                     Manager_Agent_prompt_templates = yaml.safe_load(stream)
-
-        with open(find_by_relative_path("./agent_prompts/Managed_agent_webSearch.yaml"), 'r') as stream:
-                    Web_search_Prompt_template = yaml.safe_load(stream)
-
-        with open(find_by_relative_path("./agent_prompts/Managed_agent_analytics_prompt.yaml"), 'r') as stream:
-                    Analytic_Reasoning_Prompt_Template = yaml.safe_load(stream)
 
 
         #Tool initalization
@@ -610,60 +599,29 @@ class vidintel_agent_gui():
         Extract_audio = ExtractAudioFromVideo
         fetch_youtube_video_information = Fetch_top_trending_youtube_videos
         log_every_step = Log_Agent_Progress
-        Transcriber = SpeechToTextToolCPU_VIDEOENCHANCERPROGRAM()
+        Transcriber = SpeechToTextToolCUDA()
         PythonInterpeter = PythonInterpreterTool()
         Visit_WebPage = VisitWebpageTool()
 
 
-
-        Analytic_reasoning_assistant = CodeAgent (
-            model=self.model,
-            name="Analytic_reasoning_ManagedAgent",
-            description="Analyzes search results from Web_Search_Assistant and extracts viral insights. Generates a concise content package including: title, description, hashtags, keywords, and creative tips or ideas. Returns this package to the manager agent for final output.",
-            prompt_templates=Analytic_Reasoning_Prompt_Template,
-            tools=[final_answer],
-            add_base_tools=True,
-            max_steps=4,
-            provide_run_summary=True,
-            verbosity_level=1,
-          #  stream_outputs=True
-        )
-        Web_Search_Assistant = CodeAgent (
-            model=self.model,
-            name="Web_Search_ManagedAgent",
-            description="Receives transcribed text from the manager agent, performs a web and YouTube search using the tools available for the most recent and relevant content on the similar content/topic, and forwards the gathered information to Analytic_reasoning_assistant for summarization and viral insight extraction. to reason and create a optimized title, description, hashtags, keywords and unique message",
-            tools=[web_search, Visit_WebPage, fetch_youtube_video_information, Read_transcript,final_answer],
-            prompt_templates=Web_search_Prompt_template,
-            add_base_tools=True,
-            max_steps=4,
-            verbosity_level=1,
-            provide_run_summary=True,
-         #   stream_outputs=True
-        )
         manager_agent  = CodeAgent(
             model=self.model,
             tools=[
                 final_answer,log_every_step,
                   Extract_audio,
                   Transcriber,
-                  PythonInterpeter
+                  PythonInterpeter,
+                  fetch_youtube_video_information,
+                  Visit_WebPage,
                   ], 
-            managed_agents=[
-                Web_Search_Assistant,
-                Analytic_reasoning_assistant
-                ],
-            max_steps=10,
-            verbosity_level=1,
-            planning_interval=1,
+            max_steps=4,
             prompt_templates=Manager_Agent_prompt_templates,
-            add_base_tools=True,
-           # stream_outputs=True
-            
+        
         )
 
         context_vars = {
                "video_path": Video_path,
-               'Transcript_text_filepath': find_by_relative_path("./Project_text_files/Audio_TO_transcript.txt"), #kan endre dette så det finnes en .txt path som agent kan sende inn til speectotexttool når den er ferdig med extractaudiofromvideo, men må huske og endre system prompten også.
+              'Transcript_text_filepath': find_by_relative_path("./Project_text_files/Audio_TO_transcript.txt"), #kan endre dette så det finnes en .txt path som agent kan sende inn til speectotexttool når den er ferdig med extractaudiofromvideo, men må huske og endre system prompten også.
                "chat_display": self.chat_display,
             }       
 
@@ -1149,7 +1107,7 @@ class social_media_optimizer_Gui:
 
 
 
-#didrik
+
 #Upload videos too (instagram,facebook,youtube,tiktok) if available for api's. (options too use smolgent with a generate button for automatic generation of (title,description,keywords,hashtags.))
 class SocialMediaUploading:
     def __init__(self, parent_container):
@@ -1504,7 +1462,7 @@ class SocialMediaUploading:
 
 
 
-#didrik
+
 ####Youtube Download#####
 global youtube_progress_var
 def place_youtube_download_menu(parent_container):
@@ -1527,7 +1485,11 @@ def place_youtube_download_menu(parent_container):
         if url in formats_fetched:
             video_formats, audio_formats = formats_fetched[url]
         else:
-            video_formats, audio_formats = get_available_formats(url)
+            result = get_available_formats(url)
+            if result is None:
+                print("Error Requesting formats. please check if your cookies are outdated.")
+                return
+            video_formats, audio_formats = result
             formats_fetched[url] = (video_formats,audio_formats)
             print("Formats fetched and cached.")
 
@@ -2101,7 +2063,6 @@ def upload_cookie_file():
     if cookie_file_path_input:
         try:
   
-
            save_path = COOKIE_STORAGE_DIR / fixed_cookie_filename
 
            shutil.copy(cookie_file_path_input, save_path)
@@ -2110,9 +2071,8 @@ def upload_cookie_file():
 
 
            update_cookie_timestamps(cookie_file_path)
-           upload_button.place_forget()
+           upload_button.place_forget() ## REMEMBER TO MAKE UPLOAD BUTTON DISSAPEAR RIGHT AFTER UPLOADING COOKIE
            
-
         except Exception as e:
             logging.info(f"Error saving cookie file: {e}")
     else: 
@@ -2169,7 +2129,7 @@ def get_available_formats(youtube_url):
                     info = ydl.extract_info(youtube_url, download=False)
                     formats = info.get('formats', []) if info else []
 
-                    video_formats = ['Video Formats...','Only Audio']
+                    video_formats = ['Only Audio','Video Formats...']
                     audio_formats = []
 
                     for f in formats:
@@ -6789,7 +6749,7 @@ def on_app_close() -> None:
     
 class VideoEnhancer():
     def __init__(self, Master):
-        threading.Thread(target=load_model_async, daemon=True).start()
+        #threading.Thread(target=load_model_async, daemon=True).start()
         self.toplevel_window = None
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
