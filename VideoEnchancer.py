@@ -9,7 +9,7 @@ from functools  import cache
 from time       import sleep
 from subprocess import run  as subprocess_run
 import ffmpeg
-from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, LiteLLMModel,VLLMModel, SpeechToTextTool,PythonInterpreterTool,SpeechToTextToolCUDA
+from smolagents import CodeAgent, FinalAnswerTool,  DuckDuckGoSearchTool, GoogleSearchTool, VisitWebpageTool, LiteLLMModel,VLLMModel, SpeechToTextTool,PythonInterpreterTool
 from Agents_tools import ExtractAudioFromVideo, Fetch_top_trending_youtube_videos, Log_Agent_Progress,Read_transcript
 import numpy as np
 from PIL import Image, ImageTk
@@ -119,6 +119,11 @@ from numpy import (
 import torch
 import tkinter as tk
 from tkinter import StringVar, DISABLED,END,scrolledtext
+try:
+    import tkinterdnd2 as _tkdnd
+    _TKDND_AVAILABLE = True
+except ImportError:
+    _TKDND_AVAILABLE = False
 from customtkinter import (
     CTk,
     CTkButton,
@@ -185,11 +190,25 @@ def find_by_relative_path(relative_path: str) -> str:
 
 
 app_name   = "LearnReflect AI"
-app_name_color = "#F0F8FF"
-dark_color     = "#080808"
-background_color        = "#000000"
-text_color              = "#B8B8B8"
-widget_background_color = "#181818"
+app_name_color          = "#D49A2A"    # amber
+dark_color              = "#070707"
+background_color        = "#060606"
+text_color              = "#948C7E"    # warm muted
+widget_background_color = "#0E0E0D"
+# ── Design system ────────────────────────────────────────────────────
+AMBER        = "#D49A2A"
+AMBER_DIM    = "#8C6418"
+AMBER_GLOW   = "#3C2808"
+CREAM        = "#E0D8C8"
+CREAM2       = "#948C7E"
+CREAM3       = "#4A4640"
+BORDER1      = "#141210"
+BORDER2      = "#201E1A"
+BORDER3      = "#383028"
+GREEN_OK     = "#38A858"
+GREEN_BG     = "#0C1C10"
+PANEL_BG     = "#0A0A09"
+PANEL2_BG    = "#0E0E0D"
 very_low_VRAM  = 4
 low_VRAM       = 3
 medium_VRAM    = 2.2
@@ -224,6 +243,8 @@ current_loaded_model = None
 model_loading_thread = None
 global original_preview
 global upscaled_preview
+global original_preview_frame
+global upscaled_preview_frame
 preview_instance = None  
 file_list_update_callback = None
 media_info_update_callback = None
@@ -285,6 +306,11 @@ else:
 COMPLETED_STATUS = "Completed"
 ERROR_STATUS     = "Error"
 STOP_STATUS      = "Stop"
+
+controls_bar_frame  = None   # set in VideoEnhancer.__init__
+controls_grid       = None   # 2-row × 4-col inner grid frame
+file_overrides      = {}    # per-file AI setting overrides: {file_path: {key: value}}
+upscale_slot_frame  = None   # set in place_message_label()
 
 offset_y_options = 0.105
 row0_y = 0.52
@@ -378,6 +404,78 @@ class modelmanager:
     
 
 
+from smolagents.tools import PipelineTool
+
+
+
+class SpeechToTextToolCUDA(PipelineTool):
+    default_checkpoint = r"c:\Users\didri\Desktop\AI-models\Audio-Models\faster-whisper-large-v3-turbo-int8float16"
+    description = "Fast tool that transcribes audio into text using faster-whisper. It returns the path to the transcript file"
+    name = "transcriber"
+    inputs = {
+        "audio": {
+            "type": "audio",
+            "description": "The audio to transcribe. Can be a local path, a URL, or a tensor.",
+        },
+        "text_path": {
+            "type": "string",
+             "description": "The path to save the transcript to.",
+        },
+        "video_path": {
+            "type": "string",
+            "description": "The path to the video to transcribe. only for info printging",
+        }
+    }
+    output_type = "string"
+    def setup(self):
+
+        self.model = WhisperModel(
+                model_size_or_path=self.default_checkpoint,
+                device="cuda",
+                compute_type="int8_float16"
+                )
+    def forward(self, inputs):
+        audio_path = inputs["audio"]
+        text_path = inputs["text_path"]
+        video_path = inputs["video_path"]
+        segments, info = self.model.transcribe(
+            audio_path,
+            language="en",
+            temperature=0.0,
+            vad_filter=True,
+            initial_prompt="Motivational podcast",
+            condition_on_previous_text=True,
+
+        )
+        print(f"\n🔊 Using Whisper on device: {self.device}, \ntranscribing video: {video_path} \n   with inputs: {self.inputs}")
+        print(f"[INFO] Detected Language: {info.language} (confidence: {info.language_probability:.2f})")
+        print(f"[INFO] Audio Duration: {info.duration:.2f} seconds")
+
+        try:
+            with open(text_path, "a", encoding="utf-8") as f:
+                print(f"opening txt_path on: {text_path} device: {self.device}")
+
+                try:
+                    for segment in segments:
+                         f.write(f"{segment.text.strip()}\n")
+                    f.write("\n\n")
+                except Exception as e:
+                    print(f"error during segments: {str(e)}")
+
+        finally:
+            print(f"transcription complete ! device  {self.device}")
+            if self.device == "cuda":
+                torch.cuda.empty_cache()
+                gc.collect()
+                del self.model
+
+        return text_path
+
+    def encode(self, audio):
+        return {"audio": audio}
+
+    def decode(self, outputs):
+        return outputs
 
 
 
@@ -406,8 +504,6 @@ class modelmanager:
 
 
 
-
-#didrik
 class vidintel_agent_gui():
     """Agent that retrieves transcripts, searches the web, and generates optimized metadata for videos."""
 
@@ -599,7 +695,7 @@ class vidintel_agent_gui():
         Extract_audio = ExtractAudioFromVideo
         fetch_youtube_video_information = Fetch_top_trending_youtube_videos
         log_every_step = Log_Agent_Progress
-        Transcriber = SpeechToTextToolCUDA()
+       #Transcriber = SpeechToTextToolCUDA()
         PythonInterpeter = PythonInterpreterTool()
         Visit_WebPage = VisitWebpageTool()
 
@@ -609,7 +705,7 @@ class vidintel_agent_gui():
             tools=[
                 final_answer,log_every_step,
                   Extract_audio,
-                  Transcriber,
+                #  Transcriber,
                   PythonInterpeter,
                   fetch_youtube_video_information,
                   Visit_WebPage,
@@ -1466,256 +1562,103 @@ class SocialMediaUploading:
 ####Youtube Download#####
 global youtube_progress_var
 def place_youtube_download_menu(parent_container):
-    global youtube_link_entry, youtube_output_path_entry ,video_format_var, audio_format_var
-    frame_width, frame_height = 250, 150
+    global youtube_link_entry, youtube_output_path_entry, video_format_var, audio_format_var
+
+    # ── Design tokens ────────────────────────────────────────────────────────
+    _BG       = "#08090a"
+    _SURFACE  = "#0d0f11"
+    _PANEL    = "#111316"
+    _PANEL2   = "#161a1e"
+    _BORDER   = "#1e2229"
+    _BORDER2  = "#252b34"
+    _RED      = "#cc2222"
+    _RED_HOV  = "#e63333"
+    _TEXT     = "#c8cdd4"
+    _TEXT_DIM = "#555f6e"
+    _WHITE    = "#eef0f3"
+
+    frame_width, frame_height = 200, 110
     youtube_link_settings = {}
     formats_fetched = {}
 
     youtube_progress_var.set("")
+
+    # Make parent_container fill its allocated space completely
     parent_container.grid_rowconfigure(0, weight=1)
     parent_container.grid_columnconfigure(0, weight=1)
 
-        
+    # ── inner helpers ────────────────────────────────────────────────────────
     def update_format_list():
-        window.after(0, lambda: addlist_btn.configure(state="normal"))
         url = youtube_link_entry.get()
         if not url:
             return
-        
-        if url in formats_fetched:
-            video_formats, audio_formats = formats_fetched[url]
-        else:
-            result = get_available_formats(url)
-            if result is None:
-                print("Error Requesting formats. please check if your cookies are outdated.")
-                return
-            video_formats, audio_formats = result
-            formats_fetched[url] = (video_formats,audio_formats)
-            print("Formats fetched and cached.")
+        fetch_button.configure(state="disabled", text="Fetching…")
 
-            if video_formats or audio_formats:
-                video_format_dropdown.configure(values=video_formats if video_formats else ["No video formats available"])
-                audio_format_dropdown.configure(values=audio_formats if audio_formats else ["No audio formats available"])
-                download_btn.configure(state="normal")
+        def fetch_thread():
+            try:
+                if url in formats_fetched:
+                    video_formats, audio_formats = formats_fetched[url]
+                else:
+                    result = get_available_formats(url)
+                    if result is None:
+                        print("Error Requesting formats. please check if your cookies are outdated.")
+                        window.after(0, lambda: fetch_button.configure(state="normal", text="Fetch Details"))
+                        return
+                    video_formats, audio_formats = result
+                    formats_fetched[url] = (video_formats, audio_formats)
+                    print("Formats fetched and cached.")
 
-           
-            if video_formats:
-                video_format_var.set(video_formats[0])
-            if audio_formats:
-                audio_format_var.set(audio_formats[0])
+                def update_ui():
+                    window.after(0, lambda: addlist_btn.configure(state="normal"))
+                    if video_formats or audio_formats:
+                        video_format_dropdown.configure(values=video_formats if video_formats else ["No video formats available"])
+                        audio_format_dropdown.configure(values=audio_formats if audio_formats else ["No audio formats available"])
+                        download_btn.configure(state="normal")
+                    if video_formats:
+                        video_format_var.set(video_formats[0])
+                    if audio_formats:
+                        audio_format_var.set(audio_formats[0])
+                    fetch_button.configure(text="Fetch Details")
 
-            fetch_button.configure(state="disabled")
+                window.after(0, update_ui)
+            except Exception as e:
+                print(f"Error in fetch thread: {e}")
+                window.after(0, lambda: fetch_button.configure(state="normal", text="Fetch Details"))
 
-
-
-    input_frame = CTkFrame(
-        master=parent_container,
-        fg_color=dark_color,
-        bg_color=dark_color,
-        corner_radius=15,
-        border_width=4,
-        border_color="white"  
-    )
-    input_frame.grid(row=0, column=0, padx=0, pady=0)  
-    input_frame.grid_rowconfigure(0, weight=1)
-    input_frame.grid_columnconfigure(0, weight=1)
-
-
-
-    youtube_widget_container = CTkFrame(
-        master=input_frame,
-        #fg_color="#161b22",  
-        fg_color="black",  
-        border_width=2,
-        border_color="white"  
-
-    )
-    youtube_widget_container.grid(row=0, column=0)
-
-
-  
-    #youtube image
-    bg_image = Image.open(find_by_relative_path("Assets" + os_separator + "youtube_img.png")).resize((frame_width, frame_height))
-    bg_image_tk = CTkImage(bg_image, size=(frame_width, frame_height))
-    bg_label = CTkLabel(
-        master=youtube_widget_container,
-        image=bg_image_tk,
-        width=frame_width,
-        height=frame_height,
-        bg_color='white',
-        fg_color="white",
-        text="",
-    )
-    bg_label.grid(row=1,column=7, padx=(1,0), sticky="w")
-    bg_label.image = bg_image_tk
-
-
-
-    progress_label = CTkLabel(
-        master=youtube_widget_container,
-        textvariable=youtube_progress_var,
-        text_color="#CCCCCC",
-        bg_color="transparent",
-        font=("Segoe UI", 12, "bold"),
-        text="waiting",
-        width=100
-    )
-    progress_label.grid(row=6, column=3, sticky="w", padx=10, pady=10)
-
-
-
-    Info_button_youtubedownloader = create_info_button(
-            open_YoutubeDownloader_tool_info,
-            "INFO",
-            width=100,
-            master=youtube_widget_container
-        )
-    Info_button_youtubedownloader.grid(row=6, column=0,padx=5, sticky="w", pady=0)
-
-    youtube_output_path_entry = CTkEntry(
-        master=youtube_widget_container,
-        width=300,
-        height=25,
-        corner_radius=10,
-        font=("Segoe UI", 12),
-        fg_color="#1e1e1e",  
-        border_color="#3b82f6", 
-        border_width=2,
-        bg_color="black",
-        justify="center",
-    )
-    youtube_output_path_entry.grid(row=0, column=1, sticky="w", padx=10, pady=10)
-    youtube_output_path_entry.insert(0,DOCUMENT_PATH)
-
-
-
-    Choose_path_btn = CTkButton(
-        master=youtube_widget_container,
-        text="Choose path",
-        width=80,
-        height=25,
-        fg_color="black",
-        hover_color="#2563eb",  
-        border_color="black", 
-        font=bold11,
-        text_color="#ffffff",
-        command=lambda: select_youtube_output_path()
-    )
-    Choose_path_btn.grid(row=0,column=0, padx=10, pady=10, sticky="w")
-
-
-
- 
-
-
-    youtube_url_label = CTkLabel(
-        master=youtube_widget_container,
-        text="YouTube URL:", 
-        fg_color="transparent",
-        justify="center",
-        text_color="#CCCCCC",
-        bg_color="transparent",
-        font=("Segoe UI", 12, "bold"),
-    )
-    youtube_url_label.grid(row=2, column=0, padx=10, pady=10, sticky="w")
-        
-
-    youtube_link_entry = CTkEntry(
-        master=youtube_widget_container,
-        width=300,
-        height=30,
-        corner_radius=10,
-        font=("Segoe UI", 12),
-        fg_color="#1e1e1e", 
-        border_color="#3b82f6",  
-        border_width=2,
-        placeholder_text="Add youtube Link",
-        bg_color="black",
-        text_color="#f0f0f0",
-        justify="center"
-    )
+        threading.Thread(target=fetch_thread, daemon=True).start()
 
     def update_fetch_button_state(event=None):
         url = youtube_link_entry.get()
-        if "youtube.com" in url or "youtu.de" in url:
-            fetch_button.configure(state="normal")  
-        else:       
+        if "youtube.com" in url or "youtu.be" in url:
+            fetch_button.configure(state="normal")
+        else:
             fetch_button.configure(state="disabled")
 
-    youtube_link_entry.grid(row=2,column=1, padx=10, pady=10, sticky="w")
-
-    youtube_link_entry.bind("<KeyRelease>", update_fetch_button_state)
-#
-
-
-
-
-    Youtubelist_label =  CTkLabel(
-        master=youtube_widget_container,
-        text="YouTube List: ", 
-        font=("Segoe UI", 12, "bold"),
-        text_color="#CCCCCC",
-        bg_color="transparent",
-        fg_color="transparent",
-        justify="center"
-    )
-    Youtubelist_label.grid(row=1, column=0, sticky="w", padx=10, pady=10)
-
-
     def on_link_selected(selected_url):
-        youtube_link_entry.delete(0,tk.END)
+        youtube_link_entry.delete(0, tk.END)
         youtube_link_entry.insert(0, selected_url)
-
         if selected_url in formats_fetched:
             video_formats, audio_formats = formats_fetched[selected_url]
         else:
-             video_formats, audio_formats = get_available_formats(selected_url)
-             formats_fetched[selected_url] = (video_formats, audio_formats)
-
+            video_formats, audio_formats = get_available_formats(selected_url)
+            formats_fetched[selected_url] = (video_formats, audio_formats)
         video_format_dropdown.configure(values=video_formats if video_formats else ["No video formats available"])
         audio_format_dropdown.configure(values=audio_formats if audio_formats else ["No audio formats available"])
-
         saved_settings = youtube_link_settings.get(selected_url, {})
         saved_video_format = saved_settings.get("video_format")
         saved_audio_format = saved_settings.get("audio_format")
-
         if saved_video_format in video_formats:
             video_format_var.set(saved_video_format)
         else:
             video_format_var.set(video_format_var.get() if video_formats else "Video Formats...")
         if saved_audio_format in audio_formats:
             audio_format_var.set(saved_audio_format)
+        else:
             audio_format_var.set(audio_format_var.get() if audio_formats else "Audio Formats...")
-
-       
-
-
         youtube_link_settings[selected_url] = {
             "video_format": video_format_var.get(),
             "audio_format": audio_format_var.get()
         }
-
-
-    global youtubelist_variable
-    global youtube_list_menu
-    youtubelist_variable = StringVar(value=youtube_download_list)
-    youtube_list_menu = CTkOptionMenu(
-            master=youtube_widget_container,
-            variable=youtubelist_variable,
-            values=youtube_download_list,
-            width=300,
-            button_color="#0f172a",      
-            bg_color="white",
-            fg_color="#1e1e1e",         
-            text_color="#FFFFFF",
-            button_hover_color="#2563eb",   
-            dropdown_fg_color="#1e1e1e",    
-            dropdown_hover_color="#3b82f6", 
-            dropdown_text_color="#ffffff",
-            font=("Segoe UI", 12),
-        )
-    youtube_list_menu.grid(row=1, column=1, sticky="w", padx=10, pady=10)
-    youtube_list_menu.configure(command=on_link_selected)
 
     def on_video_format_change(event=None):
         selected_url = youtubelist_variable.get().strip()
@@ -1727,267 +1670,490 @@ def place_youtube_download_menu(parent_container):
         if selected_url in youtube_link_settings:
             youtube_link_settings[selected_url]["video_format"] = video_format_var.get()
 
-
-    video_format_label = CTkLabel(
-        master=youtube_widget_container,
-        text="Video Format:",
-        font=("Segoe UI", 12, "bold"),
-        text_color="#CCCCCC",
-        bg_color="transparent",
-    )
-    video_format_label.grid(row=3,column=0, padx=10, pady=10, sticky="w")
-
-    video_format_dropdown = CTkComboBox(
-        master=youtube_widget_container,
-        variable=video_format_var,
-        values=["Enter Link First..."],
-        width=300,
-        font=("Segoe UI", 12),
-        fg_color="black",
-        border_color="#3b82f6",
-        border_width=2,
-        button_color="#0f172a",     
-        button_hover_color="#2563eb",  
-        dropdown_fg_color="#1e1e1e",
-        dropdown_hover_color="#3b82f6",
-        text_color="#ffffff"
-    )
-    video_format_dropdown.grid(row=3,column=1, padx=10, pady=10, sticky="w")
-    video_format_dropdown.bind("<<ComboboxSelected>>", on_video_format_change)
-
-
-
-
-    audioformat_label = CTkLabel(
-        master=youtube_widget_container,
-        text="Audio Format:",
-         font=("Segoe UI", 12, "bold"),
-         text_color="#CCCCCC",
-         bg_color="transparent",
-    )
-    audioformat_label.grid(row=4,column=0, padx=10, pady=10, sticky="w")
-
-
-
-    audio_format_dropdown = CTkComboBox(
-        master=youtube_widget_container,
-        variable=audio_format_var,
-        values=["Enter Link First..."],
-        width=300,
-        font=("Segoe UI", 12),
-        fg_color="#1e1e1e",         
-        border_color="#3b82f6",    
-        border_width=2,
-        button_color="#0f172a",    
-        button_hover_color="#2563eb", 
-        dropdown_fg_color="#1e1e1e",
-        dropdown_hover_color="#3b82f6",
-        text_color="#ffffff"      
-    )
-    audio_format_dropdown.grid(row=4,column=1, padx=10, pady=10, sticky="w")
-    audio_format_dropdown.bind("<<ComboboxSelected>>", on_audio_format_change)
-
-
-    global stop_youtube_download_btn
-    stop_youtube_download_btn = CTkButton(
-        master=youtube_widget_container,
-        text="Stop Download",
-        width=100,
-        height=30,
-        font=bold11,
-        command=lambda: Stop_Youtube_Downloading(),
-        hover_color="#2563eb",  
-        border_color="#3b82f6",  
-        border_width=1,
-        state="DISABLED"
-    )
-    
     def clear_download_list():
-            youtube_download_list.clear()
-            youtubelist_variable.set("")
-            youtube_list_menu.configure(values=[])
-            download_all_btn.configure(state="disabled")
-
-    clear_list_btn = CTkButton(
-    master=youtube_widget_container,
-    text="Clear List",
-    width=100,
-    height=30,
-    command=clear_download_list,
-    fg_color="black",
-    hover_color="#2563eb",
-    border_color="#3b82f6",
-    border_width=1,
-    text_color="#ffffff"
-     )
-    clear_list_btn.grid(row=0, column=3, padx=10, pady=10, sticky="w")
-
+        youtube_download_list.clear()
+        youtubelist_variable.set("")
+        youtube_list_menu.configure(values=[])
+        download_all_btn.configure(state="disabled")
+        queue_count_lbl.configure(text="0 items")
 
     def add_link_to_download_list():
-            if video_format_var.get() == "":
-                print("Select video formats first ")
-                return
-            
-            url = youtube_link_entry.get().strip()
-            if url and url not in youtube_download_list:
-                youtube_download_list.append(url)
-                youtube_link_entry.delete(0, END)
+        if video_format_var.get() == "":
+            print("Select video formats first")
+            return
+        url = youtube_link_entry.get().strip()
+        if url and url not in youtube_download_list:
+            youtube_download_list.append(url)
+            youtube_link_entry.delete(0, END)
+            youtubelist_variable.set(youtube_download_list[-1])
+            youtube_list_menu.configure(values=youtube_download_list)
+            youtube_link_settings[url] = {
+                "video_format": video_format_var.get(),
+                "audio_format": audio_format_var.get()
+            }
+            if len(youtube_download_list) > 0:
+                download_all_btn.configure(state="normal")
+            n = len(youtube_download_list)
+            queue_count_lbl.configure(text=f"{n} item{'s' if n != 1 else ''}")
+            video_format_var.set("")
+            audio_format_var.set("")
 
-                youtubelist_variable.set(youtube_download_list[-1])
-                youtube_list_menu.configure(values=youtube_download_list)
-                youtube_link_settings[url] = {
-                    "video_format": video_format_var.get(),
-                    "audio_format": audio_format_var.get()
-                }
-                if len(youtube_download_list) > 0:
-                    download_all_btn.configure(state="normal")
-                video_format_var.set("")
-                audio_format_var.set("")
+    def select_youtube_output_path():
+        path = filedialog.askdirectory()
+        if path:
+            youtube_output_path_entry.delete(0, "end")
+            youtube_output_path_entry.insert(0, path)
+
+    # ── OUTER CARD — fills entire parent_container ───────────────────────────
+    card = CTkFrame(
+        master=parent_container,
+        fg_color=_SURFACE,
+        bg_color=_BG,
+        corner_radius=14,
+        border_width=1,
+        border_color=_BORDER,
+    )
+    card.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+
+    # Card layout: 3 rows (header | content | footer), content stretches
+    card.grid_rowconfigure(0, weight=0)   # header stripe – fixed
+    card.grid_rowconfigure(1, weight=1)   # content area  – stretches
+    card.grid_rowconfigure(2, weight=0)   # footer stripe – fixed
+    card.grid_columnconfigure(0, weight=1)
+
+    # ── HEADER STRIPE ────────────────────────────────────────────────────────
+    header = CTkFrame(master=card, fg_color=_PANEL, corner_radius=0, height=38)
+    header.grid(row=0, column=0, sticky="ew")
+    header.grid_propagate(False)
+    header.grid_columnconfigure(1, weight=1)
+
+    CTkLabel(
+        master=header,
+        text="▶   YouTube Downloader",
+        font=CTkFont(family="Segoe UI", size=11, weight="bold"),
+        text_color=_WHITE,
+        fg_color="transparent",
+    ).grid(row=0, column=0, padx=16, pady=8, sticky="w")
+
+    CTkLabel(
+        master=header,
+        text="  yt-dlp  ",
+        font=CTkFont(family="Courier New", size=9, weight="bold"),
+        text_color=_RED,
+        fg_color=_PANEL2,
+        corner_radius=10,
+        width=50,
+        height=18,
+    ).grid(row=0, column=2, padx=(0, 14), pady=8, sticky="e")
+
+    # ── CONTENT AREA — two-column: left fields | right side panel ────────────
+    content = CTkFrame(master=card, fg_color="transparent")
+    content.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
+
+    # Left fields column stretches; right side panel is fixed width
+    content.grid_columnconfigure(0, weight=1)       # left: labels
+    content.grid_columnconfigure(1, weight=3)       # left: inputs  (main stretch)
+    content.grid_columnconfigure(2, weight=2)       # left: buttons (some stretch)
+    content.grid_columnconfigure(3, weight=0, minsize=220)  # right: side panel fixed
+    for r in range(7):
+        content.grid_rowconfigure(r, weight=1)      # all rows share vertical space
+
+    # ── ROW 0 — Output path ──────────────────────────────────────────────────
+    CTkLabel(
+        master=content,
+        text="Save to",
+        font=CTkFont(family="Segoe UI", size=11),
+        text_color=_TEXT_DIM,
+        fg_color="transparent",
+        anchor="e",
+    ).grid(row=0, column=0, padx=(16, 8), pady=(10, 4), sticky="e")
+
+    youtube_output_path_entry = CTkEntry(
+        master=content,
+        height=32,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=11),
+        fg_color=_PANEL,
+        border_color=_BORDER2,
+        border_width=1,
+        bg_color=_SURFACE,
+        text_color=_TEXT,
+        justify="left",
+    )
+    youtube_output_path_entry.grid(row=0, column=1, padx=(0, 8), pady=(10, 4), sticky="ew")
+    youtube_output_path_entry.insert(0, DOCUMENT_PATH)
+
+    path_btn_row = CTkFrame(master=content, fg_color="transparent")
+    path_btn_row.grid(row=0, column=2, padx=(0, 8), pady=(10, 4), sticky="w")
+    path_btn_row.grid_columnconfigure(0, weight=1)
+    path_btn_row.grid_columnconfigure(1, weight=0)
+
+    CTkButton(
+        master=path_btn_row,
+        text="Browse",
+        width=70,
+        height=32,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        fg_color=_PANEL2,
+        hover_color="#1c2028",
+        border_color=_BORDER2,
+        border_width=1,
+        text_color=_TEXT,
+        command=lambda: select_youtube_output_path(),
+    ).grid(row=0, column=0, padx=(0, 4))
+
+    CTkButton(
+        master=path_btn_row,
+        text="✕",
+        width=32,
+        height=32,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=11, weight="bold"),
+        fg_color=_PANEL2,
+        hover_color="#3d1a1a",
+        border_color="#3d1a1a",
+        border_width=1,
+        text_color="#ff4545",
+        command=clear_download_list,
+    ).grid(row=0, column=1)
+
+    # ── ROW 1 — Queue ────────────────────────────────────────────────────────
+    CTkLabel(
+        master=content,
+        text="Queue",
+        font=CTkFont(family="Segoe UI", size=11),
+        text_color=_TEXT_DIM,
+        fg_color="transparent",
+        anchor="e",
+    ).grid(row=1, column=0, padx=(16, 8), pady=4, sticky="e")
+
+    global youtubelist_variable
+    global youtube_list_menu
+    youtubelist_variable = StringVar(value="")
+    youtube_list_menu = CTkOptionMenu(
+        master=content,
+        variable=youtubelist_variable,
+        values=youtube_download_list,
+        height=32,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=11),
+        fg_color=_PANEL,
+        button_color=_PANEL2,
+        button_hover_color=_BORDER2,
+        text_color=_TEXT,
+        dropdown_fg_color=_PANEL,
+        dropdown_hover_color="#1c2028",
+        dropdown_text_color=_TEXT,
+        command=on_link_selected,
+    )
+    youtube_list_menu.grid(row=1, column=1, padx=(0, 8), pady=4, sticky="ew")
+
+    queue_action_row = CTkFrame(master=content, fg_color="transparent")
+    queue_action_row.grid(row=1, column=2, padx=(0, 8), pady=4, sticky="w")
 
     addlist_btn = CTkButton(
-        master=youtube_widget_container,
-        text="Add List",
-        width=100,
-        height=30,
-        fg_color="black",
-        hover_color="#2563eb", 
-        border_color="#3b82f6",  
+        master=queue_action_row,
+        text="+ Add",
+        width=70,
+        height=32,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        fg_color=_PANEL2,
+        hover_color="#1c2028",
+        border_color=_BORDER2,
         border_width=1,
-        text_color="#ffffff",
+        text_color=_TEXT,
         command=add_link_to_download_list,
-        state="disabled"
+        state="disabled",
     )
-    addlist_btn.grid(row=1, column=3, sticky="w", padx=10, pady=10)
- 
+    addlist_btn.grid(row=0, column=0, padx=(0, 6))
 
-
-    global upload_button
-    upload_button = CTkButton(
-        master=youtube_widget_container,
-        text="Upload Cookies",
-        width=100,
-        height=30,
-        font=bold11,
-        command=lambda: upload_cookie_file(),
-        fg_color="black",
-        hover_color="#2563eb", 
-        border_color="#3b82f6",  
-        border_width=1
+    queue_count_lbl = CTkLabel(
+        master=queue_action_row,
+        text="0 items",
+        font=CTkFont(family="Courier New", size=9),
+        text_color=_TEXT_DIM,
+        fg_color="transparent",
+        width=50,
     )
-    if cookie_file_path is None:
-      upload_button.grid(row=6,column=3, padx=10, pady=10, sticky="w")
-    
-    if cookie_file_path is not None:
-        upload_button.place_forget()
+    queue_count_lbl.grid(row=0, column=1)
 
+    # ── ROW 2 — YouTube URL ──────────────────────────────────────────────────
+    CTkLabel(
+        master=content,
+        text="YouTube URL:",
+        font=CTkFont(family="Segoe UI", size=11),
+        text_color=_TEXT_DIM,
+        fg_color="transparent",
+        anchor="e",
+    ).grid(row=2, column=0, padx=(16, 8), pady=4, sticky="e")
+
+    youtube_link_entry = CTkEntry(
+        master=content,
+        height=34,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=11),
+        fg_color=_PANEL,
+        border_color=_BORDER2,
+        border_width=1,
+        bg_color=_SURFACE,
+        placeholder_text="Paste YouTube link…",
+        text_color=_WHITE,
+        justify="left",
+    )
+    youtube_link_entry.grid(row=2, column=1, padx=(0, 8), pady=4, sticky="ew")
+    youtube_link_entry.bind("<KeyRelease>", update_fetch_button_state)
 
     fetch_button = CTkButton(
-        master=youtube_widget_container,
+        master=content,
         text="Fetch Details",
-        width=100,
-        height=30,
-        font=bold11,
-        command=update_format_list,
-        hover_color="#2563eb",  
-        border_color="#3b82f6",  
+        width=120,
+        height=34,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        fg_color=_PANEL2,
+        hover_color="#1c2028",
+        border_color=_BORDER2,
         border_width=1,
-        text_color="#ffffff",
-        fg_color="black",
-        state="disabled"  
+        text_color=_TEXT,
+        command=update_format_list,
+        state="disabled",
     )
-    fetch_button.grid(row=2,column=3, padx=10, pady=10, sticky="w")
+    fetch_button.grid(row=2, column=2, padx=(0, 8), pady=4, sticky="w")
 
+    # ── ROW 3 — Video format ─────────────────────────────────────────────────
+    CTkLabel(
+        master=content,
+        text="Video Format:",
+        font=CTkFont(family="Segoe UI", size=11),
+        text_color=_TEXT_DIM,
+        fg_color="transparent",
+        anchor="e",
+    ).grid(row=3, column=0, padx=(16, 8), pady=4, sticky="e")
+
+    video_format_dropdown = CTkComboBox(
+        master=content,
+        variable=video_format_var,
+        values=["Enter Link First..."],
+        height=32,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=11),
+        fg_color=_PANEL,
+        border_color=_BORDER2,
+        border_width=1,
+        button_color=_PANEL2,
+        button_hover_color=_BORDER2,
+        dropdown_fg_color=_PANEL,
+        dropdown_hover_color="#1c2028",
+        text_color=_TEXT,
+    )
+    video_format_dropdown.grid(row=3, column=1, padx=(0, 8), pady=4, sticky="ew")
+    video_format_dropdown.bind("<<ComboboxSelected>>", on_video_format_change)
 
     global download_btn
     download_btn = CTkButton(
-        master=youtube_widget_container,
-        text="Download",
-        width=100,
-        height=30,
-        font=bold11,
-        command=start_youtube_download,
-        fg_color="black",
-        hover_color="#2563eb",  
-        border_color="#3b82f6", 
-        border_width=1,
+        master=content,
+        text="⬇  Download",
+        width=120,
+        height=32,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        fg_color=_RED,
+        hover_color=_RED_HOV,
         text_color="#ffffff",
-        state="disabled"
+        command=start_youtube_download,
+        state="disabled",
     )
-    download_btn.grid(row=3, column=3,  padx=10, pady=10, sticky="w")
+    download_btn.grid(row=3, column=2, padx=(0, 8), pady=4, sticky="w")
 
+    # ── ROW 4 — Audio format ─────────────────────────────────────────────────
+    CTkLabel(
+        master=content,
+        text="Audio Format:",
+        font=CTkFont(family="Segoe UI", size=11),
+        text_color=_TEXT_DIM,
+        fg_color="transparent",
+        anchor="e",
+    ).grid(row=4, column=0, padx=(16, 8), pady=4, sticky="e")
+
+    audio_format_dropdown = CTkComboBox(
+        master=content,
+        variable=audio_format_var,
+        values=["Enter Link First..."],
+        height=32,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=11),
+        fg_color=_PANEL,
+        border_color=_BORDER2,
+        border_width=1,
+        button_color=_PANEL2,
+        button_hover_color=_BORDER2,
+        dropdown_fg_color=_PANEL,
+        dropdown_hover_color="#1c2028",
+        text_color=_TEXT,
+    )
+    audio_format_dropdown.grid(row=4, column=1, padx=(0, 8), pady=4, sticky="ew")
+    audio_format_dropdown.bind("<<ComboboxSelected>>", on_audio_format_change)
 
     def download_all_from_list():
-            output_path = youtube_output_path_entry.get()
-            if not output_path:
-                info_message.set("Choose a folder for saving!")
-                return
-            if not youtube_download_list:
-                info_message.set("The list is empty!")
-                return
-            
-            stop_youtube_download_btn.grid(row=4, column=3, sticky="ew", padx=10, pady=5)
-            youtube_progress_var.set("Starting batch download...")
-            def batch_worker():
-                for idx, link in enumerate(youtube_download_list, 1):
-                    if stop_download_flag:
-                        youtube_progress_var.set("Download stopped.")
-                        return
+        output_path = youtube_output_path_entry.get()
+        if not output_path:
+            info_message.set("Choose a folder for saving!")
+            return
+        if not youtube_download_list:
+            info_message.set("The list is empty!")
+            return
+        stop_youtube_download_btn.configure(state="normal")
+        youtube_progress_var.set("Starting batch download...")
 
-                    window.after(0, lambda l=link, i=idx: youtube_progress_var.set(
-                        f"⬇️ Downloading ({i}/{len(youtube_download_list)}): {l[:50]}"
-                    ))
+        def batch_worker():
+            for idx, link in enumerate(youtube_download_list, 1):
+                if stop_download_flag:
+                    youtube_progress_var.set("Download stopped.")
+                    return
+                window.after(0, lambda l=link, i=idx: youtube_progress_var.set(
+                    f"⬇️ Downloading ({i}/{len(youtube_download_list)}): {l[:50]}"
+                ))
+                format_data = formats_fetched.get(link)
+                if format_data:
+                    video_formats, audio_formats = format_data
+                else:
+                    video_formats, audio_formats = get_available_formats(link)
+                    formats_fetched[link] = (video_formats, audio_formats)
+                settings = youtube_link_settings.get(link, {})
+                video_format_id = settings.get("video_format", "best").split(" - ")[0]
+                audio_format_id = settings.get("audio_format", "bestaudio").split(" - ")[0]
+                video_format_var.set(video_format_id)
+                audio_format_var.set(audio_format_id)
+                download_youtube_link(link, output_path, update_progress)
+            window.after(0, lambda: youtube_progress_var.set("✅ All downloads finished."))
+            youtube_download_list.clear()
+            info_message.set("✅ Batch download completed.")
 
-                
-                    format_data = formats_fetched.get(link)
-                    if format_data:
-                        video_formats, audio_formats = format_data
-                    else:
-                      
-                        video_formats, audio_formats = get_available_formats(link)
-                        formats_fetched[link] = (video_formats, audio_formats)
-
-               
-                    settings = youtube_link_settings.get(link, {})
-                    video_format_id = settings.get("video_format", "best").split(" - ")[0]
-                    audio_format_id = settings.get("audio_format", "bestaudio").split(" - ")[0]
-
-           
-                    video_format_var.set(video_format_id)
-                    audio_format_var.set(audio_format_id)
-
-                    download_youtube_link(link, output_path, update_progress)
-
-                window.after(0, lambda: youtube_progress_var.set("✅ All downloads finished."))
-                youtube_download_list.clear()#?clear
-                info_message.set("✅ Batch download completed.")
-
-            Thread(target=batch_worker).start()
-                
+        Thread(target=batch_worker).start()
 
     download_all_btn = CTkButton(
-        master=youtube_widget_container,
-        text="Download All",
-        width=100,
-        height=30,
-        font=bold11,
-        command=download_all_from_list,
-        fg_color="black",
-        hover_color="#2563eb",  
-        border_color="#3b82f6", 
+        master=content,
+        text="⬇  All",
+        width=120,
+        height=32,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        fg_color=_PANEL2,
+        hover_color="#1c2028",
+        border_color=_BORDER2,
         border_width=1,
-        text_color="#ffffff",
-        state="disabled"
+        text_color=_TEXT,
+        command=download_all_from_list,
+        state="disabled",
     )
-    download_all_btn.grid(row=5, column=3, padx=10, pady=10, sticky="w")
+    download_all_btn.grid(row=4, column=2, padx=(0, 8), pady=4, sticky="w")
 
+    # ── ROW 5 — Status ───────────────────────────────────────────────────────
+    CTkLabel(
+        master=content,
+        text="Status",
+        font=CTkFont(family="Segoe UI", size=11),
+        text_color=_TEXT_DIM,
+        fg_color="transparent",
+        anchor="e",
+    ).grid(row=5, column=0, padx=(16, 8), pady=4, sticky="e")
 
+    CTkLabel(
+        master=content,
+        textvariable=youtube_progress_var,
+        font=CTkFont(family="Segoe UI", size=11),
+        text_color=_TEXT_DIM,
+        fg_color="transparent",
+        anchor="w",
+    ).grid(row=5, column=1, padx=(0, 8), pady=4, sticky="ew")
 
+    global stop_youtube_download_btn
+    stop_youtube_download_btn = CTkButton(
+        master=content,
+        text="■  Stop",
+        width=120,
+        height=30,
+        corner_radius=8,
+        font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        fg_color=_PANEL2,
+        hover_color="#3d1a1a",
+        border_color="#3d1a1a",
+        border_width=1,
+        text_color="#ff4545",
+        command=lambda: Stop_Youtube_Downloading(),
+        state="disabled",
+    )
+    stop_youtube_download_btn.grid(row=5, column=2, padx=(0, 8), pady=4, sticky="w")
 
-    def select_youtube_output_path():
-            path = filedialog.askdirectory()
-            if path:
-                youtube_output_path_entry.delete(0,'end')
-                youtube_output_path_entry.insert(0,path)
+    # ── SIDE PANEL — spans all content rows ──────────────────────────────────
+    side_panel = CTkFrame(
+        master=content,
+        fg_color=_PANEL,
+        corner_radius=12,
+        border_width=1,
+        border_color=_BORDER,
+    )
+    side_panel.grid(row=0, column=3, rowspan=6, padx=(4, 14), pady=10, sticky="nsew")
+    side_panel.grid_rowconfigure(0, weight=1)
+    side_panel.grid_rowconfigure(1, weight=0)
+    side_panel.grid_columnconfigure(0, weight=1)
+
+    bg_image = Image.open(find_by_relative_path("Assets" + os_separator + "youtube_img.png")).resize((frame_width, frame_height))
+    bg_image_tk = CTkImage(bg_image, size=(frame_width, frame_height))
+    bg_label = CTkLabel(
+        master=side_panel,
+        image=bg_image_tk,
+        width=frame_width,
+        height=frame_height,
+        fg_color="transparent",
+        text="",
+    )
+    bg_label.grid(row=0, column=0, padx=10, pady=(14, 4), sticky="n")
+    bg_label.image = bg_image_tk
+
+    CTkLabel(
+        master=side_panel,
+        text="Powered by yt-dlp",
+        font=CTkFont(family="Courier New", size=8),
+        text_color=_TEXT_DIM,
+        fg_color="transparent",
+    ).grid(row=1, column=0, pady=(0, 12))
+
+    # ── FOOTER STRIPE ─────────────────────────────────────────────────────────
+    footer = CTkFrame(master=card, fg_color=_PANEL, corner_radius=0, height=34)
+    footer.grid(row=2, column=0, sticky="ew")
+    footer.grid_propagate(False)
+    footer.grid_columnconfigure(1, weight=1)
+
+    Info_button_youtubedownloader = create_info_button(
+        open_YoutubeDownloader_tool_info,
+        "«  INFO",
+        width=80,
+        master=footer,
+    )
+    Info_button_youtubedownloader.grid(row=0, column=0, padx=12, pady=5, sticky="w")
+
+    global upload_button
+    upload_button = CTkButton(
+        master=footer,
+        text="Upload Cookies",
+        width=110,
+        height=22,
+        corner_radius=6,
+        font=CTkFont(family="Segoe UI", size=9, weight="bold"),
+        fg_color=_PANEL2,
+        hover_color="#1c2028",
+        border_color=_BORDER2,
+        border_width=1,
+        text_color=_TEXT_DIM,
+        command=lambda: upload_cookie_file(),
+    )
+    if cookie_file_path is None:
+        upload_button.grid(row=0, column=2, padx=12, pady=5, sticky="e")
+    if cookie_file_path is not None:
+        upload_button.grid_forget()
 
 
 def delete_cookie_file_and_reset_button():
@@ -2071,7 +2237,7 @@ def upload_cookie_file():
 
 
            update_cookie_timestamps(cookie_file_path)
-           upload_button.place_forget() ## REMEMBER TO MAKE UPLOAD BUTTON DISSAPEAR RIGHT AFTER UPLOADING COOKIE
+           upload_button.place_forget() 
            
         except Exception as e:
             logging.info(f"Error saving cookie file: {e}")
@@ -2095,23 +2261,30 @@ def get_available_formats(youtube_url):
     ydl_opts = {
              'quiet': True,
              "nocheckcertificate": True,
-             'format': 'best',
-             "cookiefile": cookie_file_path
+             "cookiefile": cookie_file_path,
+             # Explicitly use node runtime
+             'js_runtimes': {'node': {}},
+             'extractor_args': {'youtube': {'remote_components': 'ejs:github'}},
+             'remote_components': ['ejs:github']
             }
     ydl_opts_backup = {
         'quiet': True,
         'nocheckcertificate': True,
-        'format': 'best',
         'no_signature': True,  
-        "cookiefile": cookie_file_path
+        "cookiefile": cookie_file_path,
+        'js_runtimes': {'node': {}},
+        'extractor_args': {'youtube': {'remote_components': 'ejs:github'}},
+        'remote_components': ['ejs:github']
     }
     ydl_opts_fallback = {
         'quiet': True,
         'nocheckcertificate': True,
-        'format': 'best',
         'force_generic_extractor': True, 
         'ignoreerrors': True,
-        "cookiefile": cookie_file_path
+        "cookiefile": cookie_file_path,
+        'js_runtimes': {'node': {}},
+        'extractor_args': {'youtube': {'remote_components': 'ejs:github'}},
+        'remote_components': ['ejs:github']
     }
 
     if cookie_file_path:
@@ -2123,21 +2296,40 @@ def get_available_formats(youtube_url):
         return
 
     logging.info(f"cookie_file_path when getting available format: {cookie_file_path}")
-
+    
+    
     def try_fetching_format(ydl_opts_variable):
                 with yt_dlp.YoutubeDL(ydl_opts_variable) as ydl:
                     info = ydl.extract_info(youtube_url, download=False)
                     formats = info.get('formats', []) if info else []
 
-                    video_formats = ['Only Audio','Video Formats...']
-                    audio_formats = []
+                    video_formats_list = []
+                    audio_formats_list = []
 
                     for f in formats:
-                        if f.get('vcodec') != 'none' and f.get('acodec') == 'none':  
-                            video_formats.append(f"{f['format_id']} - {f.get('resolution', 'Unknown')} ({f['ext']})")
+                        if f.get('vcodec') != 'none' and f.get('acodec') == 'none':
+                            height = f.get('height') or 0
+                            resolution = f.get('resolution', 'Unknown')
+                            ext = f.get('ext', '')
+                            format_id = f['format_id']
+                            video_formats_list.append({'height': height, 'str': f"{format_id} - {resolution} ({ext})"})
                         elif f.get('acodec') != 'none' and f.get('vcodec') == 'none': 
-                            audio_formats.append(f"{f['format_id']} - {f.get('abr', 'Unknown')}kbps ({f['ext']})")
+                            # Filter for English audio only
+                            language = f.get('language', '')
+                            if language and language != 'en':
+                                continue
+                            abr = f.get('abr') or 0
+                            ext = f.get('ext', '')
+                            format_id = f['format_id']
+                            lang_tag = f" [{language}]" if language else ""
+                            audio_formats_list.append({'abr': abr, 'str': f"{format_id} - {abr}kbps ({ext}){lang_tag}"})
                     
+                    # Sort descending
+                    video_formats_list.sort(key=lambda x: x['height'], reverse=True)
+                    audio_formats_list.sort(key=lambda x: x['abr'], reverse=True)
+
+                    video_formats = ['Only Audio','Video Formats...'] + [x['str'] for x in video_formats_list]
+                    audio_formats = [x['str'] for x in audio_formats_list]
 
                 return video_formats, audio_formats
     
@@ -2146,7 +2338,20 @@ def get_available_formats(youtube_url):
             return video_formats, audio_formats
     
     except yt_dlp.utils.DownloadError as e:
-        logging.info(f"Error fetching formats: {e}")
+        logging.info(f"Error fetching formats with default opts: {e}")
+        try:
+            logging.info("Retrying with backup options (no_signature)...")
+            video_formats, audio_formats = try_fetching_format(ydl_opts_backup)
+            return video_formats, audio_formats
+        except yt_dlp.utils.DownloadError as e2:
+            logging.info(f"Error fetching formats with backup opts: {e2}")
+            try:
+                logging.info("Retrying with fallback options (force_generic_extractor)...")
+                video_formats, audio_formats = try_fetching_format(ydl_opts_fallback)
+                return video_formats, audio_formats
+            except yt_dlp.utils.DownloadError as e3:
+                logging.info(f"All fetch attempts failed: {e3}")
+                return None
         if "cookie" in str(e).lower() or "sign in" in str(e).lower() or "403" in str(e):
                 logging.info("⚠️ Cookie file seems broken or expired. Resetting...")
                 delete_cookie_file_and_reset_button()
@@ -2161,7 +2366,7 @@ def get_available_formats(youtube_url):
                 delete_cookie_file_and_reset_button()
                 return [], []
             logging.info(f"❌ Backup method failed: {e}")
-            logging.info("🛠️ Trying final fallback method (force_generic_extractor)...")
+            logging.info("🛠️ Trying final fallback metho d (force_generic_extractor)...")
 
         try:
             video_formats, audio_formats = try_fetching_format(ydl_opts_fallback)
@@ -2188,31 +2393,53 @@ def download_youtube_link(youtube_url,output_path, progress_callback=None):
     audio_format = audio_format_var.get().split(" - ")[0]  
 
     if video_format == "Only Audio":
-        video_format = "bestaudio"
-
+        # Audio only download
+        format_string = audio_format if audio_format else "bestaudio"
         merge_format = "mp3"
     else:
+        # Video + audio download
+        format_string = f"{video_format}+{audio_format}/bestaudio"
         merge_format = "mp4"
-    ydl_opts = {
+    
+    base_opts = {
         "outtmpl": f'{output_path}/%(title)s.%(ext)s',
         "cookiefile": cookie_file_path,
-        'format': f"{video_format}+{audio_format}/bestaudio",
+        'format': format_string,
         'merge_output_format': merge_format,
         'progress_hooks': [progress_callback] if progress_callback else [],
         'nocheckcertificate': True,
-        'cookiesfrombrowser': None,  
+        'cookiesfrombrowser': None,
+        'js_runtimes': {'node': {}},
+        'extractor_args': {'youtube': {'remote_components': 'ejs:github'}},
+        'remote_components': ['ejs:github']
     }
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-             ydl.download([youtube_url])
-        return "Download Complete!"  and window.after(0, lambda: [stop_youtube_download_btn.pack_forget(), stop_youtube_download_btn.update_idletasks()])
+    # Fallback options similar to get_available_formats
+    opts_list = [
+        base_opts,
+        {**base_opts, 'no_signature': True},
+        {**base_opts, 'force_generic_extractor': True, 'ignoreerrors': True}
+    ]
 
-    except yt_dlp.utils.DownloadError as e:
-        return f"Error: {str(e)}"
+    last_error = None
+    for opts in opts_list:
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                 ydl.download([youtube_url])
+            
+            window.after(0, lambda: [stop_youtube_download_btn.pack_forget(), stop_youtube_download_btn.update_idletasks()])
+            return "Download Complete!"
+
+        except yt_dlp.utils.DownloadError as e:
+            last_error = e
+            if "User stopped the download." in str(e):
+                return f"Error: {str(e)}"
+            logging.info(f"Download failed with opts: {e}. Retrying...")
+            continue
+        except Exception as e:
+            return f"Error: {str(e)}"
     
-    except Exception as e:
-        return f"Error: {str(e)}"
+    return f"Error: {str(last_error)}"
     
 def update_progress(d):
     if stop_download_flag:
@@ -2334,7 +2561,7 @@ def get_ffmpeg_details(file_path):
 
 
 
-#didrik
+
 class ToolMenu:
     def __init__(self, parent_container):
         self.parent_container = parent_container
@@ -2438,7 +2665,7 @@ class ToolMenu:
 
 
 
-#didrik
+
 class VidGenesis_Automation_Agent:
 
     def __init__(self, parent_container):
@@ -2583,7 +2810,7 @@ class VidGenesis_Automation_Agent:
                             "video_amount": self.video_amount_var.get(),
                             "media_type": self.media_type_var.get()
                             }
-                #didrik
+                
                 AutoMation_agent  = CodeAgent(
                     model=self.model,
                     tools=[
@@ -2675,7 +2902,7 @@ class VidGenesis_Automation_Agent:
 
 
 
-#didrik
+
 class ColorRestorer_gui:
 
     def __init__(self, parent_container):
@@ -2824,7 +3051,7 @@ class ColorRestorer_gui:
 
 
 
-#didrik
+
 ####TOOL(1) FOR TOOLCLASS#####
 class MediaTree_Inspector_gui:
     def __init__(self, parent_container):
@@ -3085,23 +3312,25 @@ class MediaTree_Inspector_gui:
 
 
 
-#didrik
+
 ####TOOLCLASS#####
 ### a class with list of available tools that changes window for each tool on the main window.
 class ToolWindowClass:
     def __init__(self, master):
         self.master = master
 
-        self.container = CTkFrame(master, fg_color="black",border_width=1.5, border_color="blue")
-        self.container.place(relx=0.37, rely=0.71, relwidth=0.37, relheight=0.58, anchor="center")
+        self.container = CTkFrame(master, fg_color="black", border_width=0, corner_radius=0)
+        self.container.place(relx=0.0, rely=0.0, relwidth=0.22, relheight=1.0)
 
 
     
         self.create_widgets()
 
     def create_widgets(self):
-        self.menu_frame = CTkFrame(self.container, fg_color="transparent")
-        self.menu_frame.pack(side="top", pady=(20, 10))
+        self.menu_frame = CTkFrame(self.container, fg_color="#0A0A09",
+                                   border_width=0, corner_radius=0, height=44)
+        self.menu_frame.pack(side="top", fill="x")
+        self.menu_frame.pack_propagate(False)
 
   
         self.tool_list = ['Tool Menu','YouTube Downloader', 'MediaTree Inspector', 'SocialMedia Uploading','VidIntel Agent','VidGenesis Automation Agent','ColorRestorer AI','Corelytics InsightCatcher AI','Social Media Optimizer AI']
@@ -3111,15 +3340,21 @@ class ToolWindowClass:
             variable=self.tool_menu_var,
             values=self.tool_list,
             command=self.on_tool_select,
-            width=150,
-            fg_color="#282828",
-            button_color="#404040",
-            text_color="#FFFFFF"
+            width=200,
+            height=36,
+            fg_color="#0E0E0D",
+            button_color="#201E1A",
+            button_hover_color="#383028",
+            text_color="#C8C0B0",
+            dropdown_fg_color="#0E0E0D",
+            dropdown_text_color="#C8C0B0",
+            dropdown_hover_color="#181614",
+            font=CTkFont(family="Segoe UI", size=10, weight="bold"),
         )
-        self.tool_menu.pack(side="top", pady=10) 
+        self.tool_menu.pack(side="top", fill="x", padx=8, pady=4)
 
         self.content_frame = CTkFrame(self.container, fg_color="transparent")
-        self.content_frame.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.9, relheight=0.8)
+        self.content_frame.pack(side="top", fill="both", expand=True)
 
   
         self.on_tool_select(self.tool_list[0])
@@ -3182,6 +3417,8 @@ class ToolWindowClass:
         self.colorRestorer_ai.container.pack(fill="both", expand=True, padx=10, pady=10)
 
     def create_youtube_downloader(self):
+        self.content_frame.grid_rowconfigure(0, weight=1)
+        self.content_frame.grid_columnconfigure(0, weight=1)
         place_youtube_download_menu(self.content_frame)
 
 
@@ -3270,304 +3507,562 @@ class ToolWindowClass:
 
 ####VIDEO PREVIEW CLASS######
 class VideoPreview:
+    """
+    Owns its layout completely inside parent_container (the global 'container').
+
+    Side-by-side:  two CTkLabel frames packed left/right
+    SoloFrame:     one tk.Canvas with draggable before/after split line
+    """
+
+    # ── Design tokens ──────────────────────────────────────────────────
+    _ACCENT      = "#D49A2A"   # amber
+    _ACCENT_DIM  = "#48403A"
+    _SEP_COLOR   = "#141210"
+    _TAG_FG      = "#948C7E"
+    _TAG_BG      = "#0E0D0C"
+    _SLIDER_FG   = "#D8C090"
+    _BTN_ACTIVE  = "#1C1810"
+    _BTN_IDLE    = "#0C0C0B"
+
     def __init__(self, parent_container, original_label, upscaled_label, video_path):
         logging.info("Initializing VideoPreview...")
         self.parent_container = parent_container
-        self.original_label = original_label
-        self.upscaled_label = upscaled_label
-        self.video_path = video_path
-        self.cap = cv2.VideoCapture(video_path)
-        self.target_size = (600, 1200)
-        self.fps = int(self.cap.get(cv2.CAP_PROP_FPS))
+        self.video_path       = video_path
+
+        # ── Video source ──────────────────────────────────────────────
+        self.cap          = cv2.VideoCapture(video_path)
+        self.fps          = int(self.cap.get(cv2.CAP_PROP_FPS))
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        raw_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        raw_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.source_aspect = (raw_w / raw_h) if raw_h > 0 else (16/9)
+        self.target_size   = (raw_w, raw_h)
 
+        # ── State ─────────────────────────────────────────────────────
+        self.view_mode       = StringVar(value="side_by_side")
+        self.split_ratio     = 0.5
+        self.last_original   = None
+        self.last_upscaled   = None
+        self.solo_canvas     = None
+        self._canvas_photo   = None
 
-        self.view_mode = StringVar(value="side_by_side")
-        self.slider_position = tk.DoubleVar(value=0.5)
-        self.original_label.bind("<B1-Motion>",self.handle_drag_slider)
-        self.upscaled_label.bind("<Button-1>", self.handle_drag_slider)
+        # ── Destroy any existing layout widgets inside parent_container
+        for w in parent_container.winfo_children():
+            w.destroy()
 
+        # ── Top bar ───────────────────────────────────────────────────
+        self.top_bar = CTkFrame(parent_container, fg_color="#090907",
+                                corner_radius=0, height=44)
+        self.top_bar.pack(side="top", fill="x")
+        self.top_bar.pack_propagate(False)
 
-        self.mode_selector = CTkOptionMenu(
-            self.parent_container,
-            values=["side_by_side","SoloFrame"],
-            variable = self.view_mode,
-            command=self.switch_view_mode
+        # Thin separator line under top bar
+        CTkFrame(parent_container, fg_color=self._SEP_COLOR,
+                 height=1, corner_radius=0).pack(side="top", fill="x")
+
+        # Mode toggle buttons
+        btn_row = CTkFrame(self.top_bar, fg_color="#090907", corner_radius=6)
+        btn_row.pack(side="left", padx=10, pady=8)
+
+        self._btn_sbs = CTkButton(
+            btn_row, text="Side by Side",
+            width=104, height=26, corner_radius=6,
+            font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+            fg_color=self._BTN_ACTIVE, hover_color="#28220E",
+            text_color=self._ACCENT,
+            border_width=1, border_color="#302818",
+            command=lambda: self._set_mode("side_by_side")
         )
-        self.mode_selector.pack(pady=10)
+        self._btn_sbs.pack(side="left", padx=(0, 3))
 
- 
+        self._btn_solo = CTkButton(
+            btn_row, text="Compare",
+            width=90, height=26, corner_radius=6,
+            font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+            fg_color=self._BTN_IDLE, hover_color="#141210",
+            text_color=self._ACCENT_DIM,
+            border_width=1, border_color="#181410",
+            command=lambda: self._set_mode("SoloFrame")
+        )
+        self._btn_solo.pack(side="left")
+
+        # Timer label — shows current position as MM:SS
+        self.timer_label = CTkLabel(
+            self.top_bar, text="00:00",
+            font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+            text_color=self._ACCENT_DIM,
+            fg_color="#090907",
+            width=44,
+        )
+        self.timer_label.pack(side="left", padx=(8, 2), pady=0)
+
+        # Timeline slider — right side
         self.timeline_slider = CTkSlider(
-            self.parent_container,
-            from_=0,
-            to=self.total_frames,
-            command=self.update_frame_preview
-        )
-        
-        
-        self.update_frame_preview(0)
-        logging.info("VideoPreview initialized successfully.")
-        if self.total_frames <= 1: 
-            self.timeline_slider.pack_forget()
-            self.timeline_slider.configure(state='disabled')
-        else:
-            self.timeline_slider.pack(padx=0.01, pady=0.01)
-            self.timeline_slider.configure(state='normal')
-    
-    def handle_drag_slider(self,event):
-        widget_width = self.original_label.winfo_width()
-        rel_x = max(0, min(1,event.x / widget_width))
-        self.slider_position.set(rel_x)
-
-        if hasattr(self, "last_original") and hasattr(self, "last_upscaled"):
-            self.show_soloFame(self.last_original,self.last_upscaled)
- 
-
-
-
-
-#SOLO FRAME MODE
-    def show_soloFame(self, original_frame, upscaled_frame):
-
-        self.last_original = original_frame
-        self.last_upscaled = upscaled_frame
-
-        display_size = (900, 1300)  # Wider to show enough image and slider
-        cut_point = int(original_frame.shape[1] * self.slider_position.get())
-
-        # Merge images
-        combined = original_frame.copy()
-        combined[:, cut_point:] = upscaled_frame[:, cut_point:]
-
-        rgb_frame = cv2.cvtColor(combined, cv2.COLOR_BGR2RGB)
-        resized = cv2.resize(rgb_frame, display_size)
-
-        pil_image = Image.fromarray(resized)
-        draw = ImageDraw.Draw(pil_image)
-
-        cut_point_scaled = int(cut_point * (display_size[0] / original_frame.shape[1]))
-        height = display_size[1]
-        handle_y = height // 2
-        handle_radius = 12
-
-        # TEMP TEST COLOR
-        draw.line([(cut_point_scaled, 0), (cut_point_scaled, height)], fill="red", width=4)
-        draw.ellipse(
-            [cut_point_scaled - handle_radius, handle_y - handle_radius,
-            cut_point_scaled + handle_radius, handle_y + handle_radius],
-            fill="yellow", outline="black"
+            self.top_bar,
+            from_=0, to=max(1, self.total_frames - 1),
+            command=self._on_timeline_change,
+            button_color=self._ACCENT,
+            button_hover_color="#F0D880",
+            progress_color="#2A1E08",
+            fg_color="#141210",
+            height=12,
         )
 
-        tk_image = CTkImage(pil_image, size=display_size)
-        self.original_label.configure(width=display_size[0], height=display_size[1])
-        self.original_label.configure(image=tk_image)
-        self.original_label.image = tk_image
+        # ── Display area ──────────────────────────────────────────────
+        self.display_area = CTkFrame(parent_container, fg_color="#060606")
+        self.display_area.pack(side="top", fill="both", expand=True)
 
+        # ── Side-by-side sub-frames ───────────────────────────────────
+        self.orig_frame = CTkFrame(self.display_area, fg_color="#060606")
+        self.orig_label = CTkLabel(self.orig_frame, text="")
+        self.orig_label.pack(fill="both", expand=True, padx=4, pady=(0, 6))
 
+        self.mid_sep = CTkFrame(self.display_area, fg_color="#161210",
+                                width=1, corner_radius=0)
 
+        self.ups_frame = CTkFrame(self.display_area, fg_color="#060606")
+        self.ups_label = CTkLabel(self.ups_frame, text="")
+        self.ups_label.pack(fill="both", expand=True, padx=4, pady=(0, 6))
 
-    
-    
+        # ── Solo canvas ───────────────────────────────────────────────
+        self.solo_canvas = tk.Canvas(
+            self.display_area, bg="#060606",
+            highlightthickness=0, cursor="sb_h_double_arrow"
+        )
+        self.solo_canvas.bind("<ButtonPress-1>", self._on_canvas_drag)
+        self.solo_canvas.bind("<B1-Motion>",     self._on_canvas_drag)
 
-    def switch_view_mode(self, mode):
-        logging.info(f"Switched to {mode} view mode.")
-        self.upscaled_label.pack_forget()
+        # Show side-by-side initially
+        self._show_sbs_layout()
+        # Defer frame load until layout is fully rendered so winfo_width/height
+        # return real values (not 0/1), preventing a black initial preview.
+        # Load the midpoint frame so the thumbnail is representative.
+        mid_frame = max(0, self.total_frames // 2)
+        self.parent_container.after(150, lambda: self._load_frame(mid_frame))
 
+        if self.total_frames > 1:
+            self.timeline_slider.pack(side="right", fill="x", expand=True,
+                                      padx=(6, 14), pady=0)
+            # Move slider to midpoint to match the frame we're loading
+            self.timeline_slider.set(mid_frame)
+
+        logging.info("VideoPreview initialized.")
+
+    # ================================================================== #
+    #  Header factory — compact pill tag                                   #
+    # ================================================================== #
+    def _make_header(self, parent, text):
+        row = CTkFrame(parent, fg_color="#060606")
+        row.pack(side="top", fill="x", padx=4, pady=(6, 2))
+        is_ups = (text == "UPSCALED")
+        CTkLabel(
+            row, text=text,
+            font=CTkFont(family="Segoe UI", size=9, weight="bold"),
+            text_color=AMBER_DIM if is_ups else self._TAG_FG,
+            fg_color="#0C0906" if is_ups else self._TAG_BG,
+            corner_radius=4, padx=8, pady=3, width=0,
+        ).pack(anchor="center", expand=True)
+
+    # ================================================================== #
+    #  Layout helpers                                                      #
+    # ================================================================== #
+    def _show_sbs_layout(self):
+        self.solo_canvas.pack_forget()
+        self.orig_frame.pack(side="left",  fill="both", expand=True)
+        self.mid_sep.pack(   side="left",  fill="y",    pady=8)
+        self.ups_frame.pack( side="right", fill="both", expand=True)
+
+    def _show_solo_layout(self):
+        self.orig_frame.pack_forget()
+        self.mid_sep.pack_forget()
+        self.ups_frame.pack_forget()
+        # Center the compare canvas instead of stretching to the left
+        # Keep the canvas at its rendered image size and let extra space
+        # distribute evenly around it so it stays centered.
+        self.solo_canvas.pack(expand=True, padx=4, pady=4)
+
+    def _set_mode(self, mode):
+        self.view_mode.set(mode)
         if mode == "side_by_side":
-            self.original_label.pack(side="left", padx=10)
-            self.upscaled_label.pack(side="left", padx=10)
-        elif mode == "SoloFrame":
-              if original_label_title: original_label_title.pack_forget()
-              if upscaled_label_title: upscaled_label_title.pack_forget()
-              self.original_label.pack_forget()
-              self.original_label.pack(expand=True)
-              self.original_label.pack_configure(anchor="center")
+            self._btn_sbs.configure(fg_color=self._BTN_ACTIVE,
+                                    text_color=self._ACCENT,
+                                    border_color="#302818")
+            self._btn_solo.configure(fg_color=self._BTN_IDLE,
+                                     text_color=self._ACCENT_DIM,
+                                     border_color="#181410")
+            self._show_sbs_layout()
         else:
-            if original_label_title: original_label_title.pack(pady=5)
-            if upscaled_label_title: upscaled_label_title.pack(pady=5)
+            self._btn_solo.configure(fg_color=self._BTN_ACTIVE,
+                                     text_color=self._ACCENT,
+                                     border_color="#302818")
+            self._btn_sbs.configure(fg_color=self._BTN_IDLE,
+                                    text_color=self._ACCENT_DIM,
+                                    border_color="#181410")
+            self._show_solo_layout()
+        self._refresh_display()
 
+    def _on_mode_change(self, mode):
+        self._set_mode(mode)
 
-        
-        if hasattr(self, "last_original") and hasattr(self, "last_upscaled"):
-            self.update_gui(self.last_original, self.last_upscaled)
-    
+    # ================================================================== #
+    #  Helpers                                                             #
+    # ================================================================== #
+    def _fit_size(self, max_w, max_h, aspect=None):
+        if aspect is None:
+            aspect = self.source_aspect
+        aspect = max(0.01, aspect)
+        if max_w / aspect <= max_h:
+            w, h = max_w, int(max_w / aspect)
+        else:
+            h, w = max_h, int(max_h * aspect)
+        return max(1, w), max(1, h)
 
+    def _frame_aspect(self, frame):
+        h, w = frame.shape[:2]
+        return w / h if h > 0 else self.source_aspect
 
-    def show_side_by_side(self,original_frame,upscaled_frame):
-        preview_size = (500, 1300)  
- 
-        original_image = self.convert_frame_to_ctk(original_frame)
-        upscaled_image = self.convert_frame_to_ctk(upscaled_frame)
+    def _to_ctk(self, frame_bgr, w, h):
+        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        res = cv2.resize(rgb, (w, h), interpolation=cv2.INTER_AREA)
+        return CTkImage(Image.fromarray(res), size=(w, h))
 
-        self.original_label.configure(image=original_image)
-        self.upscaled_label.configure(image=upscaled_image)
-
-    
-        self.original_label.configure(width=preview_size[0], height=preview_size[1])
-        self.upscaled_label.configure(width=preview_size[0], height=preview_size[1])
-
-        self.original_label.image = original_image
-        self.upscaled_label.image = upscaled_image
-        self.original_label.update_idletasks()
-        self.upscaled_label.update_idletasks()
-
-        self.timeline_slider.configure(state='normal')
-        logging.info("Side by side frame updated successfully!")
-
-    def update_gui(self, original_frame, upscaled_frame):
-
-        if self.view_mode.get() == "side_by_side":
-            self.show_side_by_side(original_frame,upscaled_frame)
-
-        elif self.view_mode.get() == "SoloFrame":
-            self.show_soloFame(original_frame,upscaled_frame)
-        
-
-        
-      
-
-    def update_frame_preview(self, frame_number):
-        logging.info(f"Updating frame preview for frame {frame_number}...")
-        self.timeline_slider.configure(state='disabled')   
-
-        self.loading_icon = LoadingIcon(self.parent_container)
-        self.loading_icon.start()
-
-        Thread(target=self.process_and_update_frame, args=(frame_number,)).start()
-
-    def process_and_update_frame(self, frame_number):
-        try:
-            logging.info(f"Processing frame {frame_number}...")
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_number))
-            
-   
-            if frame_number in frame_cache:
-                self.loading_icon.stop()
-                logging.info(f"Frame {frame_number} loaded from cache.")
-                original_frame, upscaled_frame = frame_cache[frame_number]
-            else:
-                success, frame = self.cap.read()
-                if success:
-                    logging.info(f"Frame {frame_number} read successfully from video.")
-                    
-               
-                    original_frame = cv2.resize(frame, self.target_size, interpolation=cv2.INTER_AREA)
-                    upscaled_frame = self.process_frame(original_frame)  
-                    frame_cache[frame_number] = (original_frame, upscaled_frame)
-                    logging.info(f"Frame {frame_number} processed and added to cache.")
-                else:
-                    logging.info(f"Failed to read frame {frame_number} from video.")
-                    return 
-            
-            
-            self.parent_container.after(0, lambda: self.update_gui(original_frame, upscaled_frame))
-            self.parent_container.after(0, self.loading_icon.stop)
-            logging.info(f"Stopped loading animation for frame {frame_number}.")
-
-        except Exception as e:
-            logging.info(f"Error processing frame {frame_number}: {str(e)}")
-            self.loading_icon.stop()
-
-    def process_frame(self, frame):
-        global preview_ai_instance, last_model_config
-        logging.info("Processing frame with AI model...")
-        
-        if not selected_AI_model or selected_AI_model == AI_LIST_SEPARATOR[0]:
-            show_error_message("Select an AI model first!")
+    # ================================================================== #
+    #  Rendering                                                           #
+    # ================================================================== #
+    def _refresh_display(self):
+        if self.last_original is None or self.last_upscaled is None:
             return
-        
-        if preview_ai_instance:
-            frame = preview_ai_instance.AI_orchestration(frame)
-            logging.debug("Frame processed by AI orchestration.")
-            return frame
+        if self.view_mode.get() == "side_by_side":
+            self._render_sbs(self.last_original, self.last_upscaled)
+        else:
+            self._render_solo(self.last_original, self.last_upscaled)
 
+    def _render_sbs(self, orig, ups):
+        self.display_area.update_idletasks()
+        avail_w = max(50, (self.display_area.winfo_width()  // 2) - 16)
+        avail_h = max(50,  self.display_area.winfo_height() - 60)
+        aspect  = self._frame_aspect(orig)
+        dw, dh  = self._fit_size(avail_w, avail_h, aspect)
+
+        orig_img = self._to_ctk(orig, dw, dh)
+        ups_img  = self._to_ctk(ups,  dw, dh)
+        self.orig_label.configure(image=orig_img, width=dw, height=dh)
+        self.ups_label.configure( image=ups_img,  width=dw, height=dh)
+        self.orig_label.image = orig_img
+        self.ups_label.image  = ups_img
+
+    def _render_solo(self, orig, ups):
+        self.display_area.update_idletasks()
+        avail_w = max(50, self.display_area.winfo_width()  - 10)
+        avail_h = max(50, self.display_area.winfo_height() - 10)
+        aspect  = self._frame_aspect(orig)
+        dw, dh  = self._fit_size(avail_w, avail_h, aspect)
+
+        orig_rgb = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
+        ups_rgb  = cv2.cvtColor(ups,  cv2.COLOR_BGR2RGB)
+        orig_r   = cv2.resize(orig_rgb, (dw, dh), interpolation=cv2.INTER_AREA)
+        ups_r    = cv2.resize(ups_rgb,  (dw, dh), interpolation=cv2.INTER_AREA)
+
+        sx       = max(0, min(dw, int(dw * self.split_ratio)))
+        combined = orig_r.copy()
+        if sx < dw:
+            combined[:, sx:] = ups_r[:, sx:]
+
+        pil  = Image.fromarray(combined).convert("RGBA")
+        draw = ImageDraw.Draw(pil, "RGBA")
+
+        # Main divider — white
+        draw.line([(sx, 0), (sx, dh)], fill=(255, 255, 255, 255), width=2)
+
+        # Circle handle — white
+        hy, r = dh // 2, 16
+        draw.ellipse([sx-r, hy-r, sx+r, hy+r],
+                     fill=(255, 255, 255, 255), outline=(180, 180, 180, 220), width=1)
+        ap, arrow_col = 4, (50, 50, 50, 255)
+        draw.polygon([(sx-r+ap+2, hy), (sx-ap, hy-7), (sx-ap, hy+7)], fill=arrow_col)
+        draw.polygon([(sx+r-ap-2, hy), (sx+ap, hy-7), (sx+ap, hy+7)], fill=arrow_col)
+
+        # Corner pill labels
+        try:
+            fnt = ImageFont.truetype("segoeuib.ttf", max(11, dh // 36))
+        except IOError:
+            try:
+                fnt = ImageFont.truetype("arial.ttf", max(11, dh // 36))
+            except IOError:
+                fnt = ImageFont.load_default()
+
+        def _pill(text, x, y, text_col, bg_col):
+            tw = int(draw.textlength(text, font=fnt))
+            th = max(11, dh // 36)
+            px, py = 8, 4
+            draw.rounded_rectangle([x-px, y-py, x+tw+px, y+th+py],
+                                   radius=4, fill=bg_col)
+            draw.text((x, y), text, fill=text_col, font=fnt)
+
+        self.solo_canvas.config(width=dw, height=dh)
+        photo = ImageTk.PhotoImage(pil.convert("RGB"))
+        self.solo_canvas.delete("all")
+        self.solo_canvas.create_image(dw // 2, dh // 2, anchor="center", image=photo)
+        self._canvas_photo = photo
+
+    # ================================================================== #
+    #  Events                                                              #
+    # ================================================================== #
+    def _on_canvas_drag(self, event):
+        cw = self.solo_canvas.winfo_width()
+        if cw > 0:
+            self.split_ratio = max(0.0, min(1.0, event.x / cw))
+        if self.last_original is not None:
+            self._render_solo(self.last_original, self.last_upscaled)
+
+    def _on_timeline_change(self, value):
+        frame_number = int(float(value))
+        # Update timer label (MM:SS)
+        fps = self.fps if self.fps > 0 else 24
+        total_seconds = frame_number / fps
+        minutes = int(total_seconds // 60)
+        seconds = int(total_seconds % 60)
+        self.timer_label.configure(text=f"{minutes:02d}:{seconds:02d}")
+        self._load_frame(frame_number)
+
+    # ================================================================== #
+    #  Frame loading                                                       #
+    # ================================================================== #
+    def _load_frame(self, frame_number):
+        self.timeline_slider.configure(state="disabled")
+        loading = LoadingIcon(self.parent_container)
+        loading.start()
+        Thread(target=self._process_frame_bg,
+               args=(frame_number, loading), daemon=True).start()
+
+    def _process_frame_bg(self, frame_number, loading):
+        try:
+            if frame_number in frame_cache:
+                orig, ups = frame_cache[frame_number]
+            else:
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_number))
+                ok, frame = self.cap.read()
+                if not ok:
+                    return
+                orig = cv2.resize(frame, self.target_size, interpolation=cv2.INTER_AREA)
+                ups  = self._ai_process(orig)
+                frame_cache[frame_number] = (orig, ups)
+
+            self.last_original = orig
+            self.last_upscaled = ups
+            self.parent_container.after(0, self._refresh_display)
+            self.parent_container.after(0, loading.stop)
+            self.parent_container.after(0, lambda: self.timeline_slider.configure(state="normal"))
+        except Exception as e:
+            logging.info(f"Error processing frame {frame_number}: {e}")
+            try:
+                self.parent_container.after(0, loading.stop)
+            except Exception:
+                pass
+
+    def _ai_process(self, frame):
+        global preview_ai_instance
+        if preview_ai_instance:
+            return preview_ai_instance.AI_orchestration(frame)
         return frame
 
-    def convert_frame_to_ctk(self, frame):
-        preview_width, preview_height = 500, 1300  
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        resized_frame = cv2.resize(rgb_frame, (preview_width, preview_height), interpolation=cv2.INTER_AREA)
-        
-        pil_image = Image.fromarray(resized_frame)
-        return CTkImage(pil_image, size=(preview_width, preview_height))  
-
+    # ================================================================== #
+    #  Cleanup                                                             #
+    # ================================================================== #
     def close(self):
-        logging.info("Releasing video capture and destroying slider...")
         self.cap.release()
-        self.timeline_slider.destroy()
+        try:
+            self.timeline_slider.destroy()
+        except Exception:
+            pass
+
+
 
 
 
 
 # GUI place functions ---------------------------
-def create_placeholder_image(width, height):
-    img = Image.new('RGB', (width, height), color='#000000')
+def create_placeholder_image(width, height, label="ORIGINAL"):
+    """Render a placeholder that matches the HTML design: amber play-circle, cream text."""
+    from PIL import Image, ImageDraw, ImageFont
+    import math
+
+    # ── background ────────────────────────────────────────────────────
+    img  = Image.new('RGB', (width, height), color='#0B0B0A')
     draw = ImageDraw.Draw(img)
+
+    # ── play button circle — matches HTML .play-btn ────────────────────
+    cx, cy = width // 2, height // 2 - 20
+    r = 23  # matches ~46px diameter / 2 in HTML
+
+    # circle fill (transparent-ish dark)
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r],
+                 outline="#8C6418", width=2, fill="#0B0B0A")
+
+    # play triangle — amber-dim fill matching HTML color: #8C6418
+    tri_pts = [
+        (cx - 7,  cy - 11),
+        (cx - 7,  cy + 11),
+        (cx + 13, cy),
+    ]
+    draw.polygon(tri_pts, fill="#8C6418")
+
+    # ── fonts ─────────────────────────────────────────────────────────
     try:
-        font = ImageFont.truetype("arial.ttf", 100)
+        font_main = ImageFont.truetype("arialbd.ttf", 12)
+        font_sub  = ImageFont.truetype("arial.ttf",    9)
     except IOError:
-        font = ImageFont.load_default()
-    text = "?"
-    text_width = draw.textlength(text, font=font)
-    text_height = font.size
-    x = (width - text_width) // 2
-    y = (height - text_height) // 2
-    draw.text((x, y), text, fill="#FFFFFF", font=font)
+        font_main = ImageFont.load_default()
+        font_sub  = font_main
+
+    # ── "Upload a file to preview" — cream2 #948C7E ───────────────────
+    main_text = "Upload a file to preview"
+    sub_text  = "Or enable Google Chrome & Google Autoplay"
+
+    mw = draw.textlength(main_text, font=font_main)
+    sw = draw.textlength(sub_text,  font=font_sub)
+
+    draw.text(((width - mw) / 2, cy + r + 14), main_text, fill="#948C7E", font=font_main)
+    draw.text(((width - sw) / 2, cy + r + 32), sub_text,  fill="#2a2824", font=font_sub)
+
     return img
 
 
 
-#didrik
+
 
 
 
 def place_loadFile_section(window):
-    global container, original_preview, upscaled_preview,original_label_title, upscaled_label_title
-
-    preview_width = 1400  
-    preview_height = 1080  
-
+    global container, original_preview, upscaled_preview
+    global original_preview_frame, upscaled_preview_frame
+    global original_label_title, upscaled_label_title
 
     window.preview_frame = CTkFrame(
-        master=window, 
-        fg_color=dark_color,
-        width=preview_width,
-        height=preview_height,
-        corner_radius=3
+        master=window,
+        fg_color="#060606",
+        corner_radius=0,
     )
-    window.preview_frame.place(relx=0.78, rely=0.5, relwidth=0.45, relheight=1.0, anchor="center")
-    window.preview_frame.pack_propagate(False)  
+    window.preview_frame.place(relx=0.55, rely=0.0, relwidth=0.45, relheight=1.0)
 
+    container = CTkFrame(window.preview_frame, fg_color="#060606")
+    container.pack(pady=0, padx=0, fill='both', expand=True)
 
-    placeholder_img = create_placeholder_image(1920, 1080)
-    placeholder_photo = CTkImage(placeholder_img, size=(preview_width, preview_height))
+    # Build the default side-by-side layout directly in container
+    _build_side_by_side_layout(container)
 
- 
-    container = CTkFrame(window.preview_frame, fg_color=dark_color)
-    container.pack(pady=13, padx=21, fill='both', expand=True) 
-
-
-    original_frame = CTkFrame(container, fg_color=dark_color)
-    original_frame.pack(side='left', fill='both', expand=True, padx=5)
-    original_frame.pack_propagate(False)
-    original_label_title = CTkLabel(original_frame, text="Original", font=bold18, text_color=app_name_color).pack(pady=5)
-
-    original_preview = CTkLabel(original_frame, image=placeholder_photo, text="")
-    original_preview.pack(fill='both', expand=True)
-    original_preview.pack_propagate(False)
-    
-    upscaled_frame = CTkFrame(container, fg_color=dark_color)
-    upscaled_frame.pack(side='right', fill='both', expand=True, padx=10)
-    upscaled_frame.pack_propagate(False)
-    upscaled_label_title = CTkLabel(upscaled_frame, text="Upscaled Preview", font=bold18, text_color=app_name_color).pack(pady=5)
-
-    upscaled_preview = CTkLabel(upscaled_frame, image=placeholder_photo, text="")
-    upscaled_preview.pack(fill='both', expand=True)
-    upscaled_preview.pack_propagate(False)
-   
     globals()['container'] = container
-    globals()['original_preview'] = original_preview
-    globals()['upscaled_preview'] = upscaled_preview
+
+    # ── Drag-and-drop registration ────────────────────────────────────
+    if _TKDND_AVAILABLE:
+        def _on_drop(event):
+            # Restore normal border colour
+            try:
+                window.preview_frame.configure(border_color=BORDER2, border_width=0)
+            except Exception:
+                pass
+            add_files_from_drop(event.data)
+
+        def _on_enter(event):
+            try:
+                window.preview_frame.configure(border_width=2, border_color=AMBER)
+            except Exception:
+                pass
+            return event.action
+
+        def _on_leave(event):
+            try:
+                window.preview_frame.configure(border_width=0)
+            except Exception:
+                pass
+
+        for widget in (window.preview_frame, container):
+            widget.drop_target_register(_tkdnd.DND_FILES)
+            widget.dnd_bind('<<Drop>>', _on_drop)
+            widget.dnd_bind('<<DragEnter>>', _on_enter)
+            widget.dnd_bind('<<DragLeave>>', _on_leave)
+
+
+def _build_side_by_side_layout(container):
+    """Create the default side-by-side preview layout inside container."""
+    global original_preview, upscaled_preview
+    global original_preview_frame, upscaled_preview_frame
+    global original_label_title, upscaled_label_title
+
+    ph_w, ph_h = 400, 225
+    placeholder_img_orig   = create_placeholder_image(ph_w, ph_h, label="ORIGINAL")
+    placeholder_img_ups    = create_placeholder_image(ph_w, ph_h, label="UPSCALED")
+    placeholder_photo_orig = CTkImage(placeholder_img_orig, size=(ph_w, ph_h))
+    placeholder_photo_ups  = CTkImage(placeholder_img_ups,  size=(ph_w, ph_h))
+
+    # ── Single centered panel: shown when no file is loaded ──────────
+    original_preview_frame = CTkFrame(
+        container,
+        fg_color="#0B0B0A",
+        border_width=1,
+        border_color=BORDER2,
+        corner_radius=8,
+    )
+    # Center the single panel with equal padding on both sides
+    original_preview_frame.pack(fill='both', expand=True, padx=30, pady=30)
+
+    # Image label fills the panel
+    original_preview = CTkLabel(original_preview_frame, image=placeholder_photo_orig, text="")
+    original_preview.pack(fill='both', expand=True)
+
+    # Badge overlaid at bottom-left using place()
+    original_label_title = CTkLabel(
+        original_preview_frame,
+        text="ORIGINAL",
+        font=CTkFont(family="Segoe UI", size=9, weight="bold"),
+        text_color=CREAM3,
+        fg_color="#0C0C0B",
+        corner_radius=4,
+        padx=8,
+        pady=3,
+    )
+    original_label_title.place(relx=0.0, rely=1.0, anchor="sw", x=8, y=-8)
+    # Hide the ORIGINAL badge when showing the placeholder (no file loaded)
+    original_label_title.place_forget()
+
+    # ── Thin amber divider between panels (hidden initially) ─────────
+    _divider = CTkFrame(container, fg_color=AMBER_GLOW, width=1)
+    # Do NOT pack _divider yet — shown only after a file is loaded
+
+    # ── Right panel: UPSCALED (hidden initially) ─────────────────────
+    upscaled_preview_frame = CTkFrame(
+        container,
+        fg_color="#060606",
+        border_width=1,
+        border_color=BORDER2,
+        corner_radius=6,
+    )
+    # Do NOT pack upscaled_preview_frame yet — shown only after a file is loaded
+
+    upscaled_preview = CTkLabel(upscaled_preview_frame, image=placeholder_photo_ups, text="")
+    upscaled_preview.pack(fill='both', expand=True)
+
+    upscaled_label_title = CTkLabel(
+        upscaled_preview_frame,
+        text="UPSCALED",
+        font=CTkFont(family="Segoe UI", size=9, weight="bold"),
+        text_color=AMBER_DIM,
+        fg_color="#0C0906",
+        corner_radius=4,
+        padx=8,
+        pady=3,
+    )
+    upscaled_label_title.place(relx=0.0, rely=1.0, anchor="sw", x=8, y=-8)
+
+    # Store divider reference so it can be shown later
+    globals()['_preview_divider']       = _divider
+
+    globals()['original_preview']       = original_preview
+    globals()['upscaled_preview']       = upscaled_preview
+    globals()['original_preview_frame'] = original_preview_frame
+    globals()['upscaled_preview_frame'] = upscaled_preview_frame
+    globals()['original_label_title']   = original_label_title
+    globals()['upscaled_label_title']   = upscaled_label_title
 
 
  
@@ -3581,35 +4076,59 @@ def place_loadFile_section(window):
 
 
 
-#didrik
+
 ###Loading-ICON####
 class LoadingIcon:
-    def __init__(self,master):
+    def __init__(self, master):
         self.master = master
-        self.loading_gif = Image.open(find_by_relative_path("Assets" + os_separator + "Loading.gif"))
-        self.frames = [CTkImage(frame.convert('RGBA'), size=(100, 100)) 
-               for frame in ImageSequence.Iterator(self.loading_gif)]
-
-        self.label = CTkLabel(master,text="", image=self.frames[0],bg_color='transparent')
-        self.label.place(relx=0.5, rely=0.5, anchor="center")
-        self.current_frame = 0
         self.animating = False
+        self.angle = 0
+
+        size = 60
+        self.canvas = tk.Canvas(
+            master,
+            width=size,
+            height=size,
+            bg="#060606",
+            highlightthickness=0,
+            bd=0,
+        )
+        self.canvas.place(relx=0.5, rely=0.5, anchor="center")
+
+        self._size = size
+        self._arc_id = None
 
     def start(self):
         self.animating = True
         logging.info("Started loading animation")
-        self.animate()
+        self._draw()
 
     def stop(self):
         self.animating = False
-        self.label.destroy()
+        self.canvas.destroy()
         logging.info("Stopped loading animation")
-    
-    def animate(self):
-        if self.animating:
-            self.label.configure(image=self.frames[self.current_frame])
-            self.current_frame = (self.current_frame + 1) % len(self.frames)
-            self.master.after(50,self.animate)
+
+    def _draw(self):
+        if not self.animating:
+            return
+        s = self._size
+        pad = 8
+        self.canvas.delete("all")
+
+        # Faint grey track circle
+        self.canvas.create_oval(pad, pad, s - pad, s - pad,
+                                outline="#2A2A2A", width=5)
+
+        # Amber arc spinner
+        self.canvas.create_arc(pad, pad, s - pad, s - pad,
+                               start=self.angle,
+                               extent=270,
+                               outline=AMBER,
+                               width=5,
+                               style="arc")
+
+        self.angle = (self.angle + 12) % 360
+        self.master.after(30, self._draw)
 
 
 
@@ -4534,18 +5053,42 @@ class FileWidget(CTkScrollableFrame):
         self.upscale_factor = upscale_factor
 
         self.label_list = []
+        # Make column 0 stretch to fill full width of the scrollable frame
+        self.columnconfigure(0, weight=1)
         self._create_widgets()
 
     def _destroy_(self) -> None:
-        self.file_list = []
+        global selected_file_list, preview_instance, file_widget
 
-        if hasattr(self, 'file_widget') and self.file_widget:
-            self.file_widget.destroy()
-            
-        if hasattr(self, 'preview_frame') and self.preview_frame:
-            self.preview_frame.destroy()
+        # Clear both the local and global file lists
+        self.file_list.clear()
+        selected_file_list.clear()
+        file_overrides.clear()
 
-        place_loadFile_section(window)  
+        # Stop any active preview
+        if preview_instance:
+            try:
+                preview_instance.close()
+            except Exception:
+                pass
+            preview_instance = None
+
+        # Destroy the FileWidget completely so next open_files_action
+        # creates a fresh one (including the Empty LIST button)
+        try:
+            file_widget.destroy()
+        except Exception:
+            pass
+        del file_widget
+
+        place_loadFile_section(window)
+
+        # Re-show the empty-state hint ("Drop files here or click SELECT FILES")
+        try:
+            app.file_list_bg.lift()
+            app._empty_state_frame.lift()
+        except Exception:
+            pass
 
 
     def _create_widgets(self) -> None:
@@ -4558,99 +5101,233 @@ class FileWidget(CTkScrollableFrame):
 
 
     def add_file_information(self, file_path, index_row) -> CTkLabel:
-        file_frame = CTkFrame(self, fg_color="transparent")
-        file_frame.grid(row=index_row, column=0, sticky="ew", pady=3, padx=3)
+        # Outer card frame — spans full column width with amber-theme border
+        file_frame = CTkFrame(
+            self,
+            fg_color="#0E0E0D",
+            border_width=1,
+            border_color="#201E1A",
+            corner_radius=5,
+        )
+        file_frame.grid(row=index_row, column=0, sticky="ew", pady=3, padx=4)
+        file_frame.columnconfigure(0, weight=1)
 
-       
         infos, icon = self.extract_file_info(file_path)
         label = CTkLabel(
-            file_frame,  
+            file_frame,
             text=infos,
             image=icon,
             font=bold12,
-            text_color="#C0C0C0",
+            text_color="#948C7E",
             compound="left",
             anchor="w",
             padx=10,
             pady=5,
             justify="left",
         )
-        label.pack(side="left", fill="x", expand=True)
+        label.grid(row=0, column=0, sticky="ew")
+
+        # Button row — right-aligned
+        btn_frame = CTkFrame(file_frame, fg_color="transparent")
+        btn_frame.grid(row=0, column=1, padx=(0, 8), pady=4, sticky="e")
+
+        # Edit button — opens per-file settings dialog
+        edit_btn = CTkButton(
+            btn_frame,
+            text="Edit",
+            width=72,
+            height=24,
+            font=bold11,
+            fg_color="#1A1408",
+            hover_color="#2A200A",
+            text_color="#D49A2A",
+            border_color="#8C6418",
+            border_width=1,
+            corner_radius=5,
+            command=lambda path=file_path: self.open_edit_dialog(path)
+        )
+        edit_btn.pack(side="left", padx=(0, 4))
 
         global preview_button
         preview_button = CTkButton(
-            file_frame,
+            btn_frame,
             text="Preview",
-            width=80,
+            width=72,
             height=24,
             font=bold11,
+            fg_color="#0E0E0C",
+            hover_color="#181612",
+            text_color="#948C7E",
+            border_color="#201E1A",
+            border_width=1,
+            corner_radius=5,
             command=lambda path=file_path: self.preview_file(path)
         )
-        preview_button.pack(side="right", padx=(0, 10))
+        preview_button.pack(side="left", padx=(0, 4))
 
         delete_btn = CTkButton(
-            file_frame,
+            btn_frame,
             text="Delete",
-            width=80,
+            width=72,
             height=24,
             font=bold11,
-            fg_color="#282828",
-            text_color="#E0E0E0",
-            border_color="#FF3131",
+            fg_color="#160808",
+            hover_color="#220C0C",
+            text_color="#C04040",
+            border_color="#EC1D1D",
             border_width=1,
+            corner_radius=5,
             command=lambda path=file_path: self.delete_single_file(path)
         )
-        delete_btn.pack(side="right", padx=(0, 10))
+        delete_btn.pack(side="left")
 
         return file_frame
 
 
 
-    def delete_single_file(self, file_path):
-        global selected_file_list, preview_instance, original_preview, upscaled_preview
-        if file_path in selected_file_list:
-        
-            selected_file_list.remove(file_path)
-    
-            if preview_instance and preview_instance.video_path == file_path:
-                preview_instance.close()
-                preview_instance = None
-    
-                placeholder_img = create_placeholder_image(500, 2000)
-                placeholder_photo = CTkImage(placeholder_img, size=(500, 2000))
-                original_preview.configure(image=placeholder_photo)
-                upscaled_preview.configure(image=placeholder_photo)
-                original_preview.image = placeholder_photo
-                upscaled_preview.image = placeholder_photo
+    def open_edit_dialog(self, file_path):
+        """Open a per-file settings override dialog."""
+        global file_overrides
 
-  
-            self.clean_file_list()
+        dialog = CTkToplevel(self)
+        dialog.title(f"Edit: {os_path_basename(file_path)}")
+        dialog.geometry("380x340")
+        dialog.resizable(False, False)
+        dialog.configure(fg_color="#0A0A09")
+        dialog.grab_set()
+
+        ov = file_overrides.get(file_path, {})
+
+        CTkLabel(
+            dialog,
+            text="Per-file AI settings",
+            font=CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=AMBER, fg_color="transparent",
+        ).pack(pady=(12, 2))
+        CTkLabel(
+            dialog, text=os_path_basename(file_path),
+            font=CTkFont(family="Segoe UI", size=9),
+            text_color=CREAM3, fg_color="transparent",
+        ).pack(pady=(0, 10))
+
+        form = CTkFrame(dialog, fg_color="#0E0E0D", border_width=1, border_color=BORDER2, corner_radius=6)
+        form.pack(fill="x", padx=16, pady=4)
+
+        def make_row(label_text, widget_fn):
+            r = CTkFrame(form, fg_color="transparent")
+            r.pack(fill="x", padx=10, pady=4)
+            CTkLabel(r, text=label_text, width=120, anchor="w",
+                     font=CTkFont(family="Segoe UI", size=9, weight="bold"),
+                     text_color=AMBER_DIM, fg_color="transparent").pack(side="left")
+            w = widget_fn(r)
+            w.pack(side="left", padx=(6, 0))
+            return w
+
+        ai_var     = StringVar(value=ov.get("ai_model",     default_AI_model))
+        interp_var = StringVar(value=ov.get("interpolation", default_interpolation))
+        res_var    = StringVar(value=str(ov.get("resize_factor", selected_input_resize_factor.get())))
+        img_var    = StringVar(value=ov.get("image_ext",    default_image_extension))
+        vid_var    = StringVar(value=ov.get("video_ext",    default_video_extension))
+
+        make_row("AI Model",       lambda p: create_option_menu_2(lambda v: ai_var.set(v),     AI_models_list,       ai_var.get(),     master=p, width=200))
+        make_row("AI Interpolation", lambda p: create_option_menu_2(lambda v: interp_var.set(v), interpolation_list,  interp_var.get(), master=p, width=200))
+        make_row("Input Res %",    lambda p: CTkEntry(p, textvariable=res_var, width=200, height=26,
+                                                      font=CTkFont(family="Segoe UI", size=10),
+                                                      fg_color="#080808", border_color=BORDER2, border_width=1,
+                                                      text_color=CREAM2, corner_radius=4))
+        make_row("Image Codec",    lambda p: create_option_menu_2(lambda v: img_var.set(v),    image_extension_list, img_var.get(),    master=p, width=200))
+        make_row("Video Codec",    lambda p: create_option_menu_2(lambda v: vid_var.set(v),    video_extension_list, vid_var.get(),    master=p, width=200))
+
+        def save_and_close():
+            interp_map = {"Disabled": 0, "Low": 0.3, "Medium": 0.5, "High": 0.7}
+            try:   rf = int(float(res_var.get()))
+            except: rf = int(float(selected_input_resize_factor.get()))
+            file_overrides[file_path] = {
+                "ai_model":      ai_var.get(),
+                "interpolation": interp_var.get(),
+                "interp_factor": interp_map.get(interp_var.get(), 0),
+                "resize_factor": rf,
+                "image_ext":     img_var.get(),
+                "video_ext":     vid_var.get(),
+            }
+            update_file_widget(1, 2, 3)
+            dialog.destroy()
+
+        def clear_and_close():
+            file_overrides.pop(file_path, None)
+            update_file_widget(1, 2, 3)
+            dialog.destroy()
+
+        btn_row = CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(pady=12)
+
+        CTkButton(btn_row, text="Save", width=110, height=28, command=save_and_close,
+                  fg_color=AMBER_GLOW, hover_color="#5a3c0c", text_color=AMBER,
+                  border_color=AMBER_DIM, border_width=1, corner_radius=5,
+                  font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        ).pack(side="left", padx=6)
+
+        CTkButton(btn_row, text="Reset to global", width=130, height=28, command=clear_and_close,
+                  fg_color="#0E0E0C", hover_color="#181612", text_color=CREAM2,
+                  border_color=BORDER2, border_width=1, corner_radius=5,
+                  font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        ).pack(side="left", padx=6)
+
+
+    def delete_single_file(self, file_path):
+        global selected_file_list, preview_instance, file_widget
+
+        if file_path not in selected_file_list:
+            return
+
+        selected_file_list.remove(file_path)
+        self.file_list = selected_file_list
+        # Remove any per-file override for the deleted file
+        file_overrides.pop(file_path, None)
+
+        if preview_instance and preview_instance.video_path == file_path:
+            try:
+                preview_instance.close()
+            except Exception:
+                pass
+            preview_instance = None
+
+        if not selected_file_list:
+            # No files left — destroy widget entirely, reset the preview area
+            # Do NOT call _destroy_() to avoid double-clearing the list
+            try:
+                file_widget.destroy()
+            except Exception:
+                pass
+            del file_widget
+            place_loadFile_section(window)
+            # Re-show the empty-state hint
+            try:
+                app.file_list_bg.lift()
+                app._empty_state_frame.lift()
+            except Exception:
+                pass
+        else:
+            # Rebuild rows inside the existing scrollable frame (keeps Empty LIST)
+            self.label_list = []
+            for widget in self.winfo_children():
+                widget.destroy()
             self._create_widgets()
             update_file_widget(1, 2, 3)
-
-
-            if not selected_file_list:
-                if hasattr(self, 'file_widget'):
-                    self.file_widget.destroy()
-                if hasattr(self, 'preview_frame'):
-                    self.preview_frame.destroy()
-                    place_loadFile_section(window) 
             
 
 
 
 
     def preview_file(self, file_path):
-        global preview_instance, container, original_preview, upscaled_preview,shared_view_mode_var
+        global preview_instance, container
 
         if preview_instance:
             preview_instance.close()
             preview_instance = None
 
-   
-        preview_instance = VideoPreview(container, original_preview, upscaled_preview, file_path)
+        preview_instance = VideoPreview(container, None, None, file_path)
         preview_button.configure(state=DISABLED)
-        #didrik
   
     
 
@@ -4662,16 +5339,20 @@ class FileWidget(CTkScrollableFrame):
             font         = bold11,
             text         = "Empty LIST", 
             compound     = "left",
-            width        = 100, 
-            height       = 20,
+            width        = 120, 
+            height       = 22,
             border_width = 1,
-            fg_color     = "#282828",
-            text_color   = "#E0E0E0",
-            border_color = "#0096FF"
+            fg_color     = "#1A1408",
+            hover_color  = "#2A200A",
+            text_color   = AMBER,
+            border_color = AMBER_DIM,
+            corner_radius= 5,
             )
 
         button.configure(command=lambda: self._destroy_())
-        button.grid(row = 0, column=2, pady=(7, 7), padx = (0, 7))
+        # Place in column 0 with east-anchor so file-row frames can stretch
+        # to the full scrollable-frame width without any adjacent column stealing space.
+        button.grid(row=0, column=0, sticky="e", pady=(7, 7), padx=(0, 7))
         
     @cache
     def extract_file_icon(self, file_path) -> CTkImage:
@@ -4679,9 +5360,22 @@ class FileWidget(CTkScrollableFrame):
 
         if check_if_file_is_video(file_path):
             video_cap   = opencv_VideoCapture(file_path)
-            _, frame    = video_cap.read()
-            source_icon = opencv_cvtColor(frame, COLOR_BGR2RGB)
+            total_frames = int(video_cap.get(CAP_PROP_FRAME_COUNT))
+            # Seek to 10% into the video to avoid black/empty opening frames
+            seek_frame = max(1, int(total_frames * 0.10))
+            video_cap.set(cv2.CAP_PROP_POS_FRAMES, seek_frame)
+            success, frame = video_cap.read()
+            # Fallback: try a few more positions if still black
+            if not success or frame is None or frame.max() < 10:
+                for pct in [0.25, 0.5, 0.01]:
+                    video_cap.set(cv2.CAP_PROP_POS_FRAMES, max(1, int(total_frames * pct)))
+                    success, frame = video_cap.read()
+                    if success and frame is not None and frame.max() >= 10:
+                        break
             video_cap.release()
+            if not success or frame is None:
+                frame = numpy_zeros((50, 50, 3), dtype=uint8)
+            source_icon = opencv_cvtColor(frame, COLOR_BGR2RGB)
         else:
             source_icon = opencv_cvtColor(image_read(file_path), COLOR_BGR2RGB)
 
@@ -4814,32 +5508,24 @@ def update_file_widget(a, b, c) -> None:
     
 
 def create_info_button(
-        command: Callable, 
+        command: Callable,
         text: str,
         width: int = 150,
         master=None
         ) -> CTkButton:
-     
-    bg_image = Image.open(find_by_relative_path("Assets" + os_separator + "1.jpg"))
-    bg_image = bg_image.resize((width, 22))  
-    bg_image_ctk = CTkImage(bg_image)
-
-    
     return CTkButton(
-         master=master if master else window, 
-        command = command,
-        text          = text,
+        master        = master if master else window,
+        command       = command,
+        text          = "● " + text,
         fg_color      = "transparent",
-        hover_color   = "black",
-        text_color    = text_color,
-        anchor        = "center",
-        corner_radius = 10,
-        height        = 14,
+        hover_color   = "#181410",
+        text_color    = "#5A5248",
+        anchor        = "w",
+        corner_radius = 0,
+        height        = 20,
         width         = width,
-        font          = bold12,
-        image         = bg_image_ctk,
-        border_width  = 1.2,
-        border_color  = "black" ,
+        font          = CTkFont(family="Segoe UI", size=8, weight="bold"),
+        border_width  = 0,
     )
 
 
@@ -4875,79 +5561,76 @@ def create_option_menu(
 
 
 def create_option_menu_2(
-        command: Callable, 
+        command: Callable,
         values: list,
         default_value: str,
         width: int = 330,
-        master=None  
+        master=None
         ) -> CTkFrame:
-    
-
     option_menu_frame = CTkFrame(
-        master=master, 
-        width=width, 
-        height=40, 
-        border_width=1.2,  
-        border_color="black",  
-        corner_radius=5
+        master=master,
+        width=width,
+        height=36,
+        border_width=1,
+        border_color=BORDER2,
+        corner_radius=6,
+        fg_color="#0B0B0A",
     )
-
-
     option_menu = CTkOptionMenu(
-        master=option_menu_frame, 
+        master=option_menu_frame,
         command=command,
         values=values,
         width=width,
-        height=30,
+        height=28,
         corner_radius=5,
-        dropdown_font=bold11,
-        font=bold11,
+        dropdown_font=CTkFont(family="Segoe UI", size=10),
+        font=CTkFont(family="Segoe UI", size=11, weight="bold"),
         anchor="center",
-        text_color=text_color,
-        fg_color=widget_background_color,
-        button_color=widget_background_color,
-        button_hover_color="#282828",
-        dropdown_fg_color="black"
+        text_color=CREAM,
+        fg_color="#0B0B0A",
+        button_color="#181410",
+        button_hover_color="#22201C",
+        dropdown_fg_color="#0E0E0C",
+        dropdown_text_color=CREAM2,
+        dropdown_hover_color="#181410",
     )
     option_menu.set(default_value)
-
     option_menu_frame.pack_propagate(False)
-    option_menu.place(relx=0.5, rely=0.5, anchor="center")  
-
-    return option_menu_frame  
-
+    option_menu.place(relx=0.5, rely=0.5, anchor="center")
+    return option_menu_frame
 
 
-def create_text_box(textvariable: StringVar,master=None) -> CTkEntry:
+
+def create_text_box(textvariable: StringVar, master=None, width=150) -> CTkEntry:
     return CTkEntry(
-        master=master if master else window,        
+        master        = master if master else window,
         textvariable  = textvariable,
         corner_radius = 5,
-        width         = 150,
+        width         = width,
         height        = 30,
-        font          = bold11,
+        font          = CTkFont(family="Segoe UI", size=12, weight="bold"),
         justify       = "center",
-        text_color    = text_color,
-        fg_color      = widget_background_color,
+        text_color    = CREAM,
+        fg_color      = "#0B0B0A",
         border_width  = 1,
-        border_color  = "black",  
+        border_color  = BORDER2,
     )
 
 
 
 def create_text_box_output_path(textvariable: StringVar, width=None) -> CTkEntry:
     return CTkEntry(
-        master        = window, 
+        master        = window,
         textvariable  = textvariable,
         border_width  = 1,
         corner_radius = 5,
         width         = width if width != None else 225,
         height        = 25,
-        font          = bold11,
+        font          = CTkFont(family="Segoe UI", size=9),
         justify       = "center",
-        text_color    = "#C0C0C0",
-        fg_color      = "#000000",
-        border_color  = "blue",
+        text_color    = CREAM3,
+        fg_color      = "#0A0A09",
+        border_color  = BORDER2,
         state         = DISABLED
     )
 
@@ -4959,22 +5642,30 @@ def create_active_button(
         icon: CTkImage = None,
         width: int = 140,
         height: int = 30,
-        border_color: str = "#0096FF"
+        border_color: str = AMBER
         ) -> CTkButton:
-    
+    is_stop    = (border_color == "#EC1D1D")
+    is_select  = (text == "SELECT")
+    if is_stop:
+        bg   = "#160808"; hov = "#220C0C"; tc = "#E04040"; bc = "#EC1D1D"
+    elif is_select:
+        bg   = "#0E0E0C"; hov = "#181612"; tc = CREAM2;    bc = "#FFFFFF"
+    else:
+        bg   = "#0E0E0C"; hov = "#181612"; tc = CREAM2;    bc = "#FFFFFF"
     return CTkButton(
-        master     = window, 
-        command    = command,
-        text       = text,
-        image      = icon,
-        width      = width,
-        height     = height,
-        font         = bold11,
-        border_width = 1,
-        fg_color     = widget_background_color,
-        hover_color  = "#282828",  # Lysere grå ved hover
-        text_color   = "white",
-        border_color = border_color
+        master        = window,
+        command       = command,
+        text          = text,
+        image         = icon,
+        width         = width,
+        height        = height,
+        font          = CTkFont(family="Segoe UI", size=11, weight="bold"),
+        border_width  = 1,
+        fg_color      = bg,
+        hover_color   = hov,
+        text_color    = tc,
+        border_color  = bc,
+        corner_radius = 7,
     )
 
 
@@ -5610,7 +6301,8 @@ def upscale_button_command() -> None:
                 selected_interpolation_factor,
                 selected_AI_multithreading,
                 selected_keep_frames,
-                selected_audio_mode 
+                selected_audio_mode,
+                dict(file_overrides),   # pass a copy of per-file overrides
             )
         )
         process_upscale_orchestrator.start()
@@ -5634,38 +6326,67 @@ def upscale_orchestrator(
         selected_interpolation_factor: float,
         selected_AI_multithreading: int,
         selected_keep_frames: bool,
-        selected_audio_mode: str
+        selected_audio_mode: str,
+        file_overrides: dict = None
         ) -> None:
 
+    if file_overrides is None:
+        file_overrides = {}
+
     write_process_status(processing_queue, f"Loading AI model")
+
+    # Build a default AI instance (used for files without per-file overrides)
     AI_instance = AI(selected_AI_model, selected_gpu, input_resize_factor, tiles_resolution)
-    AI_instance_list = []
-    AI_instance_list.append(AI_instance)
+    AI_instance_list = [AI_instance]
 
     if selected_AI_multithreading > 1:
         for _ in range(selected_AI_multithreading - 1):
-            AI_instance_list.append(AI(selected_AI_model, selected_gpu, input_resize_factor,  tiles_resolution))
+            AI_instance_list.append(AI(selected_AI_model, selected_gpu, input_resize_factor, tiles_resolution))
+
+    # Cache of (model, resize_factor) -> AI instance to avoid reloading the same model
+    _ai_cache = {(selected_AI_model, input_resize_factor): AI_instance}
 
     try:
-
         how_many_files = len(selected_file_list)
         for file_number in range(how_many_files):
             file_path   = selected_file_list[file_number]
             file_number = file_number + 1
 
+            # Resolve per-file settings (fall back to global when not overridden)
+            ov = file_overrides.get(file_path, {})
+            f_ai_model    = ov.get("ai_model",      selected_AI_model)
+            f_resize      = ov.get("resize_factor",  input_resize_factor)
+            f_interp      = ov.get("interp_factor",  selected_interpolation_factor)
+            f_image_ext   = ov.get("image_ext",      selected_image_extension)
+            f_video_ext   = ov.get("video_ext",      selected_video_extension)
+
+            # Re-use or create a per-file AI instance
+            cache_key = (f_ai_model, f_resize)
+            if cache_key not in _ai_cache:
+                write_process_status(processing_queue, f"Loading model {f_ai_model}")
+                _ai_cache[cache_key] = AI(f_ai_model, selected_gpu, f_resize, tiles_resolution)
+            f_ai_instance      = _ai_cache[cache_key]
+            f_ai_instance_list = [f_ai_instance]
+            if selected_AI_multithreading > 1:
+                for _ in range(selected_AI_multithreading - 1):
+                    sub_key = (f_ai_model, f_resize, _)
+                    if sub_key not in _ai_cache:
+                        _ai_cache[sub_key] = AI(f_ai_model, selected_gpu, f_resize, tiles_resolution)
+                    f_ai_instance_list.append(_ai_cache[sub_key])
+
             if check_if_file_is_video(file_path):
                 upscale_video(
                     processing_queue,
-                    file_path, 
+                    file_path,
                     file_number,
-                    selected_output_path, 
-                    AI_instance,
-                    AI_instance_list,
-                    selected_AI_model,
-                    input_resize_factor,
-                    cpu_number, 
-                    selected_video_extension, 
-                    selected_interpolation_factor,
+                    selected_output_path,
+                    f_ai_instance,
+                    f_ai_instance_list,
+                    f_ai_model,
+                    f_resize,
+                    cpu_number,
+                    f_video_ext,
+                    f_interp,
                     selected_AI_multithreading,
                     selected_keep_frames,
                     selected_audio_mode
@@ -5673,14 +6394,14 @@ def upscale_orchestrator(
             else:
                 upscale_image(
                     processing_queue,
-                    file_path, 
+                    file_path,
                     file_number,
                     selected_output_path,
-                    AI_instance,
-                    selected_AI_model,
-                    selected_image_extension, 
-                    input_resize_factor, 
-                    selected_interpolation_factor
+                    f_ai_instance,
+                    f_ai_model,
+                    f_image_ext,
+                    f_resize,
+                    f_interp
                 )
 
         write_process_status(processing_queue, f"{COMPLETED_STATUS}")
@@ -6071,6 +6792,63 @@ def get_upscale_factor() -> int:
 
 
 
+def add_files_from_drop(drop_data: str) -> None:
+    """Parse a TkinterDnD drop event data string and add valid files to the list."""
+    global selected_file_list, file_widget
+
+    # tkinterdnd2 wraps paths with braces when they contain spaces
+    import re
+    raw = drop_data.strip()
+    # Extract paths: either {path with spaces} or plain/path
+    paths = re.findall(r'\{([^}]+)\}|(\S+)', raw)
+    parsed = [a or b for a, b in paths]
+
+    supported = [
+        p for p in parsed
+        if os_path_exists(p) and any(p.lower().endswith(ext.lower()) for ext in supported_file_extensions)
+    ]
+
+    if not supported:
+        info_message.set("No supported files in drop")
+        return
+
+    new_files = [f for f in supported if f not in selected_file_list]
+    if not new_files:
+        info_message.set("Files already loaded")
+        return
+
+    widget_exists = 'file_widget' in globals() and globals()['file_widget'].winfo_exists()
+
+    for f in new_files:
+        selected_file_list.append(f)
+
+    if widget_exists:
+        next_row = 1 + len(selected_file_list) - len(new_files)
+        for f in new_files:
+            row_frame = file_widget.add_file_information(f, next_row)
+            file_widget.label_list.append(row_frame)
+            next_row += 1
+        file_widget.file_list = selected_file_list
+    else:
+        upscale_factor = get_values_for_file_widget()
+        file_widget = FileWidget(
+            master             = window,
+            selected_file_list = selected_file_list,
+            upscale_factor     = upscale_factor,
+            fg_color           = background_color,
+            bg_color           = background_color,
+        )
+        file_widget.place(relx=0.22, rely=0.186, relwidth=0.33, relheight=0.814)
+
+    if file_list_update_callback:
+        file_list_update_callback()
+    if media_info_update_callback:
+        media_info_update_callback()
+
+    update_file_widget(1, 2, 3)
+    info_message.set("Ready")
+
+
 def open_files_action():
     global selected_file_list  
     def check_supported_selected_files(uploaded_file_list: list) -> list:
@@ -6086,32 +6864,45 @@ def open_files_action():
     
     logging.info("> Uploaded files: " + str(uploaded_files_counter) + " => Supported files: " + str(supported_files_counter))
 
+    global file_widget
+
     if supported_files_counter > 0:
-        if supported_files_list:
+        new_files = [f for f in supported_files_list if f not in selected_file_list]
 
-                selected_file_list = supported_files_list
-                if file_list_update_callback:
-                    file_list_update_callback()
+        if new_files:
+            widget_exists = 'file_widget' in globals() and globals()['file_widget'].winfo_exists()
 
-                if media_info_update_callback:
-                    media_info_update_callback()
+            for f in new_files:
+                selected_file_list.append(f)
 
-                
-                update_file_widget(1, 2, 3)  
-        upscale_factor = get_values_for_file_widget()
+            if widget_exists:
+                # Append only new rows - no full rebuild, no shaking
+                next_row = 1 + len(selected_file_list) - len(new_files)
+                for f in new_files:
+                    row_frame = file_widget.add_file_information(f, next_row)
+                    file_widget.label_list.append(row_frame)
+                    next_row += 1
+                file_widget.file_list = selected_file_list
+            else:
+                upscale_factor = get_values_for_file_widget()
+                file_widget = FileWidget(
+                    master               = window,
+                    selected_file_list   = selected_file_list,
+                    upscale_factor       = upscale_factor,
+                    fg_color             = background_color,
+                    bg_color             = background_color
+                )
+                file_widget.place(relx = 0.22, rely = 0.186, relwidth = 0.33, relheight = 0.814)
 
-        global file_widget
-        file_widget = FileWidget(
-            master               = window, 
-            selected_file_list   = supported_files_list,
-            upscale_factor       = upscale_factor,
-            fg_color             = background_color, 
-            bg_color             = background_color
-        )
-        file_widget.place(relx = 0.0, rely = 0.0, relwidth = 0.555, relheight = 0.42)
+            if file_list_update_callback:
+                file_list_update_callback()
+            if media_info_update_callback:
+                media_info_update_callback()
+
+            update_file_widget(1, 2, 3)
 
         info_message.set("Ready")
-    else: 
+    else:
         info_message.set("Not supported files :(")
     
 
@@ -6513,37 +7304,94 @@ def place_input_output_resolution_textboxs():
 
 
 def place_output_path_textbox():
-    output_path_textbox = create_text_box_output_path(selected_output_path, width=150) 
-    select_output_path_button = create_active_button(command = open_output_path_action, text = "SELECT",  width   = 85, height  = 25)
-    
-    output_path_textbox.place(relx = column1_5_x - 0.57, rely  = row0_y - 0.08, anchor = "center",)
-    select_output_path_button.place(relx = column2_x - 0.645, rely  = row0_y - 0.08, anchor = "center")
+    # Row 1, cols 0-1: Output Path + Image/Video format selectors (merged)
+    outer = CTkFrame(controls_grid, fg_color=PANEL2_BG,
+                     border_width=1, border_color=BORDER2, corner_radius=5)
+    outer.grid(row=1, column=0, columnspan=2, padx=3, pady=3, sticky="nsew")
+    outer.columnconfigure(0, weight=0)
+    outer.columnconfigure(1, weight=1)
+    outer.columnconfigure(2, weight=1)
+    outer.rowconfigure(0, weight=0)
+    outer.rowconfigure(1, weight=0)
+    outer.rowconfigure(2, weight=0)
+
+    path_lbl = CTkButton(
+        outer, text="● Output Path", command=open_info_output_path,
+        fg_color="transparent", hover_color="#181410",
+        text_color=AMBER_DIM, height=14,
+        font=CTkFont(family="Segoe UI", size=8, weight="bold"),
+        border_width=0, anchor="center",
+    )
+    path_lbl.grid(row=0, column=0, columnspan=3, sticky="ew", padx=4, pady=(4, 1))
+
+    output_path_textbox = CTkEntry(
+        outer, textvariable=selected_output_path,
+        border_width=1, corner_radius=5, height=22,
+        font=CTkFont(family="Segoe UI", size=9),
+        justify="center", text_color=CREAM3,
+        fg_color="#0A0A09", border_color=BORDER2, state=DISABLED,
+    )
+    output_path_textbox.grid(row=1, column=0, columnspan=3, sticky="ew", padx=4, pady=(1, 2))
+
+    # Image sub-column
+    img_col = CTkFrame(outer, fg_color="transparent")
+    img_col.grid(row=2, column=1, padx=(4, 2), pady=(0, 4), sticky="ew")
+    CTkLabel(img_col, text="Image", font=CTkFont(family="Segoe UI", size=7),
+             text_color=CREAM3, fg_color="transparent").pack()
+    img_menu = create_option_menu_2(select_image_extension_from_menu,
+                                    image_extension_list, default_image_extension,
+                                    master=img_col, width=68)
+    img_menu.pack(fill="x")
+
+    # Video sub-column
+    vid_col = CTkFrame(outer, fg_color="transparent")
+    vid_col.grid(row=2, column=2, padx=(2, 4), pady=(0, 4), sticky="ew")
+    CTkLabel(vid_col, text="Video", font=CTkFont(family="Segoe UI", size=7),
+             text_color=CREAM3, fg_color="transparent").pack()
+    vid_menu = create_option_menu_2(select_video_extension_from_menu,
+                                    video_extension_list, default_video_extension,
+                                    master=vid_col, width=88)
+    vid_menu.pack(fill="x")
 
 
 
 def place_AI_menu():
-    AI_menu_frame = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
-    AI_menu_frame.place(relx=column0_x - 0.1235, rely=row1_y - 0.111, anchor="center")
+    # Row 0, col 0
+    frame = CTkFrame(controls_grid, fg_color=PANEL2_BG,
+                     border_width=1, border_color=BORDER2, corner_radius=5)
+    frame.grid(row=0, column=0, padx=3, pady=3, sticky="nsew")
 
+    CTkButton(
+        frame, text="● AI Model", command=open_info_AI_model,
+        fg_color="transparent", hover_color="#181410",
+        text_color=AMBER_DIM, height=14,
+        font=CTkFont(family="Segoe UI", size=8, weight="bold"),
+        border_width=0, anchor="center",
+    ).pack(fill="x", padx=4, pady=(4, 1))
 
-    AI_menu_button = create_info_button(open_info_AI_model, "AI model", width=335,master=AI_menu_frame)
-    AI_menu = create_option_menu_2(select_AI_from_menu, AI_models_list, default_AI_model,master=AI_menu_frame)
-    AI_menu.configure(width=335)
-
-    AI_menu_button.place(relx=0.5, rely=0.25, anchor="center") 
-    AI_menu.place(relx=0.5, rely=0.65, anchor="center") 
+    AI_menu = create_option_menu_2(select_AI_from_menu, AI_models_list,
+                                   default_AI_model, master=frame, width=108)
+    AI_menu.pack(fill="x", padx=4, pady=(0, 4))
 
 
 
 def place_AI_interpolation_menu():
-    AI_interpolation_frame = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
-    AI_interpolation_frame.place(relx=column0_x - 0.1235, rely=row1_y - 0.022, anchor="center")
+    # Row 0, col 1
+    frame = CTkFrame(controls_grid, fg_color=PANEL2_BG,
+                     border_width=1, border_color=BORDER2, corner_radius=5)
+    frame.grid(row=0, column=1, padx=3, pady=3, sticky="nsew")
 
-    interpolation_button = create_info_button(open_info_AI_interpolation, "AI Interpolation",width=335,master=AI_interpolation_frame)
-    interpolation_menu   = create_option_menu_2(select_interpolation_from_menu, interpolation_list, default_interpolation,master=AI_interpolation_frame)
-    
-    interpolation_button.place(relx=0.5, rely=0.25, anchor="center")
-    interpolation_menu.place(relx=0.5, rely=0.65, anchor="center")
+    CTkButton(
+        frame, text="● AI Interp.", command=open_info_AI_interpolation,
+        fg_color="transparent", hover_color="#181410",
+        text_color=AMBER_DIM, height=14,
+        font=CTkFont(family="Segoe UI", size=8, weight="bold"),
+        border_width=0, anchor="center",
+    ).pack(fill="x", padx=4, pady=(4, 1))
+
+    menu = create_option_menu_2(select_interpolation_from_menu, interpolation_list,
+                                default_interpolation, master=frame, width=108)
+    menu.pack(fill="x", padx=4, pady=(0, 4))
  
 
 
@@ -6551,14 +7399,22 @@ def place_AI_interpolation_menu():
 
     
 def place_Audio_Selection_menu():
-    audio_mode_frame = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
-    audio_mode_frame.place(relx=column0_x - 0.1235, rely=row1_y + 0.068, anchor="center")
+    # Row 0, col 2
+    frame = CTkFrame(controls_grid, fg_color=PANEL2_BG,
+                     border_width=1, border_color=BORDER2, corner_radius=5)
+    frame.grid(row=0, column=2, padx=3, pady=3, sticky="nsew")
 
-    audio_mode_button = create_info_button(open_info_audio_mode,"Audio Mode",width=335,master=audio_mode_frame)
-    Audio_mode_menu = create_option_menu_2(select_audio_mode_from_menu,audio_mode_list,default_audio_mode,master=audio_mode_frame)
-  
-    audio_mode_button.place(relx=0.5, rely=0.25, anchor="center")
-    Audio_mode_menu.place(relx=0.5, rely=0.65, anchor="center")
+    CTkButton(
+        frame, text="● Audio Mode", command=open_info_audio_mode,
+        fg_color="transparent", hover_color="#181410",
+        text_color=AMBER_DIM, height=14,
+        font=CTkFont(family="Segoe UI", size=8, weight="bold"),
+        border_width=0, anchor="center",
+    ).pack(fill="x", padx=4, pady=(4, 1))
+
+    menu = create_option_menu_2(select_audio_mode_from_menu, audio_mode_list,
+                                default_audio_mode, master=frame, width=108)
+    menu.pack(fill="x", padx=4, pady=(0, 4))
 
 
 
@@ -6574,97 +7430,125 @@ def place_keep_frames_menu():
 
 
 def place_image_output_menu():
-    file_extension_video_extension_button_menu = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
-    file_extension_video_extension_button_menu.place(relx=column0_x - 0.1235, rely=row1_y + 0.157, anchor="center")
-
-    file_extension_button = create_info_button(open_info_image_output, "Image output",master=file_extension_video_extension_button_menu,width=165)
-    file_extension_menu   = create_option_menu_2(select_image_extension_from_menu, image_extension_list, default_image_extension,master=file_extension_video_extension_button_menu,width=165)
-    
-    video_extension_button = create_info_button(open_info_video_extension, "Video output",master=file_extension_video_extension_button_menu,width=165)
-    video_extension_menu   = create_option_menu_2(select_video_extension_from_menu, video_extension_list, default_video_extension,master=file_extension_video_extension_button_menu,width=165)
-    
- 
-    video_extension_menu.place(relx=0.5, rely=0.75, anchor="w")
-    file_extension_menu.place(relx=0.5, rely=0.75, anchor="e")
-    video_extension_button.place(relx=0.5, rely=0.40, anchor="w")
-    file_extension_button.place(relx=0.5, rely=0.40, anchor="e")
+    pass  # now merged into place_output_path_textbox (row 1, cols 0-1)
 
 
 
 def place_input_resolution_textbox():
-    resize_factor_frame = CTkFrame(window, border_width=2, border_color="blue", corner_radius=10, height=90, width=350)
-    resize_factor_frame.place(relx=column0_x - 0.1235, rely=row1_y + 0.247, anchor="center")
-    resize_factor_button  = create_info_button(open_info_input_resolution, "Input resolution %",master=resize_factor_frame)
-    resize_factor_textbox = create_text_box(selected_input_resize_factor,master=resize_factor_frame) 
+    # Row 0, col 3
+    frame = CTkFrame(controls_grid, fg_color=PANEL2_BG,
+                     border_width=1, border_color=BORDER2, corner_radius=5)
+    frame.grid(row=0, column=3, padx=3, pady=3, sticky="nsew")
 
-    resize_factor_button.place(relx=0.5, rely=0.25, anchor="center")
-    resize_factor_textbox.place(relx=0.5, rely=0.65, anchor="center")
+    CTkButton(
+        frame, text="● Input Res %", command=open_info_input_resolution,
+        fg_color="transparent", hover_color="#181410",
+        text_color=AMBER_DIM, height=14,
+        font=CTkFont(family="Segoe UI", size=8, weight="bold"),
+        border_width=0, anchor="center",
+    ).pack(fill="x", padx=4, pady=(4, 1))
+
+    tb = create_text_box(selected_input_resize_factor, master=frame, width=75)
+    tb.pack(fill="x", padx=4, pady=(0, 4))
 
 
 
 def place_upscale_button(): 
-    upscale_button = create_active_button(
-        command = upscale_button_command,
-        text    = "UPSCALE",
-        icon    = upscale_icon,
-        width   = 140,
-        height  = 30
+    global upscale_slot_frame
+    # Clear previous UPSCALE/STOP widget
+    for w in upscale_slot_frame.winfo_children():
+        w.destroy()
+
+    upscale_button = CTkButton(
+        master=upscale_slot_frame,
+        command=upscale_button_command,
+        text="UPSCALE",
+        image=upscale_icon,
+        width=120, height=30,
+        font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        border_width=1,
+        fg_color=AMBER_GLOW,
+        hover_color="#5a3c0c",
+        text_color=AMBER,
+        border_color=AMBER_DIM,
+        corner_radius=6,
     )
-    upscale_button.place(relx=column0_x - 0.08, rely=row1_y + 0.345, anchor="center")
+    upscale_button.pack(side="left", padx=3)
     upscale_button.lift()
 
 def place_stop_button(): 
-    stop_button = create_active_button(
-        command = stop_button_command,
-        text    = "STOP",
-        icon    = stop_icon,
-        width   = 140,
-        height  = 30,
-        border_color = "#EC1D1D"
-    )
-    stop_button.place(relx=column0_x - 0.16 , rely=row1_y + 0.315, anchor="center")
+    global upscale_slot_frame
+    # Clear previous UPSCALE/STOP widget
+    for w in upscale_slot_frame.winfo_children():
+        w.destroy()
 
+    stop_button = CTkButton(
+        master=upscale_slot_frame,
+        command=stop_button_command,
+        text="STOP",
+        image=stop_icon,
+        width=110, height=26,
+        font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        border_width=1,
+        fg_color="#160808",
+        hover_color="#220C0C",
+        text_color="#E04040",
+        border_color="#EC1D1D",
+        corner_radius=6,
+    )
+    stop_button.pack(side="left", padx=2)
 
 
 def place_message_label():
+    global input_file_button, upscale_slot_frame
+
+    # Row 1, cols 2-3: Welcome message + SELECT FILES + UPSCALE buttons
+    action_frame = CTkFrame(controls_grid, fg_color=PANEL2_BG,
+                            border_width=1, border_color=BORDER2, corner_radius=5)
+    action_frame.grid(row=1, column=2, columnspan=2, padx=3, pady=3, sticky="nsew")
+
     message_label = CTkLabel(
-        master  = window, 
-        textvariable = info_message,
-        height       = 25,
-        font         = bold11,
-        fg_color     = "#ffbf00",
-        text_color   = "#000000",
-        anchor       = "center",
-        corner_radius = 12
+        master=action_frame,
+        textvariable=info_message,
+        height=22,
+        font=CTkFont(family="Segoe UI", size=14, weight="bold"),
+        fg_color="transparent",
+        text_color=CREAM2,
+        anchor="center",
     )
-    message_label.place(relx=column0_x - 0.08, rely=row1_y + 0.31, anchor="center")
+    message_label.pack(pady=(8, 4))
 
+    btns_row = CTkFrame(action_frame, fg_color="transparent")
+    btns_row.pack(pady=(0, 8), anchor="center")
 
-    global input_file_button
     input_file_button = CTkButton(
-        master = window,
-        command  = open_files_action,
-        text     = "SELECT FILES",
-        width    = 140,
-        height   = 30,
-        font     = bold11,
-        border_width = 1,
-        fg_color     = "#282828",
-        text_color   = "#E0E0E0",
-        border_color = "#0096FF"
-        )
-    input_file_button.place(relx=column0_x - 0.16 , rely=row1_y + 0.345, anchor="center")
+        master=btns_row,
+        command=open_files_action,
+        text="SELECT FILES",
+        width=114, height=30,
+        font=CTkFont(family="Segoe UI", size=10, weight="bold"),
+        border_width=1,
+        fg_color="#0E0E0C", hover_color="#181612",
+        text_color=CREAM2, border_color=BORDER3,
+        corner_radius=6,
+    )
+    input_file_button.pack(side="left", padx=4)
+
+    # Slot frame for UPSCALE / STOP toggle
+    upscale_slot_frame = CTkFrame(btns_row, fg_color="transparent")
+    upscale_slot_frame.pack(side="left", padx=4)
+    globals()['upscale_slot_frame'] = upscale_slot_frame
 
 
 
 
 def create_option_background():
     return CTkFrame(
-        master   = window,
-        bg_color = background_color,
-        fg_color = widget_background_color,
-        height   = 46,
-        corner_radius = 10
+        master        = window,
+        bg_color      = background_color,
+        fg_color      = PANEL2_BG,
+        height        = 46,
+        corner_radius = 8,
     )
 
 
@@ -6751,24 +7635,95 @@ class VideoEnhancer():
     def __init__(self, Master):
         #threading.Thread(target=load_model_async, daemon=True).start()
         self.toplevel_window = None
+        self._master = Master
         Master.protocol("WM_DELETE_WINDOW", on_app_close)
         Master.title('LearnReflect Video Enchancer')
-        screen_width = Master.winfo_screenwidth()
+        screen_width  = Master.winfo_screenwidth()
         screen_height = Master.winfo_screenheight()
-        window_width= int(screen_width * 0.85)
+        window_width  = int(screen_width  * 0.85)
         window_height = int(screen_height * 0.85)
-        x_offset = (screen_width - window_width) // 2
+        x_offset = (screen_width  - window_width)  // 2
         y_offset = (screen_height - window_height) // 2
-        Master.geometry(f"{window_width}x{window_height}+{x_offset}+{y_offset}")
-        Master.resizable(False, False)
+        # Store windowed geometry so we can restore it when leaving fullscreen
+        self._windowed_geometry = f"{window_width}x{window_height}+{x_offset}+{y_offset}"
+        Master.geometry(self._windowed_geometry)
+        Master.resizable(True, True)
+        # Start in fullscreen
+        Master.attributes("-fullscreen", True)
+        self._is_fullscreen = True
+        # F11 toggles fullscreen / windowed
+        Master.bind("<F11>", self._toggle_fullscreen)
+        # Escape also exits fullscreen (back to windowed)
+        Master.bind("<Escape>", self._exit_fullscreen)
         Master.iconbitmap(find_by_relative_path("Assets" + os_separator + "logo.ico"))
-        self.bg_image = CTkImage(Image.open(find_by_relative_path("Assets" + os_separator + "testbilde.png")), size=(1920, 1080))
-        self.background_label = CTkLabel(Master, image=self.bg_image, text="", fg_color="black")
-        self.background_label.place(relx=-0.1,rely=-0.22, relwidth=0.8, relheight=0.64) 
-        self.background_label.lower() 
+        # Background image hidden in new layout
+        # self.bg_image = CTkImage(...)
         load_cookie_file_path()
+
+        # ── Thin separator bar between left col and center col ──────────────
+        sep_left = CTkFrame(Master, fg_color=BORDER2, width=1, corner_radius=0)
+        sep_left.place(relx=0.22, rely=0.0, relwidth=0.001, relheight=1.0)
+
+        # ── Thin separator bar between center col (file list) and right col (preview) ──
+        sep_right = CTkFrame(Master, fg_color=BORDER2, width=1, corner_radius=0)
+        sep_right.place(relx=0.55, rely=0.0, relwidth=0.001, relheight=1.0)
+
+        # ── Controls bar (top of center column) ─────────────────────────────
+        global controls_bar_frame, controls_grid
+        self.controls_bar_frame = CTkFrame(
+            Master,
+            fg_color=PANEL2_BG,
+            corner_radius=0,
+            border_width=0,
+        )
+        self.controls_bar_frame.place(relx=0.22, rely=0.0, relwidth=0.33, relheight=0.185)
+        controls_bar_frame = self.controls_bar_frame
+
+        # ── 2-row x 4-col inner grid ─────────────────────────────────────────
+        controls_grid = CTkFrame(self.controls_bar_frame, fg_color="transparent")
+        controls_grid.pack(fill="both", expand=True, padx=5, pady=4)
+        for _c in range(4):
+            controls_grid.columnconfigure(_c, weight=1, uniform="cols")
+        controls_grid.rowconfigure(0, weight=1)
+        controls_grid.rowconfigure(1, weight=1)
+
+        # ── Thin bottom border for controls bar ─────────────────────────────
+        cb_border = CTkFrame(Master, fg_color=BORDER2, height=1, corner_radius=0)
+        cb_border.place(relx=0.22, rely=0.185, relwidth=0.33, relheight=0.001)
+
+        # ── Permanent file list area (visible even when no files are loaded) ─
+        self.file_list_bg = CTkFrame(
+            Master,
+            fg_color=PANEL_BG,
+            border_color=BORDER2,
+            border_width=1,
+            corner_radius=0,
+        )
+        self.file_list_bg.place(relx=0.22, rely=0.186, relwidth=0.33, relheight=0.814)
+
+        # ── Empty-state hint (visible until files are loaded) ─────────────
+        self._empty_state_frame = CTkFrame(
+            self.file_list_bg, fg_color="transparent"
+        )
+        self._empty_state_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        CTkLabel(
+            self._empty_state_frame,
+            text="🎞",
+            font=CTkFont(family="Segoe UI", size=28),
+            text_color=CREAM3,
+            fg_color="transparent",
+        ).pack()
+        CTkLabel(
+            self._empty_state_frame,
+            text="Drop files here or click SELECT FILES",
+            font=CTkFont(family="Segoe UI", size=11),
+            text_color=CREAM3,
+            fg_color="transparent",
+        ).pack(pady=(4, 0))
+
         self.ToolWindowClass = ToolWindowClass(Master)
-        load_model_inference()
+        #load_model_inference()
         place_loadFile_section(Master)
         place_output_path_textbox()
         place_AI_menu()
@@ -6779,11 +7734,25 @@ class VideoEnhancer():
         place_message_label()
         place_upscale_button()
         selected_VRAM_limiter.set(str(round(get_gpu_vram() / 1000)) if get_gpu_vram() else "4")
-    
- 
-    
-            
-        
+
+    # ── Fullscreen helpers ────────────────────────────────────────────
+    def _toggle_fullscreen(self, event=None):
+        """Toggle between fullscreen and windowed mode (F11)."""
+        if self._is_fullscreen:
+            self._exit_fullscreen()
+        else:
+            self._enter_fullscreen()
+
+    def _enter_fullscreen(self, event=None):
+        self._master.attributes("-fullscreen", True)
+        self._is_fullscreen = True
+
+    def _exit_fullscreen(self, event=None):
+        self._master.attributes("-fullscreen", False)
+        self._master.geometry(self._windowed_geometry)
+        self._is_fullscreen = False
+
+
 if __name__ == "__main__":
     #from Decryption import validate_jwt
     # if not validate_jwt():
@@ -6800,8 +7769,16 @@ if __name__ == "__main__":
 
  
     
-    window = CTk()
-    window.configure(fg_color="black")
+    if _TKDND_AVAILABLE:
+        # tkinterdnd2 + customtkinter: create a hybrid root that supports both
+        class _CTkDnD(CTk, _tkdnd.DnDWrapper):
+            def __init__(self, *args, **kwargs):
+                CTk.__init__(self, *args, **kwargs)
+                self.TkdndVersion = _tkdnd.DnDWrapper.tkdnd_init(self)
+        window = _CTkDnD()
+    else:
+        window = CTk()
+    window.configure(fg_color="#060606")
     youtube_progress_var = StringVar()
     processing_queue = multiprocessing_Queue(maxsize=1)
     info_message            = StringVar()
